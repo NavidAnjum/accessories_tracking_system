@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ED Module – Business Workflow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #F1F5F9;
+  padding: 56px 24px 72px;
+  color: #0F172A;
+}
+
+.page {
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+/* ── Header ── */
+.header {
+  text-align: center;
+  margin-bottom: 52px;
+}
+.header h1 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: #0F172A;
+}
+.header p {
+  font-size: 13px;
+  color: #64748B;
+  margin-top: 6px;
+  font-weight: 500;
+}
+.header-line {
+  width: 48px;
+  height: 3px;
+  background: #3B82F6;
+  border-radius: 2px;
+  margin: 14px auto 0;
+}
+
+/* ── Flow container ── */
+.flow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── Step card ── */
+.card {
+  width: 100%;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 6px 20px rgba(0,0,0,0.06);
+  padding: 18px 22px;
+  position: relative;
+  border-left: 5px solid;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+
+.badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.card-sub {
+  font-size: 12px;
+  color: #64748B;
+  line-height: 1.55;
+  padding-left: 2px;
+}
+
+/* card variants */
+.c-buyer    { border-left-color: #1E293B; }
+.b-buyer    { background: #1E293B; color: #fff; }
+
+.c-mkt      { border-left-color: #15803D; }
+.b-mkt      { background: #15803D; color: #fff; }
+
+.c-comm     { border-left-color: #1D4ED8; }
+.b-comm     { background: #1D4ED8; color: #fff; }
+
+.c-approval { border-left-color: #7C3AED; }
+.b-approval { background: #7C3AED; color: #fff; }
+
+.c-factory  { border-left-color: #B45309; }
+.b-factory  { background: #B45309; color: #fff; }
+
+.c-doc      { border-left-color: #047857; }
+.b-doc      { background: #047857; color: #fff; }
+
+/* ── System auto-fill callout ── */
+.autofill {
+  margin-top: 12px;
+  background: #EFF6FF;
+  border: 1.5px dashed #93C5FD;
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 12px;
+  color: #1E40AF;
+  line-height: 1.6;
+}
+.autofill-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #1E40AF;
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ── Arrow ── */
+.arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 38px;
+  position: relative;
+  flex-shrink: 0;
+}
+.arrow-line {
+  width: 2px;
+  flex: 1;
+  background: #CBD5E1;
+}
+.arrow-head {
+  width: 0; height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 9px solid #CBD5E1;
+  margin-top: -1px;
+}
+
+/* ── Decision diamond ── */
+.decision-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.diamond {
+  width: 150px;
+  height: 75px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.diamond::before {
+  content: '';
+  position: absolute;
+  width: 90px;
+  height: 56px;
+  background: #7C3AED;
+  transform: rotate(45deg);
+  border-radius: 7px;
+  box-shadow: 0 4px 14px rgba(124,58,237,0.35);
+}
+.diamond-text {
+  position: relative;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  z-index: 1;
+  text-align: center;
+}
+
+/* ── Branch ── */
+.branch-row {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 4px;
+}
+.branch-arm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.branch-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 14px;
+  border-radius: 20px;
+}
+.tag-yes { background: #DCFCE7; color: #166534; border: 1.5px solid #86EFAC; }
+.tag-no  { background: #FEE2E2; color: #991B1B; border: 1.5px solid #FCA5A5; }
+
+.reject-card {
+  background: #FFF5F5;
+  border: 1.5px dashed #FCA5A5;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 11.5px;
+  color: #9B1C1C;
+  text-align: center;
+  line-height: 1.55;
+  max-width: 170px;
+  font-weight: 500;
+}
+
+/* ── Document chips ── */
+.doc-grid {
+  display: grid;
+  gap: 9px;
+  margin-top: 12px;
+}
+.doc-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.doc-grid-5 { grid-template-columns: repeat(3, 1fr); }
+
+.doc-chip {
+  border-radius: 9px;
+  padding: 9px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.35;
+}
+.chip-1 { background: #F0FDF4; color: #065F46; border: 1.5px solid #A7F3D0; }
+.chip-2 { background: #ECFDF5; color: #047857; border: 1.5px solid #6EE7B7; }
+
+/* Challan spans 2 cols */
+.span2 { grid-column: span 2; }
+.span3 { grid-column: span 3; }
+
+/* ── Final terminal ── */
+.terminal {
+  width: 100%;
+  background: linear-gradient(135deg, #064E3B 0%, #065F46 100%);
+  border-radius: 14px;
+  padding: 22px 28px;
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(6,79,58,0.28);
+}
+.terminal-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.3px;
+}
+.terminal-sub {
+  font-size: 12px;
+  color: #A7F3D0;
+  margin-top: 5px;
+  font-weight: 500;
+}
+
+/* ── Legend ── */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  justify-content: center;
+  margin-top: 44px;
+  padding: 18px 20px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: #475569;
+  font-weight: 500;
+}
+.ldot {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* legend dot colors */
+.ldot-buyer    { background: #1E293B; }
+.ldot-mkt      { background: #15803D; }
+.ldot-comm     { background: #1D4ED8; }
+.ldot-approval { background: #7C3AED; }
+.ldot-factory  { background: #B45309; }
+.ldot-doc      { background: #047857; }
+
+/* branch arrow short */
+.arrow-short { height: 24px; }
+
+/* branch no arm offset */
+.branch-arm-no { margin-top: 4px; }
+
+/* factory card top gap */
+.card-after-branch { margin-top: 2px; }
+
+/* doc section sub-title */
+.doc-section-title { font-size: 13px; color: #047857; }
+
+@media print {
+  body { background: #fff; padding: 24px; }
+  .card { box-shadow: none; border: 1px solid #E2E8F0; border-left-width: 5px; }
+  .terminal { box-shadow: none; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <h1>ED Module — Business Workflow</h1>
+    <p>End-to-end process: Buyer Order → Export Documents</p>
+    <div class="header-line"></div>
+  </div>
+
+  <div class="flow">
+
+    <!-- 1. Buyer -->
+    <div class="card c-buyer">
+      <div class="card-head">
+        <span class="badge b-buyer">Buyer</span>
+        <span class="card-title">Places Order</span>
+      </div>
+      <div class="card-sub">Items · Quantity · Delivery requirement · Commercial requirement</div>
+    </div>
+
+    <div class="arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+
+    <!-- 2. Marketing receives -->
+    <div class="card c-mkt">
+      <div class="card-head">
+        <span class="badge b-mkt">Marketing</span>
+        <span class="card-title">Receives &amp; Reviews Buyer Order</span>
+      </div>
+      <div class="card-sub">First internal checkpoint — understands requirements, communicates internally</div>
+    </div>
+
+    <div class="arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+
+    <!-- 3. Commercial — load SO + auto-fill -->
+    <div class="card c-comm">
+      <div class="card-head">
+        <span class="badge b-comm">Commercial</span>
+        <span class="card-title">Enters Sales Order Number</span>
+      </div>
+      <div class="autofill">
+        <div class="autofill-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          System auto-fills from external source
+        </div>
+        Buyer · Items · Qty · Price · Amount · PI No · DC No · LC No · Payment Terms · Shipment Dates
+      </div>
+    </div>
+
+    <div class="arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+
+    <!-- 4. PI -->
+    <div class="card c-comm">
+      <div class="card-head">
+        <span class="badge b-comm">Commercial</span>
+        <span class="card-title">Creates / Checks Proforma Invoice (PI)</span>
+      </div>
+      <div class="card-sub">Early commercial document — foundation for all downstream forms</div>
+    </div>
+
+    <div class="arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+
+    <!-- 5. LC -->
+    <div class="card c-comm">
+      <div class="card-head">
+        <span class="badge b-comm">Commercial</span>
+        <span class="card-title">Checks Letter of Credit (LC)</span>
+      </div>
+      <div class="card-sub">Required before export &amp; bank documents can be prepared</div>
+    </div>
+
+    <div class="arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+
+    <!-- 6. Marketing review -->
+    <div class="card c-mkt">
+      <div class="card-head">
+        <span class="badge b-mkt">Marketing</span>
+        <span class="card-title">Reviews PI &amp; LC Details</span>
+      </div>
+      <div class="card-sub">Approves or sends back to Commercial for correction</div>
+    </div>
+
+    <div class="arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+
+    <!-- 7. Decision -->
+    <div class="decision-wrap">
+      <div class="diamond">
+        <div class="diamond-text">Approved?</div>
+      </div>
+    </div>
+
+    <!-- Branch -->
+    <div class="branch-row">
+      <div class="branch-arm">
+        <span class="branch-tag tag-yes">✓ &nbsp;YES</span>
+        <div class="arrow arrow-short"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+      </div>
+      <div class="branch-arm branch-arm-no">
+        <span class="branch-tag tag-no">✗ &nbsp;NO</span>
+        <div class="reject-card">Return to Commercial<br>for correction</div>
+      </div>
+    </div>
+
+    <!-- 8. Factory -->
+    <div class="card c-factory card-after-branch">
+      <div class="card-head">
+        <span class="badge b-factory">Factory</span>
+        <span class="card-title">Production Starts</span>
+      </div>
+      <div class="card-sub">Approved orders only · Goods prepared · Coordinates with dispatch</div>
+    </div>
+
+    <div class="arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+
+    <!-- 9. Docs Phase 1 -->
+    <div class="card c-doc">
+      <div class="card-head">
+        <span class="badge b-doc">Documents — Phase 1</span>
+        <span class="card-title doc-section-title">Delivery &amp; Packing</span>
+      </div>
+      <div class="doc-grid doc-grid-5">
+        <div class="doc-chip chip-1">Commercial<br>Invoice</div>
+        <div class="doc-chip chip-1">Packing<br>List</div>
+        <div class="doc-chip chip-1">Delivery<br>Challan</div>
+        <div class="doc-chip chip-1">Truck<br>Challan</div>
+        <div class="doc-chip chip-1 span2">Challan Sheet</div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+
+    <!-- 10. Docs Phase 2 -->
+    <div class="card c-doc">
+      <div class="card-head">
+        <span class="badge b-doc">Documents — Phase 2</span>
+        <span class="card-title doc-section-title">Export &amp; Bank</span>
+      </div>
+      <div class="doc-grid doc-grid-3">
+        <div class="doc-chip chip-2">Certificate<br>of Origin</div>
+        <div class="doc-chip chip-2">Beneficiary<br>Certificate</div>
+        <div class="doc-chip chip-2">Bill of<br>Exchange</div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+
+    <!-- 11. Final -->
+    <div class="terminal">
+      <div class="terminal-title">Forwarding Pack</div>
+      <div class="terminal-sub">Final document set — ready for export &amp; bank submission</div>
+    </div>
+
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot ldot-buyer"></div> Buyer</div>
+    <div class="legend-item"><div class="ldot ldot-mkt"></div> Marketing</div>
+    <div class="legend-item"><div class="ldot ldot-comm"></div> Commercial</div>
+    <div class="legend-item"><div class="ldot ldot-approval"></div> Approval</div>
+    <div class="legend-item"><div class="ldot ldot-factory"></div> Factory</div>
+    <div class="legend-item"><div class="ldot ldot-doc"></div> Documents</div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,2031 @@
+﻿<?php
+$pageTitle   = 'PI';
+$activePage  = 'sales';
+$navSection  = 'order';
+include __DIR__ . '/../includes/header.php';
+?>
+
+<style>
+/* â”€â”€ PI page â”€â”€ */
+.pi-summary-bar {
+    background: linear-gradient(135deg,#1e1e2e,#2d2d44);
+    border-radius: 14px; padding: 16px 24px;
+    display: flex; gap: 32px; flex-wrap: wrap;
+    align-items: center; margin-bottom: 16px; color: #fff;
+}
+.pi-sum-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(99,102,241,.35); border-radius: 10px;
+    padding: 6px 16px; font-size: 13px; font-weight: 700;
+}
+.pi-sum-badge span { font-size: 18px; font-weight: 800; color: #a5b4fc; }
+.pi-sum-item { text-align: center; }
+.pi-sum-num { font-size: 20px; font-weight: 800; color: #a5b4fc; }
+.pi-sum-lbl { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+
+/* Master PI */
+.mpi-bar {
+    background: #fff; border: 1.5px solid #e0e3ff;
+    border-radius: 14px; padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(99,102,241,.05);
+}
+.mpi-bar-left { display: flex; align-items: center; gap: 12px; }
+.mpi-icon {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: linear-gradient(135deg,#6366f1,#4f46e5);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+}
+.mpi-title { font-size: 14px; font-weight: 700; color: #1e1e2e; }
+.mpi-sub   { font-size: 11px; color: #94a3b8; margin-top: 1px; }
+
+/* Saved PI list */
+.saved-pi-list { margin: 8px 0; }
+/* Item selector groups */
+.mpi-grp { border:1.5px solid #e0e3ff; border-radius:10px; margin-bottom:10px; overflow:hidden; }
+.mpi-grp-hdr {
+    display:flex; align-items:center; gap:10px;
+    background:#f1f0ff; padding:8px 12px;
+    border-bottom:1px solid #e0e3ff;
+}
+.mpi-grp-hdr input[type=checkbox] { width:15px; height:15px; accent-color:#6366f1; flex-shrink:0; cursor:pointer; }
+.mpi-grp-pi  { font-size:12px; font-weight:800; color:#4f46e5; min-width:90px; }
+.mpi-grp-ref { font-size:11px; color:#64748b; flex:1; }
+.mpi-item-row {
+    display:grid; grid-template-columns:18px 1fr 52px 70px 70px 80px;
+    gap:6px; align-items:center;
+    padding:5px 12px; border-bottom:1px solid #f1f5f9; font-size:12px;
+}
+.mpi-item-row:last-child { border-bottom:none; }
+.mpi-item-row input[type=checkbox] { width:14px; height:14px; accent-color:#6366f1; cursor:pointer; }
+.mpi-item-desc { color:#1e1e2e; }
+.mpi-item-ply,.mpi-item-qty,.mpi-item-prc,.mpi-item-tot { text-align:right; color:#475569; }
+.mpi-item-tot { font-weight:700; color:#1e1e2e; }
+
+/* Master PI modal */
+.mpi-modal-shell {
+    display: none; position: fixed; inset: 0;
+    background: rgba(10,10,30,.5); backdrop-filter: blur(4px);
+    z-index: 9999; align-items: center; justify-content: center;
+}
+.mpi-modal-shell.open { display: flex; }
+.mpi-modal {
+    background: #fff; border-radius: 18px; padding: 0;
+    width: 100%; max-width: 780px;
+    max-height: 90vh; overflow: hidden;
+    box-shadow: 0 24px 80px rgba(0,0,0,.25);
+    display: flex; flex-direction: column;
+}
+.mpi-modal-head {
+    background: linear-gradient(135deg,#1e1e2e,#2d2d44);
+    padding: 20px 26px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+}
+.mpi-modal-body { padding: 24px 26px; overflow-y: auto; flex: 1; }
+.mpi-modal-foot {
+    padding: 16px 26px; border-top: 1.5px solid #e0e3ff;
+    display: flex; gap: 10px; justify-content: flex-end;
+    flex-shrink: 0; background: #f8f9ff;
+}
+.mpi-combined-po {
+    border: 1.5px solid #e0e3ff; border-radius: 10px;
+    padding: 12px 16px; margin-bottom: 10px;
+}
+.mpi-combined-po-hdr {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.mpi-pi-tag {
+    font-size: 10px; font-weight: 800; background: #ede9fe; color: #4f46e5;
+    padding: 2px 8px; border-radius: 999px; text-transform: uppercase;
+}
+
+/* Order PI Overview */
+.order-pi-overview { background:#fff; border:1.5px solid #e0e3ff; border-radius:14px; padding:16px 20px; margin-bottom:16px; }
+.opo-title { font-size:13px; font-weight:800; color:#1e1e2e; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.opo-list  { display:flex; flex-direction:column; gap:8px; }
+.opo-row   { display:flex; align-items:center; gap:10px; border-radius:10px; padding:9px 14px; flex-wrap:wrap; }
+.opo-row.opo-master     { background:#ede9fe; border:1.5px solid #c4b5fd; }
+.opo-row.opo-included   { background:#f0fdf4; border:1.5px solid #bbf7d0; }
+.opo-row.opo-standalone { background:#fef9c3; border:1.5px solid #fde68a; cursor:pointer; }
+.opo-row.opo-standalone:hover { filter:brightness(.97); }
+.opo-badge            { font-size:10px; font-weight:800; padding:2px 8px; border-radius:999px; flex-shrink:0; white-space:nowrap; }
+.opo-badge.b-master   { background:#7c3aed; color:#fff; }
+.opo-badge.b-included { background:#16a34a; color:#fff; }
+.opo-badge.b-standalone { background:#d97706; color:#fff; }
+.opo-num      { font-size:13px; font-weight:800; color:#1e1e2e; min-width:120px; }
+.opo-meta     { font-size:12px; color:#64748b; flex:1; }
+.opo-includes { font-size:11px; color:#7c3aed; margin-top:2px; }
+.opo-val      { font-size:13px; font-weight:700; color:#1e1e2e; white-space:nowrap; }
+/* PI item selector (inline below each PI card) */
+.opo-items-wrap { border:1.5px solid #fde68a; border-top:none; border-radius:0 0 10px 10px; margin-top:-6px; background:#fffdf0; overflow:hidden; }
+.opo-ref-line   { padding:4px 14px 3px; font-size:10px; color:#92400e; background:#fffbeb; border-bottom:1px solid #fef3c7; }
+.opo-item-row   { display:grid; grid-template-columns:16px 1fr 55px 65px 65px 78px; gap:6px; align-items:center; padding:5px 14px; font-size:11.5px; border-bottom:1px solid #fef9c3; }
+.opo-item-row:last-child { border-bottom:none; }
+.opo-item-row input[type=checkbox] { width:13px; height:13px; accent-color:#6366f1; cursor:pointer; }
+.opo-item-hdr  { display:grid; grid-template-columns:16px 1fr 55px 65px 65px 78px; gap:6px; padding:4px 14px; font-size:10px; font-weight:700; color:#92400e; background:#fff8dc; border-bottom:1px solid #fde68a; }
+/* Master PI basket bar */
+#mpiBasket { display:none; margin-top:14px; background:linear-gradient(135deg,#1e1e2e,#312e81); color:#fff; border-radius:10px; padding:11px 18px; align-items:center; gap:18px; flex-wrap:wrap; }
+#mpiBasket strong { color:#a5b4fc; }
+.mpi-basket-btn { margin-left:auto; background:#6366f1; color:#fff; border:none; border-radius:8px; padding:7px 18px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.mpi-basket-btn:hover { background:#4f46e5; }
+
+/* PI header card */
+.pi-hdr-card {
+    background: #fff; border: 1.5px solid #e8eaff;
+    border-radius: 14px; padding: 18px 22px;
+    margin-bottom: 18px;
+    box-shadow: 0 2px 8px rgba(99,102,241,.05);
+}
+
+/* PO block */
+.po-block {
+    background: #fff;
+    border: 2px solid #e0e3ff;
+    border-radius: 14px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    transition: border-color .18s, box-shadow .18s;
+}
+.po-block:focus-within { border-color: #6366f1; box-shadow: 0 4px 16px rgba(99,102,241,.10); }
+
+.po-block-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 18px; background: #f8f9ff;
+    border-bottom: 1.5px solid #e0e3ff;
+    gap: 10px; flex-wrap: wrap; cursor: pointer;
+    user-select: none;
+}
+.po-block-hdr:hover { background: #f0f0ff; }
+.po-num-chip {
+    background: #6366f1; color: #fff;
+    border-radius: 8px; padding: 3px 12px;
+    font-size: 12px; font-weight: 800;
+}
+.po-block-body { padding: 18px 20px 14px; }
+
+/* ERP banner */
+.erp-banner {
+    background: #f0f4ff; border: 1.5px solid #c7d2fe;
+    border-radius: 10px; padding: 10px 14px;
+    font-size: 12px; margin-bottom: 14px;
+}
+.erp-banner strong { color: #4f46e5; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; display: block; margin-bottom: 2px; }
+
+/* ERP search bar */
+.erp-search-row {
+    display: flex; gap: 8px; margin-bottom: 12px; align-items: center;
+}
+.erp-search-row input {
+    flex: 1; padding: 8px 14px; border: 1.5px solid #e2e8f0;
+    border-radius: 9px; font-size: 13px; outline: none;
+    transition: border-color .15s;
+}
+.erp-search-row input:focus { border-color: #6366f1; }
+
+/* Items table */
+.si-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+.si-table th {
+    background: #f1f5f9; padding: 7px 8px; text-align: left;
+    font-size: 11px; font-weight: 700; color: #64748b;
+    border-bottom: 1.5px solid #e2e8f0; white-space: nowrap;
+}
+.si-table td { padding: 4px 5px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.si-table td input {
+    width: 100%; padding: 5px 7px; border: 1.5px solid #e2e8f0;
+    border-radius: 6px; font-size: 12px; outline: none;
+    box-sizing: border-box; transition: border-color .15s;
+}
+.si-table td input:focus { border-color: #6366f1; }
+.si-table td input[readonly] { background: #f8fafc; color: #64748b; }
+.si-total-row td {
+    background: #f8f9ff; font-weight: 700; font-size: 12px;
+    padding: 8px; border-top: 2px solid #e0e3ff;
+}
+.si-del-btn {
+    background: none; border: none; color: #f87171;
+    cursor: pointer; font-size: 16px; padding: 2px 6px;
+    border-radius: 6px; transition: background .15s;
+}
+.si-del-btn:hover { background: #fee2e2; }
+</style>
+
+<!-- No-order prompt (shown when no order loaded) -->
+<div id="noOrderPrompt" style="display:none;background:#fff;border:2px dashed #c7d2fe;border-radius:16px;padding:32px;margin-bottom:20px;">
+    <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:36px;margin-bottom:8px;">PI</div>
+        <div style="font-size:17px;font-weight:800;color:#1e1e2e;margin-bottom:4px;">No Order Loaded</div>
+        <div style="font-size:13px;color:#64748b;">Select an existing order below or start a new one.</div>
+    </div>
+    <!-- Recent orders list from DB -->
+    <div id="noOrderList" style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Recent Orders</div>
+        <div id="noOrderRows" style="display:flex;flex-direction:column;gap:6px;">
+            <div style="color:#94a3b8;font-size:13px;padding:8px 0;">Loading orders…</div>
+        </div>
+    </div>
+    <div style="text-align:center;">
+        <button class="primary-btn" style="padding:10px 26px;font-size:13px;" onclick="oidNewOrder()">+ Start New Order</button>
+    </div>
+</div>
+
+<!-- Main PI content (hidden until order loaded) -->
+<div id="piContent">
+
+<!-- Summary bar -->
+<div class="pi-summary-bar">
+    <div class="pi-sum-badge">PI <span id="piNumDisplay">-</span></div>
+    <div class="pi-sum-item"><div class="pi-sum-num" id="sumPoCount">0</div><div class="pi-sum-lbl">PIs</div></div>
+    <div class="pi-sum-item"><div class="pi-sum-num" id="sumTotalQty">0</div><div class="pi-sum-lbl">Total Qty</div></div>
+    <div class="pi-sum-item"><div class="pi-sum-num" id="sumTotalVal">$0.00</div><div class="pi-sum-lbl">Total Value</div></div>
+    <div style="margin-left:auto;text-align:right;">
+        <div style="font-size:10px;color:#94a3b8;">Status</div>
+        <div style="font-size:13px;font-weight:700;color:#a5b4fc;" id="piStatus">Draft</div>
+    </div>
+</div>
+
+<!-- Order PI Overview -->
+<div class="order-pi-overview" id="orderPiOverview" style="display:none;">
+    <div class="opo-title">
+        PIs for this Order
+        <span id="opoPiCount" style="font-size:11px;font-weight:600;color:#6366f1;background:#ede9fe;padding:2px 10px;border-radius:999px;"></span>
+        <span style="font-size:11px;color:#64748b;font-weight:400;margin-left:6px;">- Select items for Master PI</span>
+    </div>
+    <div class="opo-list" id="opoPiList"></div>
+    <!-- Master PI basket bar -->
+    <div id="mpiBasket" style="display:none;margin-top:14px;background:linear-gradient(135deg,#1e1e2e,#312e81);color:#fff;border-radius:10px;padding:11px 18px;align-items:center;gap:18px;flex-wrap:wrap;">
+        <span style="font-size:12px;font-weight:700;" id="mpiBasketLabel">0 items selected</span>
+        <span style="font-size:12px;">Qty: <strong id="mpiBasketQty" style="color:#a5b4fc;">0</strong></span>
+        <span style="font-size:12px;">Total: <strong id="mpiBasketVal" style="color:#a5b4fc;">$0.00</strong></span>
+        <button type="button" class="mpi-basket-btn" onclick="generateMasterPi()">Create Master PI</button>
+    </div>
+</div>
+
+<!-- PI Type & Print bar -->
+<div class="mpi-bar" style="flex-wrap:wrap;gap:14px;">
+    <div class="mpi-bar-left" style="flex-shrink:0;">
+        <div class="mpi-icon">PI</div>
+        <div>
+            <div class="mpi-title">Generate &amp; Print PI</div>
+            <div class="mpi-sub">Choose type then click Print to open the formatted Proforma Invoice</div>
+        </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span id="savedPiCountBadge" style="font-size:12px;font-weight:700;background:#ede9fe;color:#6366f1;padding:4px 12px;border-radius:999px;display:none;">
+            <span id="savedPiCount">0</span> PI(s) saved
+        </span>
+        <!-- PI Type radio pills -->
+        <div style="display:flex;gap:6px;background:#f1f0ff;border:1.5px solid #c7d2fe;border-radius:10px;padding:4px 6px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:700;transition:.15s;"
+                   id="piTypeLbl_single" class="pi-type-lbl active-lbl">
+                <input type="radio" name="piTypeChoice" value="single" checked onchange="onPiTypeChange()" style="accent-color:#6366f1;"> Single PI
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:700;transition:.15s;"
+                   id="piTypeLbl_summary" class="pi-type-lbl">
+                <input type="radio" name="piTypeChoice" value="summary" onchange="onPiTypeChange()" style="accent-color:#6366f1;"> Summary PI
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:700;transition:.15s;"
+                   id="piTypeLbl_master" class="pi-type-lbl">
+                <input type="radio" name="piTypeChoice" value="master" onchange="onPiTypeChange()" style="accent-color:#6366f1;"> Master PI
+            </label>
+        </div>
+        <button type="button" id="printPiBtn" class="primary-btn" onclick="goToPiPrint()"
+                style="background:linear-gradient(135deg,#6366f1,#4f46e5);white-space:nowrap;padding:9px 22px;"
+                disabled title="Submit PI first to unlock printing">
+            Print Single PI
+        </button>
+        <button type="button" id="excelPiBtn" class="ghost-btn" onclick="goToPiPrint(true)"
+                style="white-space:nowrap;padding:9px 22px;"
+                disabled title="Submit PI first to unlock Excel download">
+            Download Excel
+        </button>
+    </div>
+</div>
+<style>
+.pi-type-lbl { color:#64748b; }
+.pi-type-lbl.active-lbl { background:#6366f1; color:#fff; }
+</style>
+<script>
+function resetSubmitBtn() {
+    const btn = document.getElementById('universalSaveBtn');
+    if (btn) {
+        btn.textContent = 'Submit';
+        btn.style.background = '';
+        btn.disabled = false;
+        btn.onclick = submitToMarketing;
+    }
+}
+
+function onPiTypeChange() {
+    resetSubmitBtn();
+    const val = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
+    document.querySelectorAll('.pi-type-lbl').forEach(l => l.classList.remove('active-lbl'));
+    const lbl = document.getElementById('piTypeLbl_' + val);
+    if (lbl) lbl.classList.add('active-lbl');
+    const labels = { single:'Print Single PI', summary:'Print Summary PI', master:'Print Master PI' };
+    const btn = document.getElementById('printPiBtn');
+    if (btn) btn.textContent = labels[val] || 'Print PI';
+    const submitBtn = document.getElementById('universalSaveBtn');
+    if (submitBtn) {
+        if (val === 'master') {
+            submitBtn.textContent = 'Create Master PI';
+            submitBtn.style.background = 'linear-gradient(135deg,#7c3aed,#6366f1)';
+            submitBtn.disabled = false;
+            submitBtn.onclick = generateMasterPi;
+        } else {
+            submitBtn.textContent = 'Submit';
+            submitBtn.style.background = '';
+            submitBtn.disabled = false;
+            submitBtn.onclick = submitToMarketing;
+        }
+    }
+    const addBtn = document.getElementById('addAnotherPoBtn');
+    if (addBtn) addBtn.style.display = val === 'single' ? 'none' : '';
+    const termsBox = document.getElementById('salesTermsBox');
+    if (termsBox) termsBox.style.display = val === 'summary' ? 'none' : '';
+    const piBlocksEditor = document.getElementById('piBlocksEditor');
+    if (piBlocksEditor) piBlocksEditor.style.display = val === 'master' ? 'none' : 'block';
+    const masterPanel = document.getElementById('masterPiSelectedPanel');
+    if (masterPanel) masterPanel.style.display = val === 'master' ? 'block' : 'none';
+    if (val === 'master') renderMasterSelectedItems();
+
+    // Single PI allows exactly 1 PO â€” remove any extras
+    if (val === 'single') {
+        const blocks = document.querySelectorAll('.po-block');
+        blocks.forEach((b, i) => { if (i > 0) b.remove(); });
+        if (blocks.length > 1) updateSummary();
+    }
+}
+document.addEventListener('DOMContentLoaded', onPiTypeChange);
+function goToPiPrint(excelMode = false) {
+    const val  = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
+    const pages = { single:'single-pi.php', summary:'summary-pi.php', master:'master-pi.php' };
+    let url = APP_BASE + '/pages/' + (pages[val] || 'single-pi.php');
+    if (val === 'master') {
+        const selection = getSelectedMasterGroups();
+        if (selection.length) {
+            sessionStorage.setItem('mpi_custom_items', JSON.stringify(selection));
+        }
+        // No selection is fine — master-pi.php loads from saved PI data directly
+    }
+    if (val === 'single' || val === 'master') {
+        const days = document.getElementById('termLcDays')?.value || '90';
+        const tol  = document.getElementById('termTolerance')?.value || '5';
+        const hs   = document.getElementById('termHsCode')?.value || '4819.10.00';
+        const docMust = document.getElementById('termDocMust')?.value || 'UD';
+        const bnk  = document.getElementById('termBank')?.value || 'ncc';
+        url += '?days=' + encodeURIComponent(days)
+            + '&lctype=Sight&tol=' + encodeURIComponent(tol)
+            + '&hs=' + encodeURIComponent(hs)
+            + '&doc=' + encodeURIComponent(docMust)
+            + '&bank=' + encodeURIComponent(bnk);
+    }
+    if (excelMode) {
+        url += (url.includes('?') ? '&' : '?') + 'excel=1';
+    }
+    window.location.href = url;
+}
+</script>
+
+<!-- PI Header -->
+<div class="pi-hdr-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+            <div class="eyebrow">Proforma Invoice</div>
+            <h2 style="margin:0;font-size:17px;">PI Header - Shared Details</h2>
+        </div>
+    </div>
+    <div class="form-grid">
+        <div class="field span-3" id="globalPiNumField" style="display:none;">
+            <label for="piNumber">PI Number</label>
+            <input id="piNumber" placeholder="e.g. 26/52017"
+                   oninput="document.getElementById('piNumDisplay').textContent=this.value||'-'">
+        </div>
+        <div class="field span-3">
+            <label for="piCustomer">Customer Name (TO)</label>
+            <select id="piCustomer" onchange="onPiCustomerChange()">
+                <option value="">Select customer</option>
+            </select>
+        </div>
+        <div class="field span-3">
+            <label for="piBuyer">Buyer (Brand / End Buyer)</label>
+            <input id="piBuyer" placeholder="e.g. Benetton, H&M, Zara...">
+        </div>
+        <div class="field span-3">
+            <label for="piDate">PI Date</label>
+            <input id="piDate" type="date">
+        </div>
+        <div class="field span-6">
+            <label for="piBuyerAddress">Customer Address</label>
+            <textarea id="piBuyerAddress" rows="2" placeholder="Auto-filled from customer profile..."></textarea>
+        </div>
+    </div>
+</div>
+
+<div id="piBlocksEditor">
+<!-- PO Blocks -->
+<div id="poBlocksContainer"></div>
+
+<!-- Add PO button -->
+<div style="text-align:center;margin-bottom:20px;">
+    <button type="button" id="addAnotherPoBtn" class="ghost-btn" onclick="addPoBlock()"
+            style="padding:10px 32px;font-size:14px;border-style:dashed;border-width:2px;">
+        + Add Another PI
+    </button>
+</div>
+</div>
+
+<div id="masterPiSelectedPanel" style="display:none;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+        <div>
+            <div class="eyebrow">Master PI Items</div>
+            <h3 style="margin:0;font-size:16px;">Selected Items Only</h3>
+        </div>
+        <div style="font-size:12px;color:#64748b;">Choose items from the list above. This section updates automatically.</div>
+    </div>
+    <div id="masterPiSelectedList"></div>
+</div>
+
+<!-- Terms & Conditions preview (matches Single PI / Master PI print) -->
+<div id="salesTermsBox" style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:20px 28px;margin-top:16px;font-family:'Times New Roman',Times,serif;font-size:10.5pt;color:#000;">
+    <div style="font-weight:700;text-decoration:underline;margin-bottom:8px;font-size:10.5pt;">Terms &amp; Conditions:</div>
+    <ol id="salesTermsList" style="margin:0;padding-left:28px;line-height:1.9;font-size:10pt;"></ol>
+</div>
+<style>
+.term-sel {
+    display:inline; border:1.5px solid #6366f1; border-radius:4px;
+    padding:1px 6px; font-size:10pt; font-family:inherit;
+    background:#f5f3ff; color:#1e40af; font-weight:700; outline:none; cursor:pointer;
+}
+</style>
+<script>
+(function(){
+    function buildSalesTerms() {
+        const days = document.getElementById('termLcDays')?.value || '90';
+        const lct  = document.getElementById('termLcType')?.value || 'Sight';
+        const tol  = document.getElementById('termTolerance')?.value || '5';
+        const hs   = document.getElementById('termHsCode')?.value || '4819.10.00';
+        const docMust = document.getElementById('termDocMust')?.value || 'UD';
+
+        const BANKS = {
+            ncc:  { label:'National Credit & Commerce Bank Plc.', name:'National Credit &amp; Commerce Bank Plc.', addr:'Motijheel main Branch, 6 Motijheel C/A Dhaka-1000 Bangladesh.', acct:'0002-0259000092', swift:'NCCLBDDHNBB', routing:'160150137' },
+            dbbl: { label:'Dutch-Bangla Bank Plc.',               name:'Dutch-Bangla Bank Plc.',               addr:'Local Office, 1, Dilkusha C/A, Dhaka-1000, Bangladesh.',             acct:'ERQ-101.117.1382',  swift:'DBBLBDDHCTS',  routing:'090273889'  }
+        };
+        const bankKey = document.getElementById('termBank')?.value || 'ncc';
+        const bank = BANKS[bankKey] || BANKS.ncc;
+        const bankOpts = Object.entries(BANKS).map(([k,b])=>`<option value="${k}"${k===bankKey?' selected':''}>${b.label}</option>`).join('');
+        const bankDetail = `<div style="margin-top:4px;padding:6px 10px;background:#f8f9ff;border-left:3px solid #6366f1;font-size:9.5pt;line-height:1.7;">
+            <strong>${bank.name}</strong><br>
+            ${bank.addr}<br>
+            Account No: ${bank.acct}<br>
+            Swift Code: ${bank.swift}<br>
+            Bank Routing No: ${bank.routing}
+        </div>`;
+
+        const DAY_OPTS = [
+            { v:'At Sight', l:'At Sight' },
+            { v:'30',  l:'30 Days' },
+            { v:'60',  l:'60 Days' },
+            { v:'90',  l:'90 Days' },
+            { v:'120', l:'120 Days' },
+        ];
+        const dOpts = DAY_OPTS.map(o=>`<option value="${o.v}"${o.v===days?' selected':''}>${o.l}</option>`).join('');
+        const daysLabel = days === 'At Sight' ? 'At Sight' : days + ' Days';
+        const rOpts = ['3','5','10'].map(v=>`<option value="${v}"${v===tol?' selected':''}>${v}%</option>`).join('');
+
+        const list = [
+            `100% Irrevocable confirmed <select id="termLcDays" class="term-sel" onchange="buildSalesTerms()">${dOpts}</select>${days !== 'At Sight' ? ' Sight' : ''} L/C to be opened in favour of <strong>Zaber &amp; Zubair ACC. Ltd.</strong>`,
+            `P.I Validity : <strong>45 Working days</strong>.`,
+            `Letter of Credit to allow acceptability of +/- <select id="termTolerance" class="term-sel" onchange="buildSalesTerms()">${rOpts}</select> <strong>tolerance</strong> in quantity and Value.`,
+            `Letter of Credit to allow for <strong>Partial Shipment</strong>.`,
+            `The Buyer should provide a copy of the master L/C and Garment Export UD before the delivery of mentioned goods.`,
+            `Where GSP certificate is required, applicant is requested to furnish full detail of the Master L/C in BBLC opened in favour of Zaber &amp; Zubair ACC. Ltd.`,
+            `Prior to delivery- we will inform you full particulars of the consignment and forward the original delivery challan for the signature of the authorised signatory of your organisation. Please make arrangements to hand over the duly signed delivery challan at the time of delivery of goods.`,
+            `Payment to be made on Maturity in US Dollar and Maturity date will be counted <strong>${daysLabel}</strong> from the date of DELIVERY Challan / Truck Receipt / <strong>This clause Will be integral Parts of L/C.</strong>`,
+            `Interest to be paid at LIBOR by the Buyer till Maturity. If payment is not made within maturity then interest <strong>@16%</strong> will be charged for overdue period and buyer's is liable to pay. <strong>This clause Must be appeared on the L/C</strong>`,
+            `Quality complaint, if any, should be notified to us prior before sewing.`,
+            `The above mention terms &amp; condition will be the integral part of the BTB L/C &amp; it must be mention in the BTB L/C.`,
+            `Beneficiary Bin No : <strong>000230256-0103</strong>`,
+            `H.S. Code : <input id="termHsCode" class="term-sel" style="min-width:150px;font-weight:700;" value="${hs}" oninput="buildSalesTerms()">`,
+            `${(() => {
+                const opts = ['UD','IP','UP'].map(v => `<option value="${v}"${v===docMust?' selected':''}>${v}</option>`).join('');
+                return `<select id="termDocMust" class="term-sel" onchange="buildSalesTerms()">${opts}</select> Mustbe`;
+            })()}`,
+            `Advising Bank : <select id="termBank" class="term-sel" onchange="buildSalesTerms()">${bankOpts}</select>${bankDetail}`,
+        ];
+        const el = document.getElementById('salesTermsList');
+        if (el) el.innerHTML = list.map(t => `<li>${t}</li>`).join('');
+    }
+    window.buildSalesTerms = buildSalesTerms;
+    document.addEventListener('DOMContentLoaded', buildSalesTerms);
+})();
+</script>
+
+<!-- Page actions -->
+<div class="page-actions" style="margin-top:16px;">
+    <div class="page-actions-left">
+        <button type="button" class="ghost-btn js-prev-page" data-prev-page="production">Previous</button>
+        <button type="button" class="ghost-btn" onclick="savePi()">Save PI</button>
+        <button type="button" class="ghost-btn" onclick="clearPiForm()">Clear</button>
+        <button type="button" class="primary-btn" id="universalSaveBtn" onclick="submitToMarketing()">Submit</button>
+    </div>
+    <div class="page-actions-right">
+        <button type="button" class="primary-btn js-next-page" data-next-page="marketing">Next: Marketing</button>
+    </div>
+</div>
+
+<!-- â”€â”€ Master PI Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<div class="mpi-modal-shell" id="masterPiModal">
+    <div class="mpi-modal">
+        <div class="mpi-modal-head">
+            <div>
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;">Master PI</div>
+                <div style="font-size:18px;font-weight:800;color:#fff;margin-top:2px;">Select Items to Include</div>
+            </div>
+            <button type="button" onclick="closeMasterPi()"
+                    style="background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:10px;width:34px;height:34px;font-size:16px;cursor:pointer;">X</button>
+        </div>
+
+        <div class="mpi-modal-body">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#334155;cursor:pointer;">
+                    <input type="checkbox" id="mpiSelectAllItems" onchange="mpiToggleAllItems(this)"
+                           style="width:15px;height:15px;accent-color:#6366f1;cursor:pointer;">
+                    Select all items
+                </label>
+                <span style="font-size:12px;color:#64748b;">Use this to include every item from the saved PIs</span>
+            </div>
+
+            <div class="saved-pi-list" id="savedPiList">
+                <p style="color:#94a3b8;font-size:13px;">No saved PIs yet. Save a PI first.</p>
+            </div>
+
+            <!-- Selection totals bar -->
+            <div id="mpiPreview" style="display:none;margin-top:14px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:10px 16px;display:flex;gap:24px;align-items:center;">
+                <span style="font-size:12px;font-weight:700;color:#166534;" id="mpiItemCount">0 items</span>
+                <span style="font-size:12px;color:#15803d;">Qty: <strong id="mpiTotalQty">0</strong></span>
+                <span style="font-size:12px;color:#15803d;">Total: <strong id="mpiTotalVal">$0.00</strong></span>
+            </div>
+        </div>
+
+        <div class="mpi-modal-foot">
+            <button type="button" class="ghost-btn" onclick="closeMasterPi()">Cancel</button>
+            <button type="button" class="primary-btn" onclick="generateMasterPi()"
+                    style="background:linear-gradient(135deg,#7c3aed,#6366f1);">
+                Open Master PI
+            </button>
+        </div>
+    </div>
+</div>
+
+</div><!-- /piContent -->
+
+<script>
+let poCount = 0;
+let rowCounters = {};
+
+/* â”€â”€ Add a new PO block â”€â”€ */
+function addPoBlock() {
+    // Single PI: only 1 PO allowed
+    const piType = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
+    if (piType === 'single' && document.querySelectorAll('.po-block').length >= 1) return;
+
+    poCount++;
+    const pid = 'po' + poCount;
+
+    const div = document.createElement('div');
+    div.className = 'po-block';
+    div.id = 'block_' + pid;
+
+    div.innerHTML = `
+    <div class="po-block-hdr" onclick="togglePo('${pid}')">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span class="po-num-chip">PI ${poCount}</span>
+            <span id="poLabel_${pid}" style="font-size:13px;font-weight:700;color:#1e1e2e;">New PI</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <span id="poBadge_${pid}" style="font-size:12px;font-weight:700;color:#6366f1;background:#ede9fe;padding:3px 12px;border-radius:999px;">$0.00 | 0 pcs</span>
+            ${poCount > 1 ? `<button class="ghost-btn" style="padding:3px 12px;font-size:12px;color:#f87171;border-color:#fca5a5;"
+                onclick="event.stopPropagation();removePo('${pid}')">Remove</button>` : ''}
+            <span id="poChevron_${pid}" style="color:#94a3b8;font-size:14px;">^</span>
+        </div>
+    </div>
+
+    <div class="po-block-body" id="body_${pid}">
+
+        <!-- PI Number for this PO -->
+        <div class="form-grid" style="margin-bottom:10px;padding-bottom:12px;border-bottom:1px solid #e2e8f0;">
+            <div class="field span-4">
+                <label>PI Number <span style="font-size:10px;font-weight:400;color:#94a3b8;">(auto-generated)</span></label>
+                <input id="piNum_${pid}" placeholder="Generating..." readonly
+                       style="background:#f8fafc;color:#374151;"
+                       oninput="(function(v){const b=document.querySelectorAll('.po-block');if(b[0]&&b[0].id==='block_${pid}'){document.getElementById('piNumDisplay').textContent=v||'-';document.getElementById('piNumber').value=v;}})(this.value)">
+            </div>
+        </div>
+
+        <!-- ERP Search -->
+        <div class="erp-search-row">
+            <input id="erpInput_${pid}" placeholder="Search by PO number or PI number..."
+                   onkeydown="if(event.key==='Enter')searchErp('${pid}')">
+            <button class="primary-btn" style="white-space:nowrap;" onclick="searchErp('${pid}')">Search ERP</button>
+            <button class="ghost-btn" onclick="clearPo('${pid}')">Clear</button>
+        </div>
+        <div class="erp-banner" id="erpBanner_${pid}">
+            <strong>ERP PO Search Result</strong>
+            <span id="erpMsg_${pid}">Enter a customer PO and click Search ERP to load order details and item rows.</span>
+        </div>
+
+        <!-- PO Fields -->
+        <div class="form-grid">
+            <input id="salesOrder_${pid}" type="hidden">
+            <div class="field span-4">
+                <label>Customer PO Number</label>
+                <input id="customerPo_${pid}" readonly placeholder="Auto-filled from ERP"
+                       oninput="document.getElementById('poLabel_${pid}').textContent=this.value||'New Purchase Order'">
+            </div>
+            <div class="field span-4">
+                <label>Buyer Name</label>
+                <input id="buyerName_${pid}" readonly placeholder="Auto-filled from ERP">
+            </div>
+            <div class="field span-4">
+                <label>Order Status</label>
+                <select id="orderStatus_${pid}" disabled>
+                    <option>Booked</option>
+                    <option>Pending</option>
+                    <option>Approved</option>
+                    <option>Released to Factory</option>
+                    <option>Closed</option>
+                </select>
+            </div>
+            <div class="field span-4">
+                <label>Requested Date</label>
+                <input id="reqDate_${pid}" type="date" readonly>
+            </div>
+        </div>
+
+        <!-- Items table -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px;">
+            <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">
+                ERP Item Rows
+            </div>
+            <button class="ghost-btn" style="padding:3px 12px;font-size:11px;" onclick="addRow('${pid}')">+ Add Row</button>
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="si-table" id="table_${pid}">
+                <thead>
+                    <tr>
+                        <th>SL</th>
+                        <th>Description of Goods</th>
+                        <th>Ply / Type</th>
+                        <th>Quantity</th>
+                        <th>Price $</th>
+                        <th>Amount $</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="tbody_${pid}"></tbody>
+                <tfoot>
+                    <tr class="si-total-row">
+                        <td colspan="3" style="text-align:right;">Subtotal</td>
+                        <td id="totQty_${pid}">0</td>
+                        <td></td>
+                        <td id="totVal_${pid}">$0.00</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>`;
+
+    document.getElementById('poBlocksContainer').appendChild(div);
+    addRow(pid);
+    updateSummary();
+    autoFillPiNum(pid);
+}
+
+async function autoFillPiNum(pid) {
+    try {
+        const r = await fetch(APP_BASE + '/api/pis.php?next_num=1');
+        const d = await r.json();
+        if (!d.pi_number) return;
+        const parts   = d.pi_number.split('/');          // ['ZZAL','PI','26','N']
+        const prefix  = parts.slice(0, 3).join('/') + '/'; // 'ZZAL/PI/26/'
+        let nextSeq   = parseInt(parts[3]) || 0;
+
+        // Bump past any ZZAL-format numbers already open in other blocks
+        document.querySelectorAll('[id^="piNum_"]').forEach(el => {
+            if (el.id === 'piNum_' + pid || !el.value) return;
+            const p = el.value.split('/');
+            if (p[0] === 'ZZAL' && p.length >= 4) {
+                const n = parseInt(p[3]);
+                if (!isNaN(n) && n >= nextSeq) nextSeq = n + 1;
+            }
+        });
+
+        const el = document.getElementById('piNum_' + pid);
+        if (el && !el.value) {
+            el.value = prefix + nextSeq;
+            const firstBlock = document.querySelectorAll('.po-block')[0];
+            if (firstBlock && firstBlock.id === 'block_' + pid) {
+                document.getElementById('piNumDisplay').textContent = prefix + nextSeq;
+                document.getElementById('piNumber').value           = prefix + nextSeq;
+            }
+        }
+    } catch(e) { /* silent - user can type manually */ }
+}
+
+/* Toggle collapse */
+function togglePo(pid) {
+    const body  = document.getElementById('body_' + pid);
+    const chev  = document.getElementById('poChevron_' + pid);
+    const open  = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    chev.textContent   = open ? 'v' : '^';
+}
+
+/* Remove PO block */
+function removePo(pid) {
+    if (!confirm('Remove this PI block?')) return;
+    document.getElementById('block_' + pid)?.remove();
+    updateSummary();
+}
+
+/* Add item row */
+function addRow(pid) {
+    if (!rowCounters[pid]) rowCounters[pid] = 0;
+    rowCounters[pid]++;
+    const sl  = rowCounters[pid];
+    const rid = pid + '_' + sl;
+
+    const tr = document.createElement('tr');
+    tr.id = 'row_' + rid;
+    tr.innerHTML = `
+        <td style="text-align:center;width:30px;font-size:11px;color:#94a3b8;">${sl}</td>
+        <td><input id="desc_${rid}" placeholder="Description of goods"></td>
+        <td><input id="ply_${rid}"  placeholder="e.g. 5Ply" style="width:80px;"></td>
+        <td><input id="qty_${rid}"  type="number" min="0" placeholder="0" oninput="calcRow('${rid}','${pid}')" style="width:80px;"></td>
+        <td><input id="prc_${rid}"  type="number" min="0" step="0.0001" placeholder="0.0000" oninput="calcRow('${rid}','${pid}')" style="width:80px;"></td>
+        <td><input id="amt_${rid}"  readonly style="background:#f8fafc;font-weight:700;color:#4f46e5;width:80px;"></td>
+        <td><button class="si-del-btn" onclick="delRow('${rid}','${pid}')">X</button></td>`;
+    document.getElementById('tbody_' + pid).appendChild(tr);
+}
+
+function delRow(rid, pid) {
+    document.getElementById('row_' + rid)?.remove();
+    calcTotal(pid);
+}
+
+function calcRow(rid, pid) {
+    const qty = parseFloat(document.getElementById('qty_' + rid)?.value || 0) || 0;
+    const prc = parseFloat(document.getElementById('prc_' + rid)?.value || 0) || 0;
+    const amt = document.getElementById('amt_' + rid);
+    if (amt) amt.value = qty > 0 || prc > 0 ? (qty * prc).toFixed(2) : '';
+    calcTotal(pid);
+}
+
+function calcTotal(pid) {
+    const rows = document.querySelectorAll('#tbody_' + pid + ' tr');
+    let tq = 0, tv = 0;
+    rows.forEach(r => {
+        const rid = r.id.replace('row_', '');
+        tq += parseFloat(document.getElementById('qty_' + rid)?.value || 0) || 0;
+        tv += parseFloat(document.getElementById('amt_' + rid)?.value || 0) || 0;
+    });
+    document.getElementById('totQty_' + pid).textContent = tq.toLocaleString();
+    document.getElementById('totVal_' + pid).textContent = '$' + tv.toFixed(2);
+    const badge = document.getElementById('poBadge_' + pid);
+    if (badge) badge.textContent = '$' + tv.toFixed(2) + ' | ' + tq.toLocaleString() + ' pcs';
+    updateSummary();
+}
+
+function updateSummary() {
+    const blocks = document.querySelectorAll('.po-block');
+    let tq = 0, tv = 0;
+    blocks.forEach(b => {
+        const pid = b.id.replace('block_', '');
+        tq += parseFloat(document.getElementById('totQty_' + pid)?.textContent?.replace(/,/g,'') || 0) || 0;
+        tv += parseFloat(document.getElementById('totVal_' + pid)?.textContent?.replace('$','') || 0) || 0;
+    });
+    document.getElementById('sumPoCount').textContent  = blocks.length;
+    document.getElementById('sumTotalQty').textContent = tq.toLocaleString();
+    document.getElementById('sumTotalVal').textContent = '$' + tv.toFixed(2);
+}
+
+/* ERP Search (mock - replace with real ERP API call) */
+function searchErp(pid) {
+    const query = document.getElementById('erpInput_' + pid)?.value?.trim();
+    if (!query) return;
+
+    const msg = document.getElementById('erpMsg_' + pid);
+                if (msg) msg.innerHTML = '<span style="color:#94a3b8;">Searching...</span>';
+
+    fetch(APP_BASE + '/api/pis.php?q=' + encodeURIComponent(query))
+        .then(r => r.json())
+        .then(res => {
+
+            // â”€â”€ Found as PI number â†’ load all its POs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            if (res.match === 'pi') {
+                const pi = res.pi;
+                (pi.pos || []).forEach((po, i) => {
+                    let targetPid = pid;
+                    if (i > 0) {
+                        addPoBlock();
+                        const blocks = document.querySelectorAll('.po-block');
+                        targetPid = blocks[blocks.length - 1].id.replace('block_', '');
+                    }
+                    fillPoBlock(targetPid, po);
+                });
+
+                if (!document.getElementById('piNumber').value) {
+                    document.getElementById('piNumber').value            = pi.pi_number;
+                    document.getElementById('piNumDisplay').textContent  = pi.pi_number;
+                }
+                if (!document.getElementById('piCustomer').value)
+                    document.getElementById('piCustomer').value = pi.customer || '';
+                if (!document.getElementById('piDate').value)
+                    document.getElementById('piDate').value = pi.pi_date || '';
+
+                if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Loaded PI ${pi.pi_number}</span> - ${(pi.pos||[]).length} PO(s) loaded from database.`;
+                return;
+            }
+
+            // â”€â”€ Found as PO number inside a saved PI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            if (res.match === 'po') {
+                fillPoBlock(pid, res.po);
+                if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Matched PO ${res.poNum}</span> from saved PI <strong>${res.pi.pi_number}</strong>.`;
+                return;
+            }
+
+            // â”€â”€ Not found in DB â†’ try real ERP API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            if (msg) msg.innerHTML = '<span style="color:#94a3b8;">Not in saved records - searching ERP...</span>';
+
+            fetch(APP_BASE + '/api/erp_proxy.php?po=' + encodeURIComponent(query))
+                .then(r => r.json())
+                .then(erp => {
+                    if (erp.error) {
+                        if (msg) msg.innerHTML = `<span style="color:#f87171;">ERP error: ${erp.error}</span>`;
+                        return;
+                    }
+                    if (!erp.found) {
+                        if (msg) msg.innerHTML = `<span style="color:#f87171;">PO <strong>${query}</strong> not found in ERP or saved records.</span>`;
+                        return;
+                    }
+
+                    // All sales orders for same customer PO â†’ merge all lines into the one searched block
+                    const firstGrp = erp.groups[0];
+                    const allLines = erp.groups.flatMap(g => g.lines).map(l => ({
+                        desc:  l.item,
+                        ply:   l.type,
+                        qty:   l.qty,
+                        price: l.price,
+                        total: (l.qty * l.price).toFixed(2)
+                    }));
+                    fillPoBlock(pid, {
+                        poNum: firstGrp.customerPo,
+                        buyer: firstGrp.buyer || firstGrp.customerName || '',
+                        items: allLines
+                    }, {
+                        salesOrder: firstGrp.salesOrderNo,
+                        reqDate:    firstGrp.requestDate || firstGrp.shipDate,
+                        status:     firstGrp.status,
+                    });
+
+                    const total = erp.groups.reduce((s, g) => s + g.lines.length, 0);
+                    if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">ERP matched PO ${erp.po}</span> - ${erp.groups.length} sales order(s) · ${total} line(s) loaded.`;
+                })
+                .catch(() => {
+                    if (msg) msg.innerHTML = '<span style="color:#f87171;">ERP server unreachable.</span>';
+                });
+        })
+        .catch(() => {
+            if (msg) msg.innerHTML = '<span style="color:#f87171;">Server error - could not search.</span>';
+        });
+}
+
+// â”€â”€ Fill a PO block with data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function fillPoBlock(pid, po, extra) {
+    document.getElementById('salesOrder_' + pid).value    = po.salesOrder || po.salesOrderNo || extra?.salesOrder || '';
+    document.getElementById('customerPo_' + pid).value    = po.poNum || '';
+    document.getElementById('buyerName_'  + pid).value    = po.buyer || extra?.buyer || '';
+    document.getElementById('reqDate_'    + pid).value    = po.reqDate || extra?.reqDate || '';
+    document.getElementById('poLabel_'    + pid).textContent = po.poNum || 'New Purchase Order';
+
+    const statusEl = document.getElementById('orderStatus_' + pid);
+    if (statusEl) statusEl.value = po.status || extra?.status || statusEl.value;
+
+    // Clear existing rows then fill items
+    document.getElementById('tbody_' + pid).innerHTML = '';
+    rowCounters[pid] = 0;
+
+    (po.items || []).forEach(item => {
+        addRow(pid);
+        const sl  = rowCounters[pid];
+        const rid = pid + '_' + sl;
+        const descEl = document.getElementById('desc_' + rid);
+        const plyEl  = document.getElementById('ply_'  + rid);
+        const qtyEl  = document.getElementById('qty_'  + rid);
+        const prcEl  = document.getElementById('prc_'  + rid);
+        const amtEl  = document.getElementById('amt_'  + rid);
+        if (descEl) descEl.value = item.desc  || '';
+        if (plyEl)  plyEl.value  = item.ply   || '';
+        if (qtyEl)  qtyEl.value  = item.qty   || 0;
+        if (prcEl)  prcEl.value  = item.price || 0;
+        if (amtEl)  amtEl.value  = item.total || ((item.qty * item.price) || 0).toFixed(2);
+    });
+    calcTotal(pid);
+}
+
+function mapMarketingRowToPiItem(row) {
+    const qty = parseFloat(row?.qty || 0) || 0;
+    const price = parseFloat(row?.unitPrc || 0) || 0;
+    const desc = row?.seg2 || row?.itemName || row?.detailExtra?.pn || '';
+    const ply = row?.unit || row?.spec1 || '';
+    return {
+        desc,
+        ply,
+        qty,
+        price,
+        total: (qty * price).toFixed(2)
+    };
+}
+
+async function fetchErpPoData(query) {
+    if (!query) return null;
+    try {
+        const erpRes = await fetch(APP_BASE + '/api/erp_proxy.php?po=' + encodeURIComponent(query));
+        const erp = await erpRes.json();
+        if (erp.error || !erp.found || !Array.isArray(erp.groups) || !erp.groups.length) return null;
+
+        const firstGrp = erp.groups[0];
+        const allLines = erp.groups.flatMap(g => (g.lines || [])).map(l => ({
+            desc:  l.item,
+            ply:   l.type || l.uom || '',
+            qty:   l.qty,
+            price: l.price,
+            total: ((parseFloat(l.qty || 0) || 0) * (parseFloat(l.price || 0) || 0)).toFixed(2)
+        }));
+
+        return {
+            po: {
+                poNum: firstGrp.customerPo || query,
+                buyer: firstGrp.buyer || firstGrp.customerName || '',
+                items: allLines
+            },
+            extra: {
+                salesOrder: firstGrp.salesOrderNo || '',
+                reqDate: firstGrp.requestDate || firstGrp.shipDate || '',
+                status: firstGrp.status || 'Booked'
+            }
+        };
+    } catch (_) {
+        return null;
+    }
+}
+
+async function hydratePiFromMarketingIntake(mkt, salesSnapshot) {
+    if (!mkt?.pos?.length) return false;
+
+    const selectedType = salesSnapshot?.piType
+        || (mkt.pos.length > 1 ? 'summary' : 'single');
+    const radio = document.querySelector(`input[name="piTypeChoice"][value="${selectedType}"]`);
+    if (radio) radio.checked = true;
+    onPiTypeChange();
+
+    const customer = salesSnapshot?.customer || mkt.customer || '';
+    const buyers = [...new Set((mkt.pos || []).map(po => (po.endBuyer || '').trim()).filter(Boolean))];
+    const sharedBuyer = salesSnapshot?.buyer || (buyers.length === 1 ? buyers[0] : (buyers[0] || ''));
+    const sharedDate = salesSnapshot?.piDate || mkt.intakeDate || new Date().toISOString().split('T')[0];
+
+    document.getElementById('piCustomer').value = customer;
+    window._pendingPiCustomer = customer;
+    document.getElementById('piBuyer').value = sharedBuyer;
+    document.getElementById('piDate').value = sharedDate;
+    if (salesSnapshot?.buyerAddress) {
+        document.getElementById('piBuyerAddress').value = salesSnapshot.buyerAddress;
+    } else if (customer) {
+        onPiCustomerChange();
+    }
+
+    document.getElementById('poBlocksContainer').innerHTML = '';
+    poCount = 0;
+    rowCounters = {};
+
+    for (const [idx, po] of (mkt.pos || []).entries()) {
+        addPoBlock();
+        const blocks = document.querySelectorAll('.po-block');
+        const pid = blocks[blocks.length - 1].id.replace('block_', '');
+        const erpData = await fetchErpPoData(po.poNum || '');
+        const fallbackItems = (po.rows || []).map(mapMarketingRowToPiItem).filter(item => item.desc || item.qty || item.price);
+        const sourcePo = erpData?.po || {
+            poNum: po.poNum || '',
+            buyer: po.endBuyer || '',
+            items: fallbackItems
+        };
+        const sourceExtra = erpData?.extra || {
+            salesOrder: po.orderNo || '',
+            reqDate: po.delivery || '',
+            status: 'Booked'
+        };
+        fillPoBlock(pid, sourcePo, sourceExtra);
+
+        const msg = document.getElementById('erpMsg_' + pid);
+        if (msg) {
+            msg.innerHTML = erpData
+                ? '<span style="color:#16a34a;font-weight:700;">Loaded from ERP</span>'
+                : '<span style="color:#64748b;">ERP not found - loaded from Marketing Intake. You can still add or edit items.</span>';
+        }
+
+        const piNumEl = document.getElementById('piNum_' + pid);
+        if (piNumEl && idx === 0) {
+            document.getElementById('piNumber').value = piNumEl.value || '';
+            document.getElementById('piNumDisplay').textContent = piNumEl.value || '-';
+        }
+    }
+
+    updateSummary();
+    document.getElementById('piStatus').textContent = 'Loaded';
+    return true;
+}
+
+function clearPo(pid) {
+    ['salesOrder','customerPo','buyerName','reqDate'].forEach(f => {
+        const el = document.getElementById(f + '_' + pid);
+        if (el) el.value = '';
+    });
+    document.getElementById('erpInput_' + pid).value = '';
+    document.getElementById('tbody_'    + pid).innerHTML = '';
+    document.getElementById('poLabel_'  + pid).textContent = 'New Purchase Order';
+    rowCounters[pid] = 0;
+    addRow(pid);
+    calcTotal(pid);
+    const msg = document.getElementById('erpMsg_' + pid);
+    if (msg) msg.textContent = 'Enter a customer PO and click Search ERP to load order details and item rows.';
+}
+
+function getSelectedMasterGroups() {
+    const groups = {};
+    document.querySelectorAll('.mpi-item-chk[data-mpi-source="overview"]:checked').forEach(chk => {
+        const pi   = _savedPisOverviewCache[+chk.dataset.pi];
+        const po   = (pi?.pos || [])[+chk.dataset.po];
+        const item = (po?.items || [])[+chk.dataset.item];
+        if (!pi || !po || !item) return;
+        const key = chk.dataset.pi + '_' + chk.dataset.po;
+        if (!groups[key]) {
+            groups[key] = {
+                piNumber:           pi.pi_number,
+                orderRef:           po.orderRef || po.salesOrder || po.salesOrderNo || '',
+                poNum:              po.poNum || po.customerPo || '',
+                style:              po.style || '',
+                sharedBuyer:        po.sharedBuyer || '',
+                sharedBuyerAddress: po.sharedBuyerAddress || '',
+                buyer:              po.buyer || '',
+                salesOrder:         po.salesOrder || po.salesOrderNo || '',
+                status:             po.status || '',
+                reqDate:            po.reqDate || '',
+                items: []
+            };
+        }
+        groups[key].items.push(item);
+    });
+    return Object.values(groups);
+}
+
+function renderMasterSelectedItems() {
+    const panel = document.getElementById('masterPiSelectedList');
+    if (!panel) return;
+    const groups = getSelectedMasterGroups();
+    renderMasterSelectedItemsFromGroups(groups);
+}
+
+function renderMasterSelectedItemsFromGroups(groups) {
+    const panel = document.getElementById('masterPiSelectedList');
+    if (!panel) return;
+    if (!groups.length) {
+        panel.innerHTML = '<div style="padding:18px;border:1px dashed #cbd5e1;border-radius:10px;color:#64748b;background:#f8fafc;">Select one or more items from the order PI list above to build the Master PI.</div>';
+        return;
+    }
+
+    let totalQty = 0;
+    let totalVal = 0;
+    let html = '<div class="opo-item-hdr"><span></span><span>Description of Goods</span><span>Ply</span><span>Qty</span><span>Unit Price</span><span>Amount</span></div>';
+    groups.forEach(group => {
+        const refParts = [
+            group.poNum ? 'PO # ' + group.poNum : '',
+            group.orderRef ? 'ORDER REF: ' + group.orderRef : '',
+            group.style ? 'Style# ' + group.style : ''
+        ].filter(Boolean);
+        if (refParts.length) {
+            html += `<div class="opo-ref-line">${refParts.join(' | ')}</div>`;
+        }
+        group.items.forEach(item => {
+            const qty = parseFloat(item.qty || 0);
+            const prc = parseFloat(item.price || item.unitPrice || 0);
+            const tot = parseFloat(item.total || (qty * prc)) || 0;
+            totalQty += qty;
+            totalVal += tot;
+            html += `<div class="opo-item-row">
+                <span></span>
+                <span>${item.desc || '-'}</span>
+                <span>${item.ply || ''}</span>
+                <span>${qty.toLocaleString()}</span>
+                <span>${prc ? '$' + prc.toFixed(2) : '-'}</span>
+                <span style="font-weight:700;">${tot ? '$' + tot.toFixed(2) : '-'}</span>
+            </div>`;
+        });
+    });
+    html += `<div style="display:flex;justify-content:flex-end;gap:18px;padding:14px 6px 0;font-size:13px;font-weight:700;color:#312e81;">
+        <span>Qty: ${totalQty.toLocaleString()}</span>
+        <span>Total: $${totalVal.toFixed(2)}</span>
+    </div>`;
+    panel.innerHTML = html;
+}
+
+// â”€â”€ Collect current PI data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function collectSalesPageData() {
+    const piType = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
+    if (piType === 'master') {
+        const masterGroups = getSelectedMasterGroups();
+        const selectedPiNumbers = [...new Set(masterGroups.map(group => group.piNumber).filter(Boolean))];
+        let grandQty = 0;
+        let grandVal = 0;
+        const pos = masterGroups.map(group => {
+            let qty = 0;
+            let val = 0;
+            group.items.forEach(item => {
+                const itemQty = parseFloat(item.qty || 0);
+                const itemVal = parseFloat(item.total || (itemQty * parseFloat(item.price || item.unitPrice || 0))) || 0;
+                qty += itemQty;
+                val += itemVal;
+            });
+            grandQty += qty;
+            grandVal += val;
+            return {
+                piNum: group.piNumber || '',
+                poNum: group.poNum || '',
+                qty,
+                val: val.toFixed(2),
+                items: group.items,
+                buyer: group.buyer || '',
+                salesOrder: group.salesOrder || '',
+                status: group.status || '',
+                reqDate: group.reqDate || ''
+            };
+        });
+
+        return {
+            piType,
+            piNum: document.getElementById('piNumber').value.trim(),
+            customer: document.getElementById('piCustomer').value.trim(),
+            buyer: document.getElementById('piBuyer').value.trim(),
+            productLine: '',
+            piDate: document.getElementById('piDate').value,
+            buyerAddress: document.getElementById('piBuyerAddress').value.trim(),
+            consigneeBank: '',
+            advisingBank: '',
+            pos,
+            masterPiSelection: masterGroups,
+            selectedPiNumbers,
+            grandQty,
+            grandVal: grandVal.toFixed(2)
+        };
+    }
+
+    const firstPid = document.querySelectorAll('.po-block')[0]?.id.replace('block_', '') || '';
+    const piNum    = document.getElementById('piNum_' + firstPid)?.value?.trim()
+                  || document.getElementById('piNumber').value.trim();
+    const customer   = document.getElementById('piCustomer').value.trim();
+    const buyer      = document.getElementById('piBuyer').value.trim();
+    const productLine= '';
+    const piDate     = document.getElementById('piDate').value;
+    const buyerAddress  = document.getElementById('piBuyerAddress').value.trim();
+    const consigneeBank = '';
+    const advisingBank  = '';
+
+    const blocks = document.querySelectorAll('.po-block');
+    const pos = [];
+    let grandQty = 0, grandVal = 0;
+
+    blocks.forEach(b => {
+        const pid  = b.id.replace('block_', '');
+        const qty  = parseFloat(document.getElementById('totQty_' + pid)?.textContent?.replace(/,/g,'') || 0) || 0;
+        const val  = parseFloat(document.getElementById('totVal_' + pid)?.textContent?.replace('$','') || 0) || 0;
+        const poNum = document.getElementById('customerPo_' + pid)?.value?.trim()
+                   || document.getElementById('erpInput_'   + pid)?.value?.trim()
+                   || ('PO ' + pid);
+
+        const items = [];
+        document.querySelectorAll('#tbody_' + pid + ' tr').forEach(tr => {
+            const rid  = tr.id.replace('row_', '');
+            const desc = document.getElementById('desc_' + rid)?.value?.trim();
+            const ply  = document.getElementById('ply_'  + rid)?.value?.trim();
+            const q    = parseFloat(document.getElementById('qty_'  + rid)?.value || 0) || 0;
+            const p    = parseFloat(document.getElementById('prc_'  + rid)?.value || 0) || 0;
+            if (desc || q) items.push({ desc, ply, qty: q, price: p, total: (q*p).toFixed(2) });
+        });
+
+        pos.push({
+            piNum: document.getElementById('piNum_' + pid)?.value?.trim() || '',
+            poNum,
+            qty,
+            val,
+            items,
+            buyer: document.getElementById('buyerName_' + pid)?.value?.trim() || '',
+            salesOrder: document.getElementById('salesOrder_' + pid)?.value?.trim() || '',
+            status: document.getElementById('orderStatus_' + pid)?.value?.trim() || '',
+            reqDate: document.getElementById('reqDate_' + pid)?.value || ''
+        });
+        grandQty += qty;
+        grandVal += val;
+    });
+
+    return {
+        piType,
+        piNum,
+        customer,
+        buyer,
+        productLine,
+        piDate,
+        buyerAddress,
+        consigneeBank,
+        advisingBank,
+        pos,
+        selectedPiNumbers: [...new Set(pos.map(po => po.piNum).filter(Boolean))],
+        grandQty,
+        grandVal: grandVal.toFixed(2)
+    };
+}
+
+function collectPiData() {
+    return collectSalesPageData();
+}
+
+async function createOrUpdateMasterPiRecord(data) {
+    const orderId = sessionStorage.getItem('ats_current_order_id') || '';
+    if (!orderId) throw new Error('No order loaded.');
+    if (!data.pos?.length) throw new Error('Please select at least one item for Master PI.');
+
+    const masterPiNum = (data.piNum && data.piNum !== data.selectedPiNumbers?.[0])
+        ? data.piNum
+        : (orderId + '-MASTER');
+
+    const payload = {
+        piNum: masterPiNum,
+        customer: data.customer,
+        buyer: data.buyer,
+        piDate: data.piDate,
+        buyerAddress: data.buyerAddress,
+        consigneeBank: data.consigneeBank,
+        advisingBank: data.advisingBank,
+        productLine: data.productLine || '',
+        pos: data.pos,
+        grandQty: data.grandQty || 0,
+        grandVal: data.grandVal || 0,
+        orderId,
+        isMaster: true,
+        includedPis: data.selectedPiNumbers || []
+    };
+
+    const piRes = await fetch(APP_BASE + '/api/pis.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    const piJson = await piRes.json();
+    if (piJson.error) throw new Error(piJson.error);
+
+    const pageRes = await fetch(APP_BASE + '/api/save_page.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            order_id: orderId,
+            page_name: 'sales',
+            ...data,
+            piType: 'master',
+            piNum: masterPiNum
+        })
+    });
+    const pageJson = await pageRes.json();
+    if (pageJson.error) throw new Error(pageJson.error);
+
+    return { orderId, masterPiNum };
+}
+
+// â”€â”€ Save PI to database â€” one PI record per PO block â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+savePi = async function() {
+    let data;
+    try { data = collectPiData(); } catch(e) { console.error('collectPiData error:', e); alert('Form read error: ' + e.message); return; }
+    const piType = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
+    const orderId = sessionStorage.getItem('ats_current_order_id') || '';
+
+    if (piType === 'master') {
+        if (!data.pos.length) { alert('Please select at least one item for Master PI.'); return; }
+        try {
+            const saved = await createOrUpdateMasterPiRecord(data);
+            document.getElementById('piStatus').textContent = 'Saved';
+            refreshSavedPiBadge();
+            renderOrderPiOverview(saved.orderId);
+            alert('Master PI created: ' + saved.masterPiNum);
+        } catch (e) {
+            console.error('save master selection error:', e);
+            alert('Save failed: ' + (e.message || 'Could not reach server. Check your connection.'));
+        }
+        return;
+    }
+
+    // Validate every PO block has a PI number
+    const missingNum = data.pos.findIndex(po => !po.piNum);
+    if (missingNum !== -1) { alert('Please enter a PI Number for PO ' + (missingNum + 1) + '.'); return; }
+
+    try {
+        // Save each PO block as its own PI record
+        let savedCount = 0, totalQty = 0, totalVal = 0;
+        for (const po of data.pos) {
+            // Embed shared header fields into pos JSON so print pages can read them
+            // even when the salesPg snapshot is unavailable
+            const poWithShared = {
+                ...po,
+                sharedBuyer:       data.buyer,
+                sharedBuyerAddress: data.buyerAddress
+            };
+            const perPi = {
+                piNum:       po.piNum,
+                customer:    data.customer,
+                buyer:       data.buyer,
+                piDate:      data.piDate,
+                buyerAddress: data.buyerAddress,
+                consigneeBank: data.consigneeBank,
+                advisingBank:  data.advisingBank,
+                pos:         [poWithShared],
+                grandQty:    po.qty,
+                grandVal:    parseFloat(po.val || 0).toFixed(2),
+                orderId
+            };
+            const piRes  = await fetch(APP_BASE + '/api/pis.php', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(perPi) });
+            const piJson = await piRes.json();
+            if (piJson.error) throw new Error(piJson.error + ' (PI: ' + po.piNum + ')');
+            savedCount++;
+            totalQty += po.qty;
+            totalVal += parseFloat(po.val || 0);
+        }
+
+        if (orderId) {
+            const pageRes = await fetch(APP_BASE + '/api/save_page.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order_id: orderId, page_name: 'sales', ...data })
+            });
+            const pageJson = await pageRes.json();
+            if (pageJson.error) alert('PIs saved, but Sales page snapshot could not be saved: ' + pageJson.error);
+        }
+
+        document.getElementById('piStatus').textContent = 'Saved';
+        refreshSavedPiBadge();
+        renderOrderPiOverview(orderId);
+        alert(savedCount + ' PI(s) saved · ' + totalQty.toLocaleString() + ' pcs · $' + totalVal.toFixed(2));
+    } catch (e) {
+        console.error('savePi error:', e);
+        alert('Save failed: ' + (e.message || 'Could not reach server. Check your connection.'));
+    }
+};
+
+async function submitToMarketing() {
+    let data;
+    try { data = collectPiData(); } catch(e) { console.error('collectPiData error:', e); alert('Form read error: ' + e.message); return; }
+    const piType = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
+    if (piType === 'master' && !data.pos.length) { alert('Please select at least one item for Master PI.'); return; }
+
+    if (piType !== 'master') {
+        const missingNum = data.pos.findIndex(po => !po.piNum);
+        if (missingNum !== -1) { alert('Please enter a PI Number for PI ' + (missingNum + 1) + '.'); return; }
+    }
+
+    const btn = document.getElementById('universalSaveBtn');
+    if (btn) { btn.textContent = 'Submitting...'; btn.disabled = true; }
+
+    const orderId = sessionStorage.getItem('ats_current_order_id') || '';
+
+    try {
+        let savedCount = 0, totalQty = 0, totalVal = 0;
+        if (piType !== 'master') {
+            // Save each PI block as its own PI record
+            for (const po of data.pos) {
+                const perPi = {
+                    piNum: po.piNum, customer: data.customer, buyer: data.buyer,
+                    piDate: data.piDate, buyerAddress: data.buyerAddress,
+                    consigneeBank: data.consigneeBank, advisingBank: data.advisingBank,
+                    pos: [po], grandQty: po.qty,
+                    grandVal: parseFloat(po.val || 0).toFixed(2), orderId
+                };
+                const piRes  = await fetch(APP_BASE + '/api/pis.php', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(perPi) });
+                const piJson = await piRes.json();
+                if (piJson.error) throw new Error(piJson.error + ' (PI: ' + po.piNum + ')');
+                savedCount++; totalQty += po.qty; totalVal += parseFloat(po.val || 0);
+            }
+        } else {
+            savedCount = data.pos.length;
+            totalQty = data.grandQty || 0;
+            totalVal = parseFloat(data.grandVal || 0);
+        }
+
+        // Update UI immediately â€” don't block on snapshot / step update
+        document.getElementById('piStatus').textContent = 'Submitted';
+        updatePrintLock('marketing');
+        refreshSavedPiBadge();
+        renderOrderPiOverview(orderId);
+        if (btn) {
+            btn.textContent = 'Submitted';
+            btn.style.background = '#16a34a';
+            btn.disabled = false;
+            setTimeout(() => {
+                onPiTypeChange();
+            }, 3000);
+        }
+
+        // Fire-and-forget background tasks
+        if (orderId) {
+            fetch(APP_BASE + '/api/save_page.php', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ order_id: orderId, page_name: 'sales', ...data })
+            }).catch(() => {});
+            fetch(APP_BASE + '/api/orders.php?id=' + encodeURIComponent(orderId) + '&step=marketing', { method: 'PUT' })
+                .catch(() => {});
+        }
+    } catch (e) {
+        console.error('submitToMarketing error:', e);
+        if (btn) {
+            onPiTypeChange();
+            btn.disabled = false;
+        }
+        alert('Submit failed: ' + (e.message || 'Could not reach server. Check your connection.'));
+    }
+}
+
+function clearPiForm() {
+    if (!confirm('Clear the current PI form?')) return;
+    document.getElementById('poBlocksContainer').innerHTML = '';
+    document.getElementById('piNumber').value = '';
+    document.getElementById('piNumDisplay').textContent = '-';
+    document.getElementById('piCustomer').value = '';
+    document.getElementById('piStatus').textContent = 'Draft';
+    poCount = 0; rowCounters = {};
+    addPoBlock();
+    updateSummary();
+}
+
+// â”€â”€ Master PI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+// Cached PI lists from the two selection surfaces
+let _savedPisOverviewCache = [];
+let _savedPisModalCache    = [];
+let _savedPisCache         = [];
+
+function refreshSavedPiBadge() {
+    const orderId = sessionStorage.getItem('ats_current_order_id') || '';
+    const url = orderId ? APP_BASE + '/api/pis.php?order_id=' + encodeURIComponent(orderId) : APP_BASE + '/api/pis.php';
+    fetch(url)
+        .then(r => r.json())
+        .then(pis => {
+            _savedPisCache = (pis || []).filter(p => !p.is_master);
+            const badge = document.getElementById('savedPiCountBadge');
+            const cnt   = document.getElementById('savedPiCount');
+            if (_savedPisCache.length > 0) {
+                badge.style.display = 'inline-block';
+                cnt.textContent = _savedPisCache.length;
+                updatePrintLock('marketing');
+            } else {
+                badge.style.display = 'none';
+            }
+        })
+        .catch(() => {});
+}
+
+function renderOrderPiOverview(orderId) {
+    const overview = document.getElementById('orderPiOverview');
+    const list     = document.getElementById('opoPiList');
+    if (!orderId) { overview.style.display = 'none'; return; }
+
+    fetch(APP_BASE + '/api/pis.php?order_id=' + encodeURIComponent(orderId))
+        .then(r => r.json())
+        .then(pis => {
+            if (!pis || !pis.length) { overview.style.display = 'none'; return; }
+            updatePrintLock('marketing');
+
+            const masters     = pis.filter(p => p.is_master);
+            const individuals = pis.filter(p => !p.is_master);
+            const includedNums = new Set(masters.flatMap(m => m.included_pis || []));
+
+            // Store individuals for item-level selection
+            _savedPisOverviewCache = individuals;
+
+            document.getElementById('opoPiCount').textContent = pis.length + ' PI(s)';
+            overview.style.display = 'block';
+
+            let html = '';
+
+            masters.forEach(pi => {
+                const combined = (pi.included_pis || []).join(', ') || '-';
+                html += `<div class="opo-row opo-master">
+                    <span class="opo-badge b-master">MASTER</span>
+                    <div class="opo-num">${pi.pi_number}</div>
+                    <div class="opo-meta">
+                        ${pi.customer || '-'} | ${(pi.pos||[]).length} PO(s)
+                        <div class="opo-includes">Combines: ${combined}</div>
+                    </div>
+                    <div class="opo-val">$${parseFloat(pi.grand_val||0).toFixed(2)}</div>
+                </div>`;
+            });
+
+            individuals.forEach((pi, piIdx) => {
+                const inMaster = includedNums.has(pi.pi_number);
+                const badge    = inMaster ? '<span class="opo-badge b-included">IN MASTER</span>' : '';
+
+                // Build inline item rows for this PI
+                let itemsHtml = '<div class="opo-item-hdr"><span></span><span>Description of Goods</span><span>Ply</span><span>Qty</span><span>Unit Price</span><span>Amount</span></div>';
+                (pi.pos || []).forEach((po, poIdx) => {
+                    const orderRef = po.orderRef || po.salesOrder || po.salesOrderNo || '';
+                    const poNum    = po.poNum    || po.customerPo || '';
+                    const style    = po.style    || '';
+                    const refParts = [
+                        poNum    ? 'PO # ' + poNum : '',
+                        orderRef ? 'ORDER REF: ' + orderRef : '',
+                        style    ? 'Style# ' + style : ''
+                    ].filter(Boolean);
+                    if (refParts.length) {
+                        itemsHtml += `<div class="opo-ref-line">${refParts.join(' | ')}</div>`;
+                    }
+                    (po.items || []).forEach((item, itemIdx) => {
+                        const qty = parseFloat(item.qty   || 0);
+                        const prc = parseFloat(item.price || item.unitPrice || 0);
+                        const tot = parseFloat(item.total || (qty * prc)) || 0;
+                        itemsHtml += `<div class="opo-item-row">
+                            <input type="checkbox" class="mpi-item-chk"
+                                   data-mpi-source="overview"
+                                    data-pi="${piIdx}" data-po="${poIdx}" data-item="${itemIdx}"
+                                    onchange="mpiUpdateTotals()">
+                            <span>${item.desc || '-'}</span>
+                            <span>${item.ply || ''}</span>
+                            <span>${qty.toLocaleString()}</span>
+                            <span>${prc ? '$' + prc.toFixed(2) : '-'}</span>
+                            <span style="font-weight:700;">${tot ? '$' + tot.toFixed(2) : '-'}</span>
+                        </div>`;
+                    });
+                });
+
+                html += `
+                <div style="border-radius:10px;overflow:hidden;border:1.5px solid ${inMaster ? '#bbf7d0' : '#fde68a'};">
+                    <div class="opo-row ${inMaster ? 'opo-included' : 'opo-standalone'}"
+                         style="border-radius:0;cursor:pointer;" onclick="mpiExpandOpoRow(${piIdx})">
+                        ${badge}
+                        <div class="opo-num">${pi.pi_number}</div>
+                        <div class="opo-meta">${pi.customer || '-'} | ${(pi.pos||[]).length} PO(s)</div>
+                        <div class="opo-val">$${parseFloat(pi.grand_val||0).toFixed(2)}</div>
+                        <span id="opoChev_${piIdx}" style="font-size:11px;color:#6366f1;white-space:nowrap;">Select Items</span>
+                        <button class="ghost-btn" style="font-size:11px;padding:2px 10px;" onclick="event.stopPropagation();loadPiIntoBlock('${pi.pi_number}')">Load</button>
+                    </div>
+                    <div id="opoItems_${piIdx}" style="display:none;">${itemsHtml}</div>
+                </div>`;
+            });
+
+            list.innerHTML = html;
+            document.getElementById('mpiBasket').style.display = 'none';
+        })
+        .catch(() => { overview.style.display = 'none'; });
+}
+
+function mpiExpandOpoRow(piIdx) {
+    const panel = document.getElementById('opoItems_' + piIdx);
+    const chev  = document.getElementById('opoChev_'  + piIdx);
+    if (!panel) return;
+    const open = panel.style.display !== 'none';
+    panel.style.display = open ? 'none' : 'block';
+    chev.textContent = open ? 'Select Items' : 'Hide Items';
+}
+
+function openMasterPi() {
+    const piType = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
+    if (piType === 'master') {
+        const selection = getSelectedMasterGroups();
+        if (selection.length) {
+            generateMasterPi();
+            return;
+        }
+    }
+
+    // If nothing is selected yet, guide the user to the selector.
+    const overview = document.getElementById('orderPiOverview');
+    if (overview) overview.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function loadPiIntoBlock(piNumber) {
+    fetch(APP_BASE + '/api/pis.php?q=' + encodeURIComponent(piNumber))
+        .then(r => r.json())
+        .then(res => {
+            if (res.match !== 'pi') { alert('PI not found: ' + piNumber); return; }
+            const pi = res.pi;
+            const po = (pi.pos || [])[0] || {};
+            addPoBlock();
+            const blocks = document.querySelectorAll('.po-block');
+            const pid = blocks[blocks.length - 1].id.replace('block_', '');
+            const piNumEl = document.getElementById('piNum_' + pid);
+            if (piNumEl) { piNumEl.value = pi.pi_number; }
+            fillPoBlock(pid, po, po);
+        })
+        .catch(() => alert('Could not load PI.'));
+}
+
+function closeMasterPi() {
+    document.getElementById('masterPiModal').classList.remove('open');
+    document.getElementById('mpiPreview').style.display = 'none';
+}
+
+function mpiToggleAllItems(chk) {
+    document.querySelectorAll('.mpi-item-chk[data-mpi-source="modal"]').forEach(c => {
+        c.checked = chk.checked;
+    });
+    mpiUpdateTotals();
+}
+
+function renderSavedPiList() {
+    const container = document.getElementById('savedPiList');
+    container.innerHTML = '<p style="color:#94a3b8;font-size:13px;padding:8px 0;">Loading...</p>';
+    const orderId = sessionStorage.getItem('ats_current_order_id') || '';
+    const url = orderId ? APP_BASE + '/api/pis.php?order_id=' + encodeURIComponent(orderId) : APP_BASE + '/api/pis.php';
+    fetch(url)
+        .then(r => r.json())
+        .then(allPis => {
+            const pis = (allPis || []).filter(p => !p.is_master);
+            _savedPisModalCache = pis;
+            if (!pis.length) {
+                container.innerHTML = '<p style="color:#94a3b8;font-size:13px;padding:8px 0;">No saved PIs yet. Save a PI first.</p>';
+                const selectAll = document.getElementById('mpiSelectAllItems');
+                if (selectAll) selectAll.checked = false;
+                return;
+            }
+
+            let html = '';
+            pis.forEach((pi, piIdx) => {
+                (pi.pos || []).forEach((po, poIdx) => {
+                    (po.items || []).forEach((item, itemIdx) => {
+                        const qty = parseFloat(item.qty || 0);
+                        const prc = parseFloat(item.price || item.unitPrice || 0);
+                        const tot = parseFloat(item.total || (qty * prc)) || 0;
+                        html += `<div class="mpi-item-row">
+                            <input type="checkbox" class="mpi-item-chk"
+                                   data-mpi-source="modal"
+                                   data-pi="${piIdx}" data-po="${poIdx}" data-item="${itemIdx}"
+                                   onchange="mpiUpdateTotals()">
+                            <span class="mpi-item-desc">${item.desc || '-'}</span>
+                            <span class="mpi-item-ply">${item.ply || ''}</span>
+                            <span class="mpi-item-qty">${qty.toLocaleString()}</span>
+                            <span class="mpi-item-prc">${prc ? prc.toFixed(3) : '-'}</span>
+                            <span class="mpi-item-tot">${tot ? '$' + tot.toFixed(2) : '-'}</span>
+                        </div>`;
+                    });
+                });
+            });
+
+            container.innerHTML = html || '<p style="color:#94a3b8;font-size:13px;padding:8px 0;">No items found in the saved PIs.</p>';
+            const selectAll = document.getElementById('mpiSelectAllItems');
+            if (selectAll) selectAll.checked = false;
+            mpiUpdateTotals();
+        })
+        .catch(() => { container.innerHTML = '<p style="color:#f87171;font-size:13px;">Could not load saved PIs.</p>'; });
+}
+
+function _getMpiCacheForCheckbox(chk) {
+    return chk?.dataset?.mpiSource === 'overview' ? _savedPisOverviewCache : _savedPisModalCache;
+}
+
+function mpiUpdateTotals() {
+    let qty = 0, val = 0, count = 0;
+    document.querySelectorAll('.mpi-item-chk:checked').forEach(chk => {
+        const cache = _getMpiCacheForCheckbox(chk);
+        const pi    = cache[+chk.dataset.pi];
+        const po    = (pi?.pos || [])[+chk.dataset.po];
+        const item  = (po?.items || [])[+chk.dataset.item];
+        if (!item) return;
+        qty += parseFloat(item.qty || 0);
+        val += parseFloat(item.total || ((item.qty||0) * (item.price||0)));
+        count++;
+    });
+    const basket = document.getElementById('mpiBasket');
+    if (basket) {
+        basket.style.display = count ? 'flex' : 'none';
+        document.getElementById('mpiBasketLabel').textContent = count + ' item' + (count !== 1 ? 's' : '') + ' selected';
+        document.getElementById('mpiBasketQty').textContent   = qty.toLocaleString();
+        document.getElementById('mpiBasketVal').textContent   = '$' + val.toFixed(2);
+    }
+    const bar = document.getElementById('mpiPreview');
+    if (bar) {
+        bar.style.display = count ? 'flex' : 'none';
+        const ic = document.getElementById('mpiItemCount'); if (ic) ic.textContent = count + ' item' + (count !== 1 ? 's' : '') + ' selected';
+        const tq = document.getElementById('mpiTotalQty');  if (tq) tq.textContent = qty.toLocaleString();
+        const tv = document.getElementById('mpiTotalVal');  if (tv) tv.textContent = '$' + val.toFixed(2);
+    }
+    if (document.querySelector('input[name="piTypeChoice"]:checked')?.value === 'master') {
+        renderMasterSelectedItems();
+    }
+}
+
+function deleteSavedPi(id, piNum) {
+    if (!confirm('Delete saved PI: ' + piNum + '?')) return;
+    fetch(APP_BASE + '/api/pis.php?id=' + id, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(() => { refreshSavedPiBadge(); renderSavedPiList(); updateMpiPreview(); })
+        .catch(() => alert('Delete failed.'));
+}
+
+function generateMasterPi() {
+    const groups = {};
+    document.querySelectorAll('.mpi-item-chk:checked').forEach(chk => {
+        const cache = _getMpiCacheForCheckbox(chk);
+        const pi    = cache[+chk.dataset.pi];
+        const po    = (pi?.pos || [])[+chk.dataset.po];
+        const item  = (po?.items || [])[+chk.dataset.item];
+        if (!pi || !po || !item) return;
+        const key = chk.dataset.pi + '_' + chk.dataset.po;
+        if (!groups[key]) {
+            groups[key] = {
+                piNumber:           pi.pi_number,
+                orderRef:           po.orderRef   || po.salesOrder || po.salesOrderNo || '',
+                poNum:              po.poNum      || po.customerPo || '',
+                style:              po.style      || '',
+                sharedBuyer:        po.sharedBuyer || '',
+                sharedBuyerAddress: po.sharedBuyerAddress || '',
+                items: []
+            };
+        }
+        groups[key].items.push(item);
+    });
+    const selection = Object.values(groups);
+    if (!selection.length) { alert('Please select at least one item.'); return; }
+    sessionStorage.setItem('mpi_custom_items', JSON.stringify(selection));
+    const days = document.getElementById('termLcDays')?.value || '90';
+    const tol  = document.getElementById('termTolerance')?.value || '5';
+    const hs   = document.getElementById('termHsCode')?.value || '4819.10.00';
+    const docMust = document.getElementById('termDocMust')?.value || 'UD';
+    const bnk  = document.getElementById('termBank')?.value || 'ncc';
+    window.location.href = APP_BASE + '/pages/master-pi.php?days=' + encodeURIComponent(days)
+        + '&lctype=Sight&tol=' + encodeURIComponent(tol)
+        + '&hs=' + encodeURIComponent(hs)
+        + '&doc=' + encodeURIComponent(docMust)
+        + '&bank=' + encodeURIComponent(bnk);
+}
+function _getMpiCacheForCheckbox(chk) {
+    return chk?.dataset?.mpiSource === 'overview' ? _savedPisOverviewCache : _savedPisModalCache;
+}
+
+function mpiUpdateTotals() {
+    let qty = 0, val = 0, count = 0;
+    document.querySelectorAll('.mpi-item-chk:checked').forEach(chk => {
+        const cache = _getMpiCacheForCheckbox(chk);
+        const pi    = cache[+chk.dataset.pi];
+        const po   = (pi?.pos || [])[+chk.dataset.po];
+        const item = (po?.items || [])[+chk.dataset.item];
+        if (!item) return;
+        qty += parseFloat(item.qty || 0);
+        val += parseFloat(item.total || ((item.qty||0) * (item.price||0)));
+        count++;
+    });
+    // Drive the inline basket bar
+    const basket = document.getElementById('mpiBasket');
+    if (basket) {
+        basket.style.display = count ? 'flex' : 'none';
+        document.getElementById('mpiBasketLabel').textContent = count + ' item' + (count !== 1 ? 's' : '') + ' selected';
+        document.getElementById('mpiBasketQty').textContent   = qty.toLocaleString();
+        document.getElementById('mpiBasketVal').textContent   = '$' + val.toFixed(2);
+    }
+    // Also update modal preview if open
+    const bar = document.getElementById('mpiPreview');
+    if (bar) {
+        bar.style.display = count ? 'flex' : 'none';
+        const ic = document.getElementById('mpiItemCount'); if (ic) ic.textContent = count + ' item' + (count !== 1 ? 's' : '') + ' selected';
+        const tq = document.getElementById('mpiTotalQty');  if (tq) tq.textContent = qty.toLocaleString();
+        const tv = document.getElementById('mpiTotalVal');  if (tv) tv.textContent = '$' + val.toFixed(2);
+    }
+    if (document.querySelector('input[name="piTypeChoice"]:checked')?.value === 'master') {
+        renderMasterSelectedItems();
+    }
+}
+
+function deleteSavedPi(id, piNum) {
+    if (!confirm('Delete saved PI: ' + piNum + '?')) return;
+    fetch(APP_BASE + '/api/pis.php?id=' + id, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(() => { refreshSavedPiBadge(); renderSavedPiList(); updateMpiPreview(); })
+        .catch(() => alert('Delete failed.'));
+}
+
+async function generateMasterPi() {
+    let data;
+    try {
+        data = collectPiData();
+        if (!data.pos.length) { alert('Please select at least one item.'); return; }
+        const saved = await createOrUpdateMasterPiRecord(data);
+        sessionStorage.setItem('mpi_custom_items', JSON.stringify(data.masterPiSelection || []));
+        document.getElementById('piStatus').textContent = 'Saved';
+        refreshSavedPiBadge();
+        renderOrderPiOverview(saved.orderId);
+        const days = document.getElementById('termLcDays')?.value || '90';
+        const tol  = document.getElementById('termTolerance')?.value || '5';
+        const hs   = document.getElementById('termHsCode')?.value || '4819.10.00';
+        const docMust = document.getElementById('termDocMust')?.value || 'UD';
+        const bnk  = document.getElementById('termBank')?.value || 'ncc';
+        window.location.href = APP_BASE + '/pages/master-pi.php?days=' + encodeURIComponent(days)
+            + '&lctype=Sight&tol=' + encodeURIComponent(tol)
+            + '&hs=' + encodeURIComponent(hs)
+            + '&doc=' + encodeURIComponent(docMust)
+            + '&bank=' + encodeURIComponent(bnk);
+    } catch (e) {
+        console.error('generateMasterPi error:', e);
+        alert('Master PI create failed: ' + (e.message || 'Could not reach server.'));
+    }
+}
+
+// â”€â”€ Show/hide PI content based on whether an order is active â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function setPiContentVisible(visible) {
+    document.getElementById('noOrderPrompt').style.display = visible ? 'none'  : 'block';
+    document.getElementById('piContent').style.display     = visible ? 'block' : 'none';
+    if (!visible) loadNoOrderList();
+}
+
+function loadNoOrderList() {
+    const rows = document.getElementById('noOrderRows');
+    if (!rows) return;
+    fetch(APP_BASE + '/api/orders.php')
+        .then(r => r.json())
+        .then(list => {
+            const relevant = (list || []).filter(o => o.current_step === 'sales');
+            if (!relevant.length) {
+                rows.innerHTML = '<div style="color:#94a3b8;font-size:13px;padding:8px 0;">No PI orders found.</div>';
+                return;
+            }
+            rows.innerHTML = relevant.slice(0, 15).map(o => {
+                const date = o.updated_at ? new Date(o.updated_at).toLocaleDateString('en-GB') : '—';
+                return `<div onclick="loadOrderFromDashboard('${o.order_id}','sales')"
+                    style="display:flex;align-items:center;gap:10px;padding:9px 14px;border:1.5px solid #e0e3ff;
+                           border-radius:10px;cursor:pointer;background:#fafbff;transition:.12s;"
+                    onmouseover="this.style.background='#eef2ff'" onmouseout="this.style.background='#fafbff'">
+                    <span style="font-size:13px;font-weight:800;color:#4f46e5;min-width:140px;">${o.order_id}</span>
+                    <span style="font-size:12px;color:#1e1e2e;flex:1;">${o.customer_name || '—'}</span>
+                    <span style="font-size:11px;color:#94a3b8;">${date}</span>
+                </div>`;
+            }).join('');
+        })
+        .catch(() => { rows.innerHTML = '<div style="color:#f87171;font-size:13px;">Could not load orders.</div>'; });
+}
+
+// â”€â”€ Customer dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+let _piCustomers = [];
+function loadPiCustomers() {
+    fetch(APP_BASE + '/api/customers.php')
+        .then(r => r.json())
+        .then(list => {
+            _piCustomers = list.filter(c => {
+                if (['sales_person','team_leader'].includes(c.stage)) return false;
+                const extra = (() => { try { return JSON.parse(c.extra_data || '{}'); } catch(e) { return {}; } })();
+                return (extra.customerCategory || '') === 'Bulk Production';
+            });
+            const sel = document.getElementById('piCustomer');
+            if (!sel) return;
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">Select customer</option>' +
+                _piCustomers.map(c => {
+                    const extra = (() => { try { return JSON.parse(c.extra_data || '{}'); } catch(e) { return {}; } })();
+                    const bin   = extra.bin || '';
+                    const addr  = (c.factory_address || c.address_head_office || '').replace(/"/g,'&quot;');
+                    return `<option value="${c.company_name}" data-addr="${addr}" data-bin="${bin.replace(/"/g,'&quot;')}">${c.company_name}</option>`;
+                }).join('');
+            if (cur) sel.value = cur;
+            if (window._pendingPiCustomer) {
+                sel.value = window._pendingPiCustomer;
+                window._pendingPiCustomer = '';
+                onPiCustomerChange();
+            }
+        })
+        .catch(() => {});
+}
+function onPiCustomerChange() {
+    const sel = document.getElementById('piCustomer');
+    const opt = sel.options[sel.selectedIndex];
+    const addr = opt?.dataset?.addr || '';
+    if (addr) document.getElementById('piBuyerAddress').value = addr;
+    buildSalesTerms();
+}
+loadPiCustomers();
+
+// Init
+addPoBlock();
+document.getElementById('piDate').value = new Date().toISOString().split('T')[0];
+refreshSavedPiBadge();
+
+// Show prompt by default; footer.php will call onOrderLoad if a session order exists
+setPiContentVisible(false);
+
+document.getElementById('masterPiModal').addEventListener('click', function(e) {
+    if (e.target === this) closeMasterPi();
+});
+
+// â”€â”€ Order ID integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const _STEP_ORDER = ['marketing-intake','costing-review','production','sales','marketing','lc','exchange','commercial','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding','po-status'];
+function _stepIdx(s) { return _STEP_ORDER.indexOf(s); }
+
+function updatePrintLock(step) {
+    const btn = document.getElementById('printPiBtn');
+    const excelBtn = document.getElementById('excelPiBtn');
+    if (!btn) return;
+    const submitted = _stepIdx(step) > _stepIdx('sales');
+    btn.disabled = !submitted;
+    btn.title    = submitted ? '' : 'Submit PI first to unlock printing';
+    btn.style.opacity = submitted ? '' : '0.5';
+    if (excelBtn) {
+        excelBtn.disabled = !submitted;
+        excelBtn.title = submitted ? '' : 'Submit PI first to unlock Excel download';
+        excelBtn.style.opacity = submitted ? '' : '0.5';
+    }
+}
+
+window.onOrderLoad = function(res) {
+    setPiContentVisible(true);
+    resetSubmitBtn();
+    const orderId = res.order?.order_id;
+    updatePrintLock(res.order?.current_step || 'sales');
+    const salesSnapshot = res.pages?.sales || null;
+    const marketingIntake = res.pages?.['marketing-intake'] || null;
+    if (salesSnapshot?.piType) {
+        const radio = document.querySelector(`input[name="piTypeChoice"][value="${salesSnapshot.piType}"]`);
+        if (radio) radio.checked = true;
+    }
+    onPiTypeChange();
+    renderOrderPiOverview(orderId);
+    if (salesSnapshot?.customer) document.getElementById('piCustomer').value = salesSnapshot.customer;
+    if (salesSnapshot?.buyer) document.getElementById('piBuyer').value = salesSnapshot.buyer;
+    if (salesSnapshot?.piDate) document.getElementById('piDate').value = salesSnapshot.piDate;
+    if (salesSnapshot?.buyerAddress) document.getElementById('piBuyerAddress').value = salesSnapshot.buyerAddress;
+    if (salesSnapshot?.piNum) {
+        document.getElementById('piNumber').value = salesSnapshot.piNum;
+        document.getElementById('piNumDisplay').textContent = salesSnapshot.piNum;
+    }
+
+    if (salesSnapshot?.piType === 'master') {
+        document.getElementById('poBlocksContainer').innerHTML = '';
+        poCount = 0;
+        rowCounters = {};
+        renderMasterSelectedItemsFromGroups(salesSnapshot.masterPiSelection || []);
+        document.getElementById('piStatus').textContent = 'Loaded';
+        return;
+    }
+
+    if (res.pis && res.pis.length) {
+        const firstPi = res.pis[0];
+        // Fill shared header fields from first PI
+        document.getElementById('piNumber').value           = firstPi.pi_number || '';
+        document.getElementById('piNumDisplay').textContent = firstPi.pi_number || '-';
+        document.getElementById('piCustomer').value         = firstPi.customer  || '';
+        const firstPo = firstPi.pos?.[0] || {};
+        document.getElementById('piBuyer').value            = salesSnapshot?.buyer          || firstPo.sharedBuyer          || '';
+        document.getElementById('piDate').value             = firstPi.pi_date || '';
+        document.getElementById('piBuyerAddress').value     = salesSnapshot?.buyerAddress   || firstPo.sharedBuyerAddress   || '';
+
+        // Each PI becomes its own PO block
+        document.getElementById('poBlocksContainer').innerHTML = '';
+        poCount = 0; rowCounters = {};
+        const piType = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
+        const pisToLoad = piType === 'single' ? res.pis.slice(0, 1) : res.pis;
+        pisToLoad.forEach(pi => {
+            const po = (pi.pos || [])[0] || {};
+            addPoBlock();
+            const blocks = document.querySelectorAll('.po-block');
+            const pid = blocks[blocks.length - 1].id.replace('block_', '');
+            const piNumEl = document.getElementById('piNum_' + pid);
+            if (piNumEl) piNumEl.value = pi.pi_number || '';
+            fillPoBlock(pid, po, po);
+        });
+        document.getElementById('piStatus').textContent = 'Loaded';
+        return;
+    }
+
+    if (hydratePiFromMarketingIntake(marketingIntake, salesSnapshot)) {
+        return;
+    }
+
+    // New order: auto-fill is handled by addPoBlock â†’ autoFillPiNum
+
+};
+
+window.onNewOrder = function(orderId) {
+    setPiContentVisible(true);
+    renderOrderPiOverview(orderId);
+    clearPiForm();
+    document.getElementById('piNumber').value           = orderId + '-PI';
+    document.getElementById('piNumDisplay').textContent = orderId + '-PI';
+    // Pre-fill first block's PI number
+    const firstPid = document.querySelectorAll('.po-block')[0]?.id.replace('block_','') || '';
+    const el = document.getElementById('piNum_' + firstPid);
+    if (el && !el.value) el.value = orderId + '-PI';
+};
+</script>
+
+<?php include __DIR__ . '/../includes/footer.php'; ?>

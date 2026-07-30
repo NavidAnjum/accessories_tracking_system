@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ED Module Workflow</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero">
+            <div class="hero-copy">
+                <p class="eyebrow">ED Module / Order to Export Pack</p>
+                <h1>One flow from buyer request to factory release.</h1>
+                <p class="hero-text">
+                    This page maps the real working scenario: Buyer gives the order, Marketing receives
+                    it, Commercial checks PI and LC, Marketing approves, Factory starts production,
+                    and the final invoice, packing, delivery, and export papers are issued from the
+                    same chain.
+                </p>
+                <div class="hero-pills">
+                    <span>Buyer</span>
+                    <span>Marketing</span>
+                    <span>Commercial</span>
+                    <span>PI</span>
+                    <span>LC</span>
+                    <span>Factory</span>
+                </div>
+            </div>
+            <div class="hero-panel">
+                <p class="panel-title">Core line</p>
+                <p class="panel-flow">Buyer -> Marketing -> Commercial -> PI + LC Check -> Marketing Approval -> Factory -> Delivery / Invoice / Packing</p>
+            </div>
+        </header>
+
+        <main>
+            <section class="flow-band">
+                <article class="flow-step">
+                    <span class="step-no">01</span>
+                    <h2>Buyer Sends Order</h2>
+                    <p>The process starts when the buyer places the order and shares requirements.</p>
+                </article>
+                <article class="flow-step">
+                    <span class="step-no">02</span>
+                    <h2>Marketing Receives</h2>
+                    <p>Marketing collects order details, buyer reference, timing, and production needs.</p>
+                </article>
+                <article class="flow-step">
+                    <span class="step-no">03</span>
+                    <h2>Commercial Reviews</h2>
+                    <p>Commercial checks PI, LC, item lines, prices, and document readiness.</p>
+                </article>
+                <article class="flow-step">
+                    <span class="step-no">04</span>
+                    <h2>Marketing Approves</h2>
+                    <p>Marketing verifies the commercial output before the order moves to factory.</p>
+                </article>
+                <article class="flow-step">
+                    <span class="step-no">05</span>
+                    <h2>Factory Starts</h2>
+                    <p>Once approved, the order goes to production and then to dispatch and export paperwork.</p>
+                </article>
+            </section>
+
+            <section class="split-layout">
+                <div class="sticky-note">
+                    <p class="note-label">Main understanding</p>
+                    <h2>The workbook is a document pack, not a single form.</h2>
+                    <p>
+                        Sales order data comes from another system. Commercial turns that into PI and
+                        shipment documents. Later forms reuse the same commercial data instead of starting
+                        from scratch.
+                    </p>
+                </div>
+
+                <div class="content-stack">
+                    <article class="card spotlight">
+                        <p class="card-kicker">System trigger</p>
+                        <h3>Sales Order is the starting input.</h3>
+                        <p>
+                            The external sales-order report already contains the strongest auto-fill data:
+                            sales order number, buyer, item lines, quantity, price, amount, PI number,
+                            DC number, shipment dates, and receivables invoice details.
+                        </p>
+                        <div class="mini-grid">
+                            <span>Sales Order Number</span>
+                            <span>Buyer</span>
+                            <span>Line Items</span>
+                            <span>Qty</span>
+                            <span>Price</span>
+                            <span>Amount</span>
+                            <span>PI Number</span>
+                            <span>DC Number</span>
+                        </div>
+                    </article>
+
+                    <article class="card">
+                        <p class="card-kicker">Department flow</p>
+                        <h3>Who does what</h3>
+                        <div class="role-list">
+                            <div>
+                                <strong>Buyer</strong>
+                                <p>Gives the order and business requirement.</p>
+                            </div>
+                            <div>
+                                <strong>Marketing</strong>
+                                <p>Receives the order, passes it to Commercial, and checks the final draft.</p>
+                            </div>
+                            <div>
+                                <strong>Commercial</strong>
+                                <p>Checks PI, checks LC, and prepares invoice, packing, and delivery documents.</p>
+                            </div>
+                            <div>
+                                <strong>Factory</strong>
+                                <p>Starts production only after the order is checked and approved.</p>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="card route-card">
+                        <p class="card-kicker">Approval route</p>
+                        <h3>PI and LC sit before factory release.</h3>
+                        <ol class="route-list">
+                            <li>Buyer gives order</li>
+                            <li>Marketing receives order</li>
+                            <li>Marketing sends details to Commercial</li>
+                            <li>Commercial creates or confirms PI</li>
+                            <li>Commercial checks LC</li>
+                            <li>Marketing checks commercial details</li>
+                            <li>Approved order goes to Factory</li>
+                            <li>Production, delivery, invoice, and packing follow</li>
+                        </ol>
+                    </article>
+                </div>
+            </section>
+
+            <section class="document-stage">
+                <div class="section-heading">
+                    <p class="eyebrow">Document chain</p>
+                    <h2>How one approved order becomes many forms.</h2>
+                </div>
+
+                <div class="document-lane">
+                    <article class="doc-card source">
+                        <p class="doc-type">Source</p>
+                        <h3>Sales Order System</h3>
+                        <p>Brings buyer, line items, qty, price, amount, PI number, DC number, and dates.</p>
+                    </article>
+
+                    <article class="doc-card core">
+                        <p class="doc-type">Commercial base</p>
+                        <h3>PI / Commercial Invoice</h3>
+                        <p>Main checked sheet where the commercial order view becomes usable for the rest of the pack.</p>
+                    </article>
+
+                    <article class="doc-card support">
+                        <p class="doc-type">Operational forms</p>
+                        <h3>Packing + Delivery + Truck Challan</h3>
+                        <p>Used for packing confirmation, dispatch, transport handover, and factory-side execution.</p>
+                    </article>
+
+                    <article class="doc-card export">
+                        <p class="doc-type">Export forms</p>
+                        <h3>Certificate + Beneficiary + Bill of Exchange</h3>
+                        <p>Created after commercial details are checked, especially for bank and export submission.</p>
+                    </article>
+
+                    <article class="doc-card final">
+                        <p class="doc-type">Final pack</p>
+                        <h3>Forwarding</h3>
+                        <p>The cover sheet for the full negotiated document set.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="two-column">
+                <article class="card">
+                    <p class="card-kicker">Auto-fill data</p>
+                    <h3>What should come from the system</h3>
+                    <ul class="clean-list">
+                        <li>Sales Order Number</li>
+                        <li>Customer PO Number</li>
+                        <li>Buyer</li>
+                        <li>Item code and item description</li>
+                        <li>UOM, quantity, price, amount</li>
+                        <li>PI number and DC number</li>
+                        <li>Requested, shipment, and dispatch dates</li>
+                        <li>Receivables invoice details</li>
+                    </ul>
+                </article>
+
+                <article class="card">
+                    <p class="card-kicker">Manual or master data</p>
+                    <h3>What Commercial still needs to complete</h3>
+                    <ul class="clean-list">
+                        <li>Consignee address</li>
+                        <li>Bank address and bank wording</li>
+                        <li>Applicant IRC, TIN, VAT, BIN</li>
+                        <li>Beneficiary VAT or BIN</li>
+                        <li>Bond license and HS code</li>
+                        <li>Sales contract number</li>
+                        <li>Export certificate wording</li>
+                        <li>Bill of exchange text and bank narrative</li>
+                    </ul>
+                </article>
+            </section>
+
+            <section class="final-banner">
+                <p class="eyebrow">One-line summary</p>
+                <h2>Sales Order feeds Commercial. Commercial feeds approval. Approval releases Factory. Factory triggers delivery and the final export pack.</h2>
+            </section>
+        </main>
+    </div>
+</body>
+</html>
