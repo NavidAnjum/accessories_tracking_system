@@ -189,6 +189,11 @@ window.onOrderLoad = function(res) {
 
     const fill = (id, val) => { const el = document.getElementById(id); if (el && val && !el.value) el.value = val; };
 
+    // ── Carry Beneficiary details from the LC page ──
+    fill('commercialBeneficiaryName',    lc.lcBeneficiaryName);
+    fill('commercialBeneficiaryAddress', lc.lcBeneficiaryAddress);
+    fill('commercialFactoryAddress',     lc.lcFactoryAddress);
+
     // ── Populate source-glance reference fields (salesOrder, customerPo, buyer, customer) ──
     const allPis   = res.pis || [];
     const resolved = window.atsResolveDisplayPos ? window.atsResolveDisplayPos(res) : { pos: sales?.pos || [] };

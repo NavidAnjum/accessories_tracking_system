@@ -52,7 +52,8 @@ function allowedTabs(): array {
     $map = [
         'marketing'       => ['marketing-intake', 'marketing', 'customer-profile', 'create-customer'],
         'sales_person'    => ['customer-profile', 'create-customer'],
-        'team_leader'     => ['customer-profile', 'create-customer'],
+        // Marketing team leader — marketing work + team-lead approval
+        'team_leader'     => ['marketing-intake', 'marketing', 'customer-profile', 'create-customer'],
         'finance'         => ['customer-profile'],
         'costing'         => ['costing-review'],
         'production'      => ['production'],

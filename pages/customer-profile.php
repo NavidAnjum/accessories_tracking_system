@@ -152,6 +152,9 @@ $stageMeta = [
                         <button class="ghost-btn" style="padding:4px 12px;font-size:12px;"
                                 onclick="openCpDetail(<?= (int)$c['id'] ?>)">View</button>
                         <?php endif; ?>
+                        <a class="ghost-btn" style="padding:4px 12px;font-size:12px;text-decoration:none;color:#4f46e5;border-color:#c7d2fe;"
+                           href="<?= BASE_PATH ?>/pages/customer-pdf.php?id=<?= (int)$c['id'] ?>" target="_blank"
+                           title="Download PDF">&#128424; PDF</a>
                     </td>
                 </tr>
             <?php endforeach; ?>

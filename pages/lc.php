@@ -6,6 +6,17 @@ $pageSubtitle = 'Letter of Credit check and record LC details.';
 include __DIR__ . '/../includes/header.php';
 ?>
 
+<style>
+.lc-up-table { width:100%; border-collapse:collapse; font-size:13px; margin-top:4px; }
+.lc-up-table th { background:#f5f7ff; color:#4f46e5; font-size:11px; text-transform:uppercase; letter-spacing:.04em; padding:8px 10px; text-align:left; border:1px solid #e0e3ff; }
+.lc-up-table td { padding:5px 6px; border:1px solid #eceffe; }
+.lc-up-table tfoot td { background:#fafbff; }
+.lc-up-inp { width:100%; border:none; border-bottom:1.5px solid #d1d5db; background:transparent; font-size:13px; padding:5px 4px; outline:none; box-sizing:border-box; }
+.lc-up-inp:focus { border-bottom-color:#6366f1; background:#f5f7ff; }
+.lc-up-rm { background:#fee2e2; border:none; border-radius:6px; color:#dc2626; width:28px; height:28px; font-size:16px; cursor:pointer; }
+.lc-up-rm:hover { background:#fecaca; }
+</style>
+
                 <section class="form-card" data-page="lc">
                     <div class="section-head">
                         <div class="section-title">
@@ -69,6 +80,39 @@ include __DIR__ . '/../includes/header.php';
                             <label for="lcAmount">LC Amount (USD)</label>
                             <input id="lcAmount" name="lcAmount" type="number" step="0.01" placeholder="0.00">
                         </div>
+                        <div class="field span-12">
+                            <label>UP / Raw Material Details</label>
+                            <table class="lc-up-table" id="lcUpTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width:22%;">Up No.</th>
+                                        <th style="width:22%;">Up Date</th>
+                                        <th style="width:24%;">Raw Material Qty</th>
+                                        <th style="width:24%;">Raw Material Value</th>
+                                        <th style="width:8%;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lcUpBody">
+                                    <tr>
+                                        <td><input class="lc-up-inp up-no" placeholder="UP number"></td>
+                                        <td><input class="lc-up-inp up-date" type="date"></td>
+                                        <td><input class="lc-up-inp up-qty" type="number" step="0.01" placeholder="0"></td>
+                                        <td><input class="lc-up-inp up-val" type="number" step="0.01" placeholder="0.00"></td>
+                                        <td><button type="button" class="lc-up-rm" onclick="lcRemoveUpRow(this)" title="Remove">&times;</button></td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="2" style="text-align:right;font-weight:700;">Total</td>
+                                        <td id="lcUpTotalQty" style="font-weight:700;">0</td>
+                                        <td id="lcUpTotalVal" style="font-weight:700;">0.00</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            <button type="button" class="ghost-btn" style="font-size:12px;padding:5px 14px;margin-top:8px;" onclick="lcAddUpRow()">+ Add Row</button>
+                            <input type="hidden" id="lcUpTableData" name="lcUpTableData">
+                        </div>
                         <div class="field span-4">
                             <label for="docSendToBuyerDate">Doc send to the Buyer (date)</label>
                             <input id="docSendToBuyerDate" name="docSendToBuyerDate" type="date">
@@ -105,6 +149,18 @@ include __DIR__ . '/../includes/header.php';
                             <label for="negotiatingBeneficiaryBank">Negotiating / Benificiary Bank</label>
                             <textarea id="negotiatingBeneficiaryBank" name="negotiatingBeneficiaryBank" placeholder="Negotiating or benificiary bank details"></textarea>
                         </div>
+                        <div class="field span-4">
+                            <label for="lcBeneficiaryName">Beneficiary Company Name</label>
+                            <input id="lcBeneficiaryName" name="lcBeneficiaryName" placeholder="Beneficiary company name…">
+                        </div>
+                        <div class="field span-4">
+                            <label for="lcBeneficiaryAddress">Head Office Address</label>
+                            <input id="lcBeneficiaryAddress" name="lcBeneficiaryAddress" placeholder="Head office address…">
+                        </div>
+                        <div class="field span-4">
+                            <label for="lcFactoryAddress">Factory Address</label>
+                            <input id="lcFactoryAddress" name="lcFactoryAddress" placeholder="Factory address…">
+                        </div>
                         <div class="field span-12">
                             <label for="lcNotes">LC Notes</label>
                             <textarea id="lcNotes" name="lcNotes" placeholder="Notes on LC check..."></textarea>
@@ -121,10 +177,76 @@ include __DIR__ . '/../includes/header.php';
                 </section>
 
 <script>
+// ── UP / Raw Material table ──────────────────────────────────────────────
+function lcAddUpRow(data) {
+    data = data || {};
+    const tbody = document.getElementById('lcUpBody');
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+        '<td><input class="lc-up-inp up-no" placeholder="UP number"></td>' +
+        '<td><input class="lc-up-inp up-date" type="date"></td>' +
+        '<td><input class="lc-up-inp up-qty" type="number" step="0.01" placeholder="0"></td>' +
+        '<td><input class="lc-up-inp up-val" type="number" step="0.01" placeholder="0.00"></td>' +
+        '<td><button type="button" class="lc-up-rm" onclick="lcRemoveUpRow(this)" title="Remove">&times;</button></td>';
+    tbody.appendChild(tr);
+    tr.querySelector('.up-no').value   = data.upNo   || '';
+    tr.querySelector('.up-date').value = data.upDate || '';
+    tr.querySelector('.up-qty').value  = data.qty    || '';
+    tr.querySelector('.up-val').value  = data.val    || '';
+    tr.querySelectorAll('.lc-up-inp').forEach(inp => inp.addEventListener('input', lcSyncUpTable));
+    lcSyncUpTable();
+}
+
+function lcRemoveUpRow(btn) {
+    const tbody = document.getElementById('lcUpBody');
+    if (tbody.rows.length <= 1) {
+        // clear the last row instead of removing it
+        btn.closest('tr').querySelectorAll('.lc-up-inp').forEach(i => i.value = '');
+    } else {
+        btn.closest('tr').remove();
+    }
+    lcSyncUpTable();
+}
+
+function lcSyncUpTable() {
+    const rows = [];
+    let totQty = 0, totVal = 0;
+    document.querySelectorAll('#lcUpBody tr').forEach(tr => {
+        const upNo   = tr.querySelector('.up-no')?.value.trim()   || '';
+        const upDate = tr.querySelector('.up-date')?.value        || '';
+        const qty    = tr.querySelector('.up-qty')?.value.trim()  || '';
+        const val    = tr.querySelector('.up-val')?.value.trim()  || '';
+        totQty += parseFloat(qty) || 0;
+        totVal += parseFloat(val) || 0;
+        if (upNo || upDate || qty || val) rows.push({ upNo, upDate, qty, val });
+    });
+    document.getElementById('lcUpTotalQty').textContent = totQty.toLocaleString();
+    document.getElementById('lcUpTotalVal').textContent = totVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    const hidden = document.getElementById('lcUpTableData');
+    if (hidden) hidden.value = JSON.stringify(rows);
+}
+
+function lcRestoreUpTable(json) {
+    let rows = [];
+    try { rows = JSON.parse(json || '[]'); } catch (_) { rows = []; }
+    const tbody = document.getElementById('lcUpBody');
+    tbody.innerHTML = '';
+    if (!rows.length) { lcAddUpRow(); return; }
+    rows.forEach(r => lcAddUpRow(r));
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    // wire the initial static row
+    document.querySelectorAll('#lcUpBody .lc-up-inp').forEach(inp => inp.addEventListener('input', lcSyncUpTable));
+});
+
 // Populate LC glance fields from saved sales page data
 window.onOrderLoad = (function(_prev) {
     return function(res) {
         if (typeof _prev === 'function') _prev(res);
+        // Restore the UP table from the saved LC page snapshot
+        const lcSnap = res.pages?.lc || {};
+        if (lcSnap.lcUpTableData) lcRestoreUpTable(lcSnap.lcUpTableData);
         const sales   = res.pages?.sales || {};
         const intake  = res.pages?.['marketing-intake'] || {};
 

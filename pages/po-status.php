@@ -6,6 +6,23 @@ $pageSubtitle = 'Challan Sheet — delivery and inspection records.';
 include __DIR__ . '/../includes/header.php';
 ?>
 
+<style>
+@media print {
+    /* Hide app chrome — print only the challan sheet */
+    nav.page-nav, .order-id-bar, .section-head, .erp-banner,
+    .challan-search-banner, .page-actions, .no-print,
+    .nav-user-bar, .modal-shell, #sharedOrderItemsPanel { display: none !important; }
+    html, body, .app-shell, .form-stack, .form-card { background: #fff !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; }
+    .challan-sheet { border: 1.5px solid #1e3a8a !important; box-shadow: none !important; margin: 0 !important; }
+    /* Force table borders/colors to render in print */
+    .challan-table th, .challan-table td, .challan-qa-card, .challan-sheet * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    @page { size: A4 landscape; margin: 8mm; }
+}
+</style>
+
                 <section class="form-card" data-page="po-status">
                     <div class="section-head">
                         <div class="section-title">
@@ -97,6 +114,7 @@ include __DIR__ . '/../includes/header.php';
                         <div class="page-actions-left">
                             <button type="button" class="ghost-btn js-prev-page" data-prev-page="bank-forwarding">Previous</button>
                             <button type="button" class="ghost-btn workflow-btn" data-action="generate-challan">Generate Challan Sheet</button>
+                            <button type="button" class="ghost-btn no-print" onclick="window.print()" style="color:#4f46e5;border-color:#c7d2fe;">&#128424; Download PDF</button>
                         </div>
                         <div class="page-actions-right">
                             <button type="button" class="primary-btn workflow-btn" data-action="generate-docs">Finish Pack</button>

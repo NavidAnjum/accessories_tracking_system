@@ -44,15 +44,96 @@ include __DIR__ . '/../includes/header.php';
 </section>
 
 <script>
-document.addEventListener('DOMContentLoaded', async function () {
-    await renderDashboard();
+// Self-contained dashboard — does NOT depend on script.js loading.
+(function () {
+    const BASE = window.APP_BASE || ('/' + window.location.pathname.split('/')[1]);
 
-    // If nothing loaded after render, redirect to first step
-    const body = document.getElementById('dashOrdersBody');
-    if (body && body.querySelector('.dash-empty')) {
-        window.location.href = APP_BASE + '/pages/marketing-intake.php';
+    const STEP_LABELS = {
+        'dashboard':'Dashboard','marketing-intake':'Marketing Intake','costing-review':'Costing Review',
+        'sales':'PI','marketing':'Marketing','lc':'LC','po-overview':'PO Status','exchange':'Bill of Exchange',
+        'commercial':'Commercial Invoice','packing':'Packing List','delivery':'Delivery Challan',
+        'truck':'Truck Challan','origin':'Certificate of Origin','beneficiary':"Beneficiary's Certificate",
+        'forwarding':'Forwarding','po-status':'Challan Sheet',
+    };
+    const STEP_ORDER = ['marketing-intake','costing-review','sales','marketing','commercial','packing',
+        'delivery','truck','origin','beneficiary','lc','forwarding'];
+    const STEP_PAGES = {
+        'marketing-intake':'marketing-intake.php','costing-review':'costing-review.php','sales':'sales.php',
+        'marketing':'marketing.php','lc':'lc.php','po-overview':'po-overview.php','exchange':'exchange.php',
+        'commercial':'commercial.php','packing':'packing.php','delivery':'delivery.php','truck':'truck.php',
+        'origin':'origin.php','beneficiary':'beneficiary.php','forwarding':'forwarding.php','po-status':'po-status.php',
+    };
+
+    window.loadOrderFromDashboard = function (orderId, step) {
+        sessionStorage.setItem('ats_current_order_id', orderId);
+        const page = STEP_PAGES[step || 'marketing-intake'] || 'marketing-intake.php';
+        window.location.href = BASE + '/pages/' + page;
+    };
+    window.deleteOrderFromDashboard = function (orderId) {
+        if (!confirm('Delete order ' + orderId + '?')) return;
+        fetch(BASE + '/api/orders.php?order_id=' + encodeURIComponent(orderId), { method: 'DELETE' })
+            .catch(() => {})
+            .finally(() => renderDash());
+    };
+
+    async function renderDash() {
+        const body = document.getElementById('dashOrdersBody');
+        if (!body) return;
+        let orders = [];
+        try {
+            const res = await fetch(BASE + '/api/orders.php');
+            if (res.ok) {
+                const db = await res.json();
+                orders = (db || []).map(o => ({
+                    id: o.order_id, customer: o.customer_name, poNumber: o.po_number,
+                    salesperson: o.salesperson, buyerCode: o.to_buyer, deliveryDate: o.delivery_date,
+                    currentStep: o.current_step, savedAt: o.updated_at,
+                }));
+            }
+        } catch (_) {}
+
+        if (!orders.length) {
+            body.innerHTML = '<tr><td colspan="10" class="dash-empty" style="text-align:center;padding:20px;color:#94a3b8;">No orders yet — click “+ New Order” to start.</td></tr>';
+            return;
+        }
+
+        body.innerHTML = orders.map(o => {
+            const stepLabel = STEP_LABELS[o.currentStep] || 'Marketing Intake';
+            const stepIdx   = STEP_ORDER.indexOf(o.currentStep || 'marketing-intake');
+            const pct       = Math.max(8, Math.round(((stepIdx + 1) / STEP_ORDER.length) * 100));
+            const saved     = o.savedAt ? new Date(o.savedAt).toLocaleDateString('en-GB') : '-';
+            const step      = o.currentStep || 'marketing-intake';
+            return `<tr>
+                <td><span class="znz-id" style="cursor:pointer;" onclick="loadOrderFromDashboard('${o.id}','${step}')">${o.id || '-'}</span></td>
+                <td>${o.customer || '-'}</td>
+                <td>${o.poNumber || '-'}</td>
+                <td>${o.salesperson || '-'}</td>
+                <td>${o.buyerCode || '-'}</td>
+                <td>${o.deliveryDate || '-'}</td>
+                <td>0</td>
+                <td>
+                    <div class="dash-step-wrap">
+                        <span class="step-badge">${stepLabel}</span>
+                        <div class="dash-progress"><div class="dash-progress-fill" style="width:${pct}%"></div></div>
+                    </div>
+                </td>
+                <td>${saved}</td>
+                <td class="dash-actions">
+                    <button class="primary-btn ghost-btn--sm" onclick="loadOrderFromDashboard('${o.id}','${step}')">▶ Go to ${stepLabel}</button>
+                    <button class="ghost-btn ghost-btn--sm dash-del-btn" onclick="deleteOrderFromDashboard('${o.id}')">Del</button>
+                </td>
+            </tr>`;
+        }).join('');
     }
-});
+
+    document.addEventListener('DOMContentLoaded', function () {
+        renderDash();
+        document.getElementById('dashNewOrderTop')?.addEventListener('click', function () {
+            sessionStorage.removeItem('ats_current_order_id');
+            window.location.href = BASE + '/pages/marketing-intake.php';
+        });
+    });
+})();
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

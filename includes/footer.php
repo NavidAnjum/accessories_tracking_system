@@ -184,10 +184,10 @@
         </div>
     </div>
 
-    <script src="<?= BASE_PATH ?>/item-data.js"></script>
-    <script src="<?= BASE_PATH ?>/js/common.js"></script>
-    <script src="<?= BASE_PATH ?>/script.js"></script>
-    <script src="<?= BASE_PATH ?>/js/html2canvas.min.js"></script>
+    <script src="../item-data.js?v=8"></script>
+    <script src="../js/common.js?v=8"></script>
+    <script src="../script.js?v=8"></script>
+    <script src="../js/html2canvas.min.js?v=8"></script>
 
 <script>
 // ── Order ID Bar — global functions ────────────────────────────────────────
@@ -668,8 +668,7 @@ function atsBuildSvgMarkupForElement(sourceEl) {
     wrapper.appendChild(clone);
 
     const xhtml = new XMLSerializer().serializeToString(wrapper);
-    const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
     <foreignObject width="100%" height="100%">${xhtml}</foreignObject>
 </svg>`;
     return { svg, width, height };

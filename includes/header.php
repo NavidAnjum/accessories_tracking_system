@@ -125,6 +125,7 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
                 </div>
                 <span class="nav-user-name"><?= htmlspecialchars($__user['name']) ?></span>
                 <span class="nav-user-role"><?= htmlspecialchars(ucwords(str_replace('_', ' ', $__user['role'] ?? ''))) ?></span>
+                <a href="<?= BASE_PATH ?>/pages/change-password.php" class="nav-logout-btn" style="background:#eef2ff;color:#4f46e5;border-color:#c7d2fe;" title="Change your password">&#128273; Password</a>
                 <a href="<?= BASE_PATH ?>/pages/logout.php" class="nav-logout-btn">Sign Out</a>
             </div>
         </div>
@@ -198,6 +199,102 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
         </div>
     </div>
     <?php endif; ?>
+
+    <!-- Self-contained Work Order bar functions (do NOT depend on footer.php/script.js) -->
+    <script>
+    (function () {
+        if (window.__oidBarReady) return;
+        window.__oidBarReady = true;
+        const OID_KEY = 'ats_current_order_id';
+        const BASE = window.APP_BASE || ('/' + window.location.pathname.split('/')[1]);
+
+        function setOrderDisplay(orderId, order) {
+            const display = document.getElementById('oidDisplay');
+            const statusRow = document.getElementById('oidStatusRow');
+            if (!display) return;
+            display.textContent = orderId;
+            if (order && statusRow) {
+                const cust = document.getElementById('oidCustomer');
+                const step = document.getElementById('oidStep');
+                const date = document.getElementById('oidDate');
+                if (cust) cust.textContent = order.customer_name || 'No customer yet';
+                if (step) step.textContent = 'Step: ' + (order.current_step || '—').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+                if (date) date.textContent = order.created_at ? new Date(order.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '';
+                statusRow.style.display = 'flex';
+            }
+            sessionStorage.setItem(OID_KEY, orderId);
+        }
+
+        function loadOrderById(id, isManual) {
+            fetch(BASE + '/api/order_lookup.php?id=' + encodeURIComponent(id))
+                .then(r => r.json())
+                .then(res => {
+                    if (!res.found) {
+                        sessionStorage.removeItem(OID_KEY);
+                        const d = document.getElementById('oidDisplay');
+                        if (d) d.textContent = 'No order loaded';
+                        const sr = document.getElementById('oidStatusRow');
+                        if (sr) sr.style.display = 'none';
+                        if (isManual) alert('Order not found: ' + id);
+                        return;
+                    }
+                    setOrderDisplay(res.order.order_id, res.order);
+                    const inp = document.getElementById('oidInput');
+                    if (inp) inp.value = '';
+                    if (typeof window.onOrderLoad === 'function') window.onOrderLoad(res);
+                })
+                .catch(() => alert('Could not reach server.'));
+        }
+
+        window.getCurrentOrderId = () => sessionStorage.getItem(OID_KEY) || '';
+        window.loadOrderById = loadOrderById;
+
+        window.oidSearch = function () {
+            const q = (document.getElementById('oidInput')?.value || '').trim();
+            if (q) loadOrderById(q, true);
+        };
+
+        window.oidNewOrder = function () {
+            if (sessionStorage.getItem(OID_KEY)) {
+                if (!confirm('Start a new order? The current order ID will be cleared from this session.')) return;
+            }
+            fetch(BASE + '/api/order_lookup.php', { method: 'POST' })
+                .then(r => r.json())
+                .then(res => {
+                    if (!res.ok) { alert('Failed to create order.'); return; }
+                    setOrderDisplay(res.order_id, null);
+                    const sr = document.getElementById('oidStatusRow');
+                    if (sr) {
+                        const cust = document.getElementById('oidCustomer');
+                        const step = document.getElementById('oidStep');
+                        const date = document.getElementById('oidDate');
+                        if (cust) cust.textContent = '';
+                        if (step) step.textContent = 'Step: Marketing Intake';
+                        if (date) date.textContent = '';
+                        sr.style.display = 'flex';
+                    }
+                    if (typeof window.onNewOrder === 'function') window.onNewOrder(res.order_id);
+                    loadOrderById(res.order_id);
+                    alert('New order created: ' + res.order_id);
+                })
+                .catch(() => alert('Could not reach server.'));
+        };
+
+        // Auto-restore the current/most-recent order on page load
+        document.addEventListener('DOMContentLoaded', function () {
+            if (!document.getElementById('oidDisplay')) return;
+            const stored = sessionStorage.getItem(OID_KEY);
+            if (stored) {
+                loadOrderById(stored);
+            } else {
+                fetch(BASE + '/api/orders.php?last=1')
+                    .then(r => r.json())
+                    .then(row => { if (row?.order_id) loadOrderById(row.order_id); })
+                    .catch(() => {});
+            }
+        });
+    })();
+    </script>
 
     <main class="form-stack">
 <script>
