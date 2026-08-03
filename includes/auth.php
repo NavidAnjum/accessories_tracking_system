@@ -73,3 +73,15 @@ function canAccessTab(string $tabId): bool {
 function currentUserRole(): string {
     return currentUser()['role'] ?? '';
 }
+
+// The team the current user belongs to (null = no team / sees all)
+function currentUserTeam(): ?string {
+    $t = currentUser()['team'] ?? null;
+    return ($t === '' ) ? null : $t;
+}
+
+// Roles whose customer visibility is limited to their own team.
+// Downstream/oversight roles (admin, finance, commercial) see all teams.
+function isTeamScopedRole(): bool {
+    return in_array(currentUserRole(), ['marketing', 'team_leader'], true);
+}

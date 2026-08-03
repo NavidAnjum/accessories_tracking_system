@@ -41,19 +41,34 @@ $method = $_SERVER['REQUEST_METHOD'];
 try {
     $db = getDB();
 
+    // ── Team scoping: marketing/team_leader see only their own team ──
+    $teamScoped = isTeamScopedRole();
+    $myTeam     = currentUserTeam();
+
     if ($method === 'GET') {
         if (!empty($_GET['id'])) {
             $stmt = $db->prepare('SELECT * FROM customers WHERE id = ?');
             $stmt->execute([(int) $_GET['id']]);
             $row = $stmt->fetch();
+            // Block cross-team access for team-scoped roles
+            if ($row && $teamScoped && ($row['team'] ?? null) !== $myTeam) {
+                echo json_encode(null);
+                exit;
+            }
             if ($row && $row['signatures']) {
                 $row['signatures'] = json_decode($row['signatures'], true) ?? [];
-            } else {
+            } else if ($row) {
                 $row['signatures'] = [];
             }
             echo json_encode($row ?: null);
         } else {
-            $stmt = $db->query("SELECT id, company_name, customer_type, chairman_name, chairman_mobile, address_head_office, factory_address, extra_data, COALESCE(stage, 'completed') as stage, created_at FROM customers ORDER BY company_name");
+            $cols = "id, company_name, customer_type, chairman_name, chairman_mobile, address_head_office, factory_address, extra_data, team, COALESCE(stage, 'completed') as stage, created_at";
+            if ($teamScoped) {
+                $stmt = $db->prepare("SELECT $cols FROM customers WHERE team <=> ? ORDER BY company_name");
+                $stmt->execute([$myTeam]);
+            } else {
+                $stmt = $db->query("SELECT $cols FROM customers ORDER BY company_name");
+            }
             echo json_encode($stmt->fetchAll());
         }
         exit;
@@ -94,15 +109,18 @@ try {
         $sigJson = json_encode($signatures);
         $stage   = firstApprovalStageForCreator($creatorRole);
 
+        // Stamp the creating user's team onto the customer
+        $customerTeam = currentUserTeam();
+
         $sql = '
             INSERT INTO customers
                 (company_name, address_head_office, factory_address, chairman_name,
                  chairman_mobile, customer_type, date_form, politics_yes, politics_party,
-                 extra_data, stage, signatures)
+                 extra_data, stage, signatures, team)
             VALUES
                 (:company_name, :address_head_office, :factory_address, :chairman_name,
                  :chairman_mobile, :customer_type, :date_form, :politics_yes, :politics_party,
-                 :extra_data, :stage, :signatures)
+                 :extra_data, :stage, :signatures, :team)
             ON DUPLICATE KEY UPDATE
                 address_head_office = VALUES(address_head_office),
                 factory_address     = VALUES(factory_address),
@@ -130,6 +148,7 @@ try {
             ':extra_data'          => $extraData,
             ':stage'               => $stage,
             ':signatures'          => $sigJson,
+            ':team'                => $customerTeam,
         ]);
 
         $id = (int) $db->lastInsertId();

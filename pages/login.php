@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'name'  => $user['name'],
                 'email' => $user['email'],
                 'role'  => $user['role'],
+                'team'  => $user['team'] ?? null,
             ];
             header('Location: ' . BASE_PATH . '/pages/dashboard.php'); exit;
         } else {
@@ -64,8 +65,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php endif; ?>
     <form method="POST">
         <div class="login-field">
-            <label>Email</label>
-            <input type="email" name="email" required autofocus placeholder="your@email.com"
+            <label>Email / Phone</label>
+            <input type="text" name="email" required autofocus placeholder="Email or phone number"
                    value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
         </div>
         <div class="login-field">

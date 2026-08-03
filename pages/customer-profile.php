@@ -10,10 +10,25 @@ $perPage = 10;
 $offset  = ($page - 1) * $perPage;
 $db      = null;
 
+// ── Team scoping: marketing/team_leader see only their own team ──
+$teamScoped = isTeamScopedRole();
+$myTeam     = currentUserTeam();
+
 try {
     $db = getDB();
-    $where = $search ? 'WHERE company_name LIKE :s OR chairman_name LIKE :s OR chairman_mobile LIKE :s OR customer_type LIKE :s' : '';
-    $params = $search ? [':s' => "%$search%"] : [];
+
+    $conds  = [];
+    $params = [];
+    if ($search) {
+        $conds[] = '(company_name LIKE :s OR chairman_name LIKE :s OR chairman_mobile LIKE :s OR customer_type LIKE :s)';
+        $params[':s'] = "%$search%";
+    }
+    if ($teamScoped) {
+        $conds[] = 'team <=> :team';
+        $params[':team'] = $myTeam;
+    }
+    $where = $conds ? ('WHERE ' . implode(' AND ', $conds)) : '';
+
     $cntStmt = $db->prepare("SELECT COUNT(*) FROM customers $where");
     $cntStmt->execute($params);
     $total = (int)$cntStmt->fetchColumn();
@@ -39,8 +54,13 @@ $canCreate = in_array($userRole, ['sales_person', 'team_leader', 'admin']);
 $pendingApprovals = [];
 if (!in_array($userRole, ['sales_person', 'admin', 'completed'])) {
     try {
-        $pStmt = $db->prepare("SELECT id, company_name, customer_type, chairman_name, chairman_mobile, created_at FROM customers WHERE stage = ? ORDER BY created_at ASC");
-        $pStmt->execute([$userRole]);
+        if ($teamScoped) {
+            $pStmt = $db->prepare("SELECT id, company_name, customer_type, chairman_name, chairman_mobile, created_at FROM customers WHERE stage = ? AND team <=> ? ORDER BY created_at ASC");
+            $pStmt->execute([$userRole, $myTeam]);
+        } else {
+            $pStmt = $db->prepare("SELECT id, company_name, customer_type, chairman_name, chairman_mobile, created_at FROM customers WHERE stage = ? ORDER BY created_at ASC");
+            $pStmt->execute([$userRole]);
+        }
         $pendingApprovals = $pStmt->fetchAll();
     } catch (Exception $e) { /* ignore */ }
 }
