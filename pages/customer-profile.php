@@ -3,6 +3,7 @@ $pageTitle  = 'Customer Profile';
 $activePage = 'customer-profile';
 $navSection = 'master';
 include __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 $search  = trim($_GET['search'] ?? '');
 $page    = max(1, (int)($_GET['page'] ?? 1));
@@ -49,6 +50,8 @@ include __DIR__ . '/../includes/header.php';
 
 $userRole  = $__user['role'] ?? '';
 $canCreate = in_array($userRole, ['sales_person', 'team_leader', 'admin']);
+// Approval stage this user handles. Both 'commercial' and 'commercial_dept' approve the 'commercial' stage.
+$approvalStage = in_array($userRole, ['commercial', 'commercial_dept'], true) ? 'commercial' : $userRole;
 
 // Fetch pending approvals for the current non-admin user
 $pendingApprovals = [];
@@ -56,10 +59,10 @@ if (!in_array($userRole, ['sales_person', 'admin', 'completed'])) {
     try {
         if ($teamScoped) {
             $pStmt = $db->prepare("SELECT id, company_name, customer_type, chairman_name, chairman_mobile, created_at FROM customers WHERE stage = ? AND team <=> ? ORDER BY created_at ASC");
-            $pStmt->execute([$userRole, $myTeam]);
+            $pStmt->execute([$approvalStage, $myTeam]);
         } else {
             $pStmt = $db->prepare("SELECT id, company_name, customer_type, chairman_name, chairman_mobile, created_at FROM customers WHERE stage = ? ORDER BY created_at ASC");
-            $pStmt->execute([$userRole]);
+            $pStmt->execute([$approvalStage]);
         }
         $pendingApprovals = $pStmt->fetchAll();
     } catch (Exception $e) { /* ignore */ }
@@ -148,7 +151,7 @@ $stageMeta = [
             <?php foreach ($customers as $i => $c):
                 $stage   = $c['stage'] ?? 'completed';
                 $sm      = $stageMeta[$stage] ?? $stageMeta['completed'];
-                $isMyTurn = ($stage === $userRole);
+                $isMyTurn = ($stage === $approvalStage);
             ?>
                 <tr style="<?= $isMyTurn ? 'background:#fffbeb;' : '' ?>">
                     <td><?= $offset + $i + 1 ?></td>
@@ -218,32 +221,14 @@ $stageMeta = [
         <!-- Approval section — shown only when this user's turn -->
         <div id="cpModalApprove" style="display:none;margin-top:16px;border-top:1.5px solid #e0e3ff;padding-top:16px;">
             <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6366f1;margin-bottom:10px;">
-                &#9998; Your Approval Required
+                &#10003; Your Approval Required
             </div>
-            <div style="display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;">
-                <div style="text-align:center;min-width:160px;">
-                    <div id="approveImgWrap" style="min-height:60px;display:flex;align-items:center;justify-content:center;">
-                        <img id="approveSigImg" src="" alt="" style="max-height:60px;max-width:160px;display:none;">
-                        <label for="approveSigFile" id="approveSigLabel"
-                               style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border:1.5px dashed #6366f1;border-radius:8px;cursor:pointer;font-size:12px;color:#6366f1;font-weight:600;">
-                            &#128393; Upload Signature
-                        </label>
-                        <input type="file" id="approveSigFile" accept="image/*" style="display:none;"
-                               onchange="loadApproveSig(this)">
-                    </div>
-                    <div style="border-top:1.5px solid #374151;margin-top:8px;padding-top:4px;">
-                        <div id="approveSigRoleLabel" style="font-size:12px;color:#374151;font-weight:600;"></div>
-                    </div>
-                </div>
-                <div style="flex:1;">
-                    <p style="font-size:12px;color:#64748b;margin:0 0 10px;">
-                        Upload your signature and click <strong>Sign &amp; Approve</strong> to forward this profile to the next stage.
-                    </p>
-                    <button class="primary-btn" onclick="doApprove()" id="approveBtn">
-                        &#10003; Sign &amp; Approve
-                    </button>
-                </div>
-            </div>
+            <p style="font-size:12px;color:#64748b;margin:0 0 12px;">
+                Click <strong>Approve</strong> to forward this profile to the next stage.
+            </p>
+            <button class="primary-btn" onclick="doApprove()" id="approveBtn">
+                &#10003; Approve
+            </button>
         </div>
     </div>
 </div>
@@ -292,36 +277,19 @@ $stageMeta = [
             <!-- Signature & approve section -->
             <div id="reviewApproveSection" style="display:none;padding:0 28px 28px;">
                 <div style="border-top:2px dashed #c7d2fe;padding-top:20px;">
-                    <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6366f1;margin-bottom:16px;">
-                        &#9998; Your Signature &amp; Approval
+                    <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6366f1;margin-bottom:12px;">
+                        &#10003; Your Approval
                     </div>
-                    <div style="display:flex;align-items:flex-end;gap:32px;flex-wrap:wrap;">
-                        <div style="text-align:center;min-width:200px;">
-                            <div style="min-height:70px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;">
-                                <img id="reviewSigImg" src="" style="max-height:70px;max-width:200px;display:none;">
-                                <label for="reviewSigFile" id="reviewSigLabel"
-                                       style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border:2px dashed #6366f1;border-radius:10px;cursor:pointer;font-size:13px;color:#6366f1;font-weight:700;">
-                                    &#9998; Upload Signature
-                                </label>
-                                <input type="file" id="reviewSigFile" accept="image/*" style="display:none;" onchange="loadReviewSig(this)">
-                            </div>
-                            <div style="border-top:1.5px solid #374151;padding-top:6px;">
-                                <div id="reviewSigRoleLabel" style="font-size:13px;color:#374151;font-weight:700;"></div>
-                            </div>
-                        </div>
-                        <div style="flex:1;min-width:200px;">
-                            <p style="font-size:13px;color:#64748b;margin:0 0 14px;line-height:1.6;">
-                                Upload your signature above. By clicking <strong>Sign &amp; Approve</strong> you confirm you have reviewed this customer profile and approve it to proceed to the next stage.
-                            </p>
-                            <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                                <button class="primary-btn" style="font-size:14px;padding:10px 24px;" onclick="doReviewApprove()">
-                                    &#10003; Sign &amp; Approve
-                                </button>
-                                <button class="ghost-btn" style="font-size:14px;padding:10px 20px;" onclick="closeReview()">
-                                    Close
-                                </button>
-                            </div>
-                        </div>
+                    <p style="font-size:13px;color:#64748b;margin:0 0 14px;line-height:1.6;">
+                        By clicking <strong>Approve</strong> you confirm you have reviewed this customer profile and approve it to proceed to the next stage.
+                    </p>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                        <button class="primary-btn" style="font-size:14px;padding:10px 24px;" onclick="doReviewApprove()">
+                            &#10003; Approve
+                        </button>
+                        <button class="ghost-btn" style="font-size:14px;padding:10px 20px;" onclick="closeReview()">
+                            Close
+                        </button>
                     </div>
                 </div>
             </div>
@@ -860,19 +828,17 @@ select.field-input { appearance:auto; }
 </style>
 
 <script>
+// The approval stage the current user handles (commercial + commercial_dept => 'commercial')
+const CURRENT_ROLE = <?= json_encode($approvalStage) ?>;
 // Stage metadata
-const STAGE_ORDER  = ['sales_person','team_leader','finance','commercial','completed'];
+const STAGE_ORDER  = ['team_leader','commercial','completed'];
 const STAGE_LABELS = {
-    sales_person: 'Sales',
     team_leader:  'Team Lead',
-    finance:      'Finance',
     commercial:   'Commercial',
     completed:    'Completed',
 };
 const STAGE_COLORS = {
-    sales_person: '#f59e0b',
     team_leader:  '#6366f1',
-    finance:      '#0ea5e9',
     commercial:   '#8b5cf6',
     completed:    '#22c55e',
 };
@@ -922,9 +888,8 @@ function buildStageBar(stage, signatures, compact) {
                 <div style="font-size:10px;font-weight:700;color:${done||current?color:'#94a3b8'};white-space:nowrap;">
                     ${STAGE_LABELS[s]||s}
                 </div>
-                ${hasSig ? `<img src="${hasSig}" style="max-width:${compact?44:54}px;max-height:${compact?22:28}px;margin-top:3px;border-bottom:1px solid #ccc;">` : ''}
             </div>
-            ${!isLast ? `<div style="flex:1;min-width:14px;height:2px;background:${done?color:'#e2e8f0'};margin-bottom:${hasSig?28:18}px;"></div>` : ''}
+            ${!isLast ? `<div style="flex:1;min-width:14px;height:2px;background:${done?color:'#e2e8f0'};margin-bottom:18px;"></div>` : ''}
         </div>`;
     });
     html += `</div>`;
@@ -1112,11 +1077,6 @@ async function openCpDetail(id) {
 
         if (stage !== 'completed' && CURRENT_ROLE === stage) {
             approveSection.style.display = 'block';
-            document.getElementById('approveSigRoleLabel').textContent = STAGE_LABELS[stage] || stage;
-            document.getElementById('approveSigImg').style.display = 'none';
-            document.getElementById('approveSigImg').src = '';
-            document.getElementById('approveSigLabel').style.display = 'inline-flex';
-            document.getElementById('approveSigFile').value = '';
         }
     } catch(e) {
         body.innerHTML = '<p style="color:red;">Error: ' + e.message + '</p>';
@@ -1137,10 +1097,7 @@ function loadApproveSig(input) {
 }
 
 async function doApprove() {
-    const btn    = document.getElementById('approveBtn');
-    const sigImg = document.getElementById('approveSigImg');
-    const sig    = (sigImg && sigImg.src && sigImg.style.display !== 'none') ? sigImg.src : null;
-
+    const btn = document.getElementById('approveBtn');
     btn.disabled = true;
     btn.textContent = 'Saving…';
 
@@ -1148,18 +1105,18 @@ async function doApprove() {
         const res  = await fetch(APP_BASE + '/api/customers.php', {
             method: 'PUT',
             headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ id: _currentApproveId, sig }),
+            body: JSON.stringify({ id: _currentApproveId }),
         });
         const json = await res.json();
         if (!res.ok || json.error) {
             alert('Error: ' + (json.error || res.statusText));
             btn.disabled = false;
-            btn.textContent = '✓ Sign & Approve';
+            btn.textContent = '✓ Approve';
         } else {
             const nextLabel = STAGE_LABELS[json.stage] || json.stage;
             const msg = json.stage === 'completed'
-                ? '✓ Approval complete! Profile is fully signed.'
-                : `✓ Signed! Forwarded to ${nextLabel}.`;
+                ? '✓ Approval complete! Customer profile approved.'
+                : `✓ Approved! Forwarded to ${nextLabel}.`;
             alert(msg);
             closeCpDetail();
             location.reload();
@@ -1167,7 +1124,7 @@ async function doApprove() {
     } catch(e) {
         alert('Network error: ' + e.message);
         btn.disabled = false;
-        btn.textContent = '✓ Sign & Approve';
+        btn.textContent = '✓ Approve';
     }
 }
 
@@ -1225,11 +1182,6 @@ async function openReview(id) {
 
         if (stage !== 'completed' && CURRENT_ROLE === stage) {
             approveSection.style.display = 'block';
-            document.getElementById('reviewSigRoleLabel').textContent = STAGE_LABELS[stage] || stage;
-            document.getElementById('reviewSigImg').style.display = 'none';
-            document.getElementById('reviewSigImg').src = '';
-            document.getElementById('reviewSigLabel').style.display = 'inline-flex';
-            document.getElementById('reviewSigFile').value = '';
         }
     } catch(e) {
         body.innerHTML = '<p style="color:red;">Error: ' + e.message + '</p>';
@@ -1250,9 +1202,6 @@ function loadReviewSig(input) {
 }
 
 async function doReviewApprove() {
-    const sigImg = document.getElementById('reviewSigImg');
-    const sig    = (sigImg && sigImg.src && sigImg.style.display !== 'none') ? sigImg.src : null;
-
     const btn = document.querySelector('#reviewApproveSection .primary-btn');
     btn.disabled = true;
     btn.textContent = 'Saving…';
@@ -1262,7 +1211,7 @@ async function doReviewApprove() {
             document.querySelectorAll('#reviewDocChecklist input[type=checkbox]:checked')
         ).map(cb => cb.value);
 
-        const body = { id: _reviewId, sig };
+        const body = { id: _reviewId };
         if (docChecklist.length) body.extraData = { docChecklist };
 
         const res  = await fetch(APP_BASE + '/api/customers.php', {
@@ -1274,12 +1223,12 @@ async function doReviewApprove() {
         if (!res.ok || json.error) {
             alert('Error: ' + (json.error || res.statusText));
             btn.disabled = false;
-            btn.textContent = '✓ Sign & Approve';
+            btn.textContent = '✓ Approve';
         } else {
             const nextLabel = STAGE_LABELS[json.stage] || json.stage;
             const msg = json.stage === 'completed'
-                ? '✓ All approvals complete! Profile is fully signed.'
-                : `✓ Signed! Forwarded to ${nextLabel}.`;
+                ? '✓ All approvals complete! Customer profile approved.'
+                : `✓ Approved! Forwarded to ${nextLabel}.`;
             closeReview();
             alert(msg);
             location.reload();
@@ -1287,7 +1236,7 @@ async function doReviewApprove() {
     } catch(e) {
         alert('Network error: ' + e.message);
         btn.disabled = false;
-        btn.textContent = '✓ Sign & Approve';
+        btn.textContent = '✓ Approve';
     }
 }
 

@@ -20,7 +20,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 
-const STAGE_ORDER = ['sales_person', 'team_leader', 'finance', 'commercial', 'completed'];
+// Approval chain: Team Lead -> Commercial -> Completed (Finance removed)
+const STAGE_ORDER = ['team_leader', 'commercial', 'completed'];
 
 function nextStage(string $current): string {
     $idx = array_search($current, STAGE_ORDER, true);
@@ -32,8 +33,10 @@ function normalizeCreatorRole(string $role): string {
     return in_array($role, ['sales_person', 'team_leader'], true) ? $role : 'sales_person';
 }
 
+// Marketing/sales creator -> needs Team Lead then Commercial.
+// Team Lead creator -> skips team-lead step, only Commercial approval needed.
 function firstApprovalStageForCreator(string $creatorRole): string {
-    return $creatorRole === 'team_leader' ? 'finance' : 'team_leader';
+    return $creatorRole === 'team_leader' ? 'commercial' : 'team_leader';
 }
 
 $method = $_SERVER['REQUEST_METHOD'];

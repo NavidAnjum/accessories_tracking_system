@@ -481,49 +481,6 @@ if (!$canCreate) {
         </div>
         <?php endif; ?>
 
-        <!-- ── Signature Block ── -->
-        <div class="cp-section-head">Signatures</div>
-        <div style="display:flex;gap:40px;flex-wrap:wrap;padding:8px 0 16px;">
-
-            <!-- Sales Person signature -->
-            <div style="text-align:center;min-width:220px;">
-                <div style="min-height:70px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;" id="cpSigWrap">
-                    <img id="cp_sigImg" src="" alt="Signature" style="max-height:70px;max-width:220px;display:none;">
-                    <?php if ($isCreator): ?>
-                    <label for="cp_sigFile" id="cp_sigLabel"
-                           style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border:2px dashed #6366f1;border-radius:10px;cursor:pointer;font-size:13px;color:#6366f1;font-weight:700;">
-                        &#9998; Upload Signature
-                    </label>
-                    <input type="file" id="cp_sigFile" accept="image/*" style="display:none;" onchange="loadCpSig(this)">
-                    <?php else: ?>
-                    <span id="cpSigPlaceholder" style="font-size:12px;color:#9ca3af;">Signed on submission</span>
-                    <?php endif; ?>
-                </div>
-                <div style="border-top:1.5px solid #374151;padding-top:6px;">
-                    <div style="font-size:13px;color:#374151;font-weight:700;">Sales Person</div>
-                    <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Signs on creation</div>
-                </div>
-            </div>
-
-            <!-- Team Lead signature -->
-            <?php if ($isTeamLead): ?>
-            <div style="text-align:center;min-width:220px;">
-                <div style="min-height:70px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;" id="tlSigWrap">
-                    <img id="tl_sigImg" src="" alt="TL Signature" style="max-height:70px;max-width:220px;display:none;">
-                    <label for="tl_sigFile" id="tl_sigLabel"
-                           style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border:2px dashed #0ea5e9;border-radius:10px;cursor:pointer;font-size:13px;color:#0ea5e9;font-weight:700;">
-                        &#9998; Upload Signature
-                    </label>
-                    <input type="file" id="tl_sigFile" accept="image/*" style="display:none;" onchange="loadTlSig(this)">
-                </div>
-                <div style="border-top:1.5px solid #374151;padding-top:6px;">
-                    <div style="font-size:13px;color:#374151;font-weight:700;">Team Lead</div>
-                    <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Signs on approval</div>
-                </div>
-            </div>
-            <?php endif; ?>
-
-        </div>
 
         <!-- Bottom actions -->
         <div style="display:flex;justify-content:flex-end;gap:10px;padding:20px 0 8px;border-top:1.5px solid #e0e3ff;margin-top:8px;">

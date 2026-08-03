@@ -103,6 +103,12 @@ function createStepNotifications(PDO $db, string $orderId, string $step, ?int $s
     $title     = $orderId . ' moved to ' . $stepLabel;
     $message   = trim(($customer !== '' ? $customer : 'No customer yet') . ($sales !== '' ? ' · Sales: ' . $sales : ''));
 
+    $existsStmt = $db->prepare("
+        SELECT id FROM notifications
+        WHERE user_id = ? AND order_id = ? AND step_name = ?
+        LIMIT 1
+    ");
+
     $insert = $db->prepare("
         INSERT INTO notifications
             (user_id, order_id, step_name, target_role, title, message, source_user_id, is_read)
@@ -111,8 +117,13 @@ function createStepNotifications(PDO $db, string $orderId, string $step, ?int $s
     ");
 
     foreach ($users as $user) {
+        $uid = (int)$user['id'];
+        // Skip if this user already has a notification for this order+step
+        $existsStmt->execute([$uid, $orderId, $step]);
+        if ($existsStmt->fetch()) continue;
+
         $insert->execute([
-            (int)$user['id'],
+            $uid,
             $orderId,
             $step,
             (string)$user['role'],

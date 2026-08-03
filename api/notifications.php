@@ -27,8 +27,9 @@ try {
     if ($method === 'GET') {
         $limit = max(1, min(200, (int)($_GET['limit'] ?? 8)));
         $full  = !empty($_GET['full']);
-        $where = $userRole === 'admin' ? '1=1' : 'n.user_id = ?';
-        $params = $userRole === 'admin' ? [] : [$userId];
+        // Everyone (including admin) sees only their own worklist — one row per order/step.
+        $where = 'n.user_id = ?';
+        $params = [$userId];
 
         $stepMatch = "BINARY COALESCE(o.current_step, '') = BINARY COALESCE(n.step_name, '')";
 
