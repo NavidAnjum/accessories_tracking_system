@@ -22,17 +22,29 @@ try {
 
     // ── POST — create new order ───────────────────────────────────────────────
     if ($method === 'POST') {
-        // Generate next order_id: ORD-YYYY-NNNN
-        $year  = date('Y');
+        // Optional starting step (e.g. 'sales' to start directly from PI)
+        $input = json_decode(file_get_contents('php://input'), true) ?: [];
+        $startStep = $input['step'] ?? ($_GET['step'] ?? 'marketing-intake');
+        if (!in_array($startStep, ['marketing-intake', 'sales'], true)) {
+            $startStep = 'marketing-intake';
+        }
+
+        // Generate next order_id: ORD-YYYY-MM-DD-NNNN (sequence resets each day)
+        $datePart = date('Y-m-d');
         $stmt  = $db->prepare("SELECT COUNT(*) FROM orders WHERE order_id LIKE ?");
-        $stmt->execute(["ORD-{$year}-%"]);
+        $stmt->execute(["ORD-{$datePart}-%"]);
         $count = (int)$stmt->fetchColumn();
-        $orderId = sprintf('ORD-%s-%04d', $year, $count + 1);
+        $orderId = sprintf('ORD-%s-%04d', $datePart, $count + 1);
 
-        $db->prepare("INSERT INTO orders (order_id, current_step) VALUES (?, 'marketing-intake')")
-           ->execute([$orderId]);
+        // Stamp who created the order
+        $me     = currentUser();
+        $byId   = $me['id']   ?? null;
+        $byName = $me['name'] ?? null;
 
-        echo json_encode(['ok' => true, 'order_id' => $orderId]);
+        $db->prepare("INSERT INTO orders (order_id, current_step, created_by_id, created_by_name) VALUES (?, ?, ?, ?)")
+           ->execute([$orderId, $startStep, $byId, $byName]);
+
+        echo json_encode(['ok' => true, 'order_id' => $orderId, 'current_step' => $startStep, 'created_by' => $byName]);
         exit;
     }
 

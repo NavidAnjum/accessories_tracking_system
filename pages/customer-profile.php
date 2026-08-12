@@ -11,29 +11,23 @@ $perPage = 10;
 $offset  = ($page - 1) * $perPage;
 $db      = null;
 
-// ── Team scoping: marketing/team_leader see only their own team ──
-$teamScoped = isTeamScopedRole();
-$myTeam     = currentUserTeam();
+// Everyone sees all customers in the list. Team scoping applies only to approval.
+$myTeam = currentUserTeam();
 
 try {
     $db = getDB();
 
-    $conds  = [];
+    $where  = '';
     $params = [];
     if ($search) {
-        $conds[] = '(company_name LIKE :s OR chairman_name LIKE :s OR chairman_mobile LIKE :s OR customer_type LIKE :s)';
+        $where = 'WHERE (company_name LIKE :s OR chairman_name LIKE :s OR chairman_mobile LIKE :s OR customer_type LIKE :s)';
         $params[':s'] = "%$search%";
     }
-    if ($teamScoped) {
-        $conds[] = 'team <=> :team';
-        $params[':team'] = $myTeam;
-    }
-    $where = $conds ? ('WHERE ' . implode(' AND ', $conds)) : '';
 
     $cntStmt = $db->prepare("SELECT COUNT(*) FROM customers $where");
     $cntStmt->execute($params);
     $total = (int)$cntStmt->fetchColumn();
-    $listStmt = $db->prepare("SELECT id, company_name, customer_type, chairman_name, chairman_mobile, address_head_office, stage, created_at FROM customers $where ORDER BY created_at DESC LIMIT $perPage OFFSET $offset");
+    $listStmt = $db->prepare("SELECT id, company_name, customer_type, chairman_name, chairman_mobile, address_head_office, stage, team, created_at FROM customers $where ORDER BY created_at DESC LIMIT $perPage OFFSET $offset");
     $listStmt->execute($params);
     $customers = $listStmt->fetchAll();
     $totalPages = max(1, (int)ceil($total / $perPage));
@@ -57,7 +51,8 @@ $approvalStage = in_array($userRole, ['commercial', 'commercial_dept'], true) ? 
 $pendingApprovals = [];
 if (!in_array($userRole, ['sales_person', 'admin', 'completed'])) {
     try {
-        if ($teamScoped) {
+        // Team leaders only approve their own team's customers; commercial approves all.
+        if ($userRole === 'team_leader') {
             $pStmt = $db->prepare("SELECT id, company_name, customer_type, chairman_name, chairman_mobile, created_at FROM customers WHERE stage = ? AND team <=> ? ORDER BY created_at ASC");
             $pStmt->execute([$approvalStage, $myTeam]);
         } else {
@@ -151,7 +146,10 @@ $stageMeta = [
             <?php foreach ($customers as $i => $c):
                 $stage   = $c['stage'] ?? 'completed';
                 $sm      = $stageMeta[$stage] ?? $stageMeta['completed'];
-                $isMyTurn = ($stage === $approvalStage);
+                // It's the user's turn to approve only if the stage matches — and, for a
+                // team leader, only for their own team's customers.
+                $isMyTurn = ($stage === $approvalStage)
+                    && ($userRole !== 'team_leader' || ($c['team'] ?? null) === $myTeam);
             ?>
                 <tr style="<?= $isMyTurn ? 'background:#fffbeb;' : '' ?>">
                     <td><?= $offset + $i + 1 ?></td>
@@ -830,6 +828,14 @@ select.field-input { appearance:auto; }
 <script>
 // The approval stage the current user handles (commercial + commercial_dept => 'commercial')
 const CURRENT_ROLE = <?= json_encode($approvalStage) ?>;
+const CURRENT_USER_ROLE = <?= json_encode($userRole) ?>;
+const MY_TEAM = <?= json_encode($myTeam) ?>;
+// Whether the current user is allowed to approve this customer record.
+function canApprove(stage, team) {
+    if (stage === 'completed' || CURRENT_ROLE !== stage) return false;
+    if (CURRENT_USER_ROLE === 'team_leader') return team === MY_TEAM; // own team only
+    return true; // commercial etc. approve any team
+}
 // Stage metadata
 const STAGE_ORDER  = ['team_leader','commercial','completed'];
 const STAGE_LABELS = {
@@ -1075,7 +1081,7 @@ async function openCpDetail(id) {
         stageBar.innerHTML = buildStageBar(stage, signatures, true);
         body.innerHTML = '<div style="font-size:13px;">' + renderCustomerDetail(data) + '</div>';
 
-        if (stage !== 'completed' && CURRENT_ROLE === stage) {
+        if (canApprove(stage, data.team)) {
             approveSection.style.display = 'block';
         }
     } catch(e) {
@@ -1180,7 +1186,7 @@ async function openReview(id) {
             }
         }
 
-        if (stage !== 'completed' && CURRENT_ROLE === stage) {
+        if (canApprove(stage, data.team)) {
             approveSection.style.display = 'block';
         }
     } catch(e) {

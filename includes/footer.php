@@ -260,17 +260,20 @@
             .catch(() => alert('Could not reach server.'));
     }
 
-    // Restore from session on page load, or auto-load most recent order
+    // Restore from session on page load, or auto-load most recent order.
+    // Skip if the header already owns the OID bar (it handles auto-load + new-order mode).
     window.addEventListener('DOMContentLoaded', function () {
-        const stored = sessionStorage.getItem(OID_KEY);
-        if (stored && document.getElementById('oidDisplay')) {
-            loadOrderById(stored);
-        } else if (!stored && document.getElementById('oidDisplay')) {
-            // Auto-load the most recently saved order for this user
-            fetch(window.APP_BASE + '/api/orders.php?last=1')
-                .then(r => r.json())
-                .then(row => { if (row?.order_id) loadOrderById(row.order_id); })
-                .catch(() => {});
+        if (!window.__oidBarReady) {
+            const stored = sessionStorage.getItem(OID_KEY);
+            if (stored && document.getElementById('oidDisplay')) {
+                loadOrderById(stored);
+            } else if (!stored && document.getElementById('oidDisplay')) {
+                // Auto-load the most recently saved order for this user
+                fetch(window.APP_BASE + '/api/orders.php?last=1')
+                    .then(r => r.json())
+                    .then(row => { if (row?.order_id) loadOrderById(row.order_id); })
+                    .catch(() => {});
+            }
         }
 
         // Next-page buttons: auto-save current page data then navigate
@@ -306,38 +309,14 @@
         });
     });
 
-    // Expose globally
-    window.oidSearch    = oidSearch;
-    window.loadOrderById = loadOrderById;
-    window.getCurrentOrderId = () => sessionStorage.getItem(OID_KEY) || '';
-    window.oidNewOrder  = function () {
-        if (sessionStorage.getItem(OID_KEY)) {
-            if (!confirm('Start a new order? The current order ID will be cleared from this session.')) return;
-        }
-        fetch(window.APP_BASE + '/api/order_lookup.php', { method: 'POST' })
-            .then(r => r.json())
-            .then(res => {
-                if (!res.ok) { alert('Failed to create order.'); return; }
-
-                // Set sessionStorage and display immediately (synchronous) so step
-                // navigation works even if the subsequent loadOrderById fetch is slow
-                setOrderDisplay(res.order_id, null);
-                const statusRow = document.getElementById('oidStatusRow');
-                if (statusRow) {
-                    document.getElementById('oidCustomer').textContent = '';
-                    document.getElementById('oidStep').textContent = 'Step: Marketing Intake';
-                    document.getElementById('oidDate').textContent = '';
-                    statusRow.style.display = 'flex';
-                }
-
-                if (typeof window.onNewOrder === 'function') {
-                    window.onNewOrder(res.order_id);
-                }
-                loadOrderById(res.order_id);
-                alert('New order created: ' + res.order_id);
-            })
-            .catch(() => alert('Could not reach server.'));
-    };
+    // Expose globally — only if the header's OID bar hasn't already defined these.
+    // (Header owns "+ New Order" = start a blank draft; do not override it here.)
+    if (!window.__oidBarReady) {
+        window.oidSearch    = oidSearch;
+        window.loadOrderById = loadOrderById;
+        window.getCurrentOrderId = () => sessionStorage.getItem(OID_KEY) || '';
+        window.oidNewOrder  = oidNewOrder;
+    }
 
     // ── Cache PI fields and apply data-pi-bind on any page ───────────────────
     function applyPiBindings() {

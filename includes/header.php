@@ -254,35 +254,48 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
             if (q) loadOrderById(q, true);
         };
 
+        // Show a blank, unsaved-order draft (no DB row is created yet).
+        // The order is created only when the user Submits the Marketing Intake.
+        function showNewOrderDraft() {
+            sessionStorage.removeItem(OID_KEY);
+            const display = document.getElementById('oidDisplay');
+            if (display) display.textContent = 'New order (unsaved)';
+            const sr = document.getElementById('oidStatusRow');
+            if (sr) {
+                const cust = document.getElementById('oidCustomer');
+                const step = document.getElementById('oidStep');
+                const date = document.getElementById('oidDate');
+                if (cust) cust.textContent = 'Fill details and Submit to create the order';
+                if (step) step.textContent = 'Step: Marketing Intake';
+                if (date) date.textContent = '';
+                sr.style.display = 'flex';
+            }
+            if (typeof window.onNewOrder === 'function') window.onNewOrder(null);
+        }
+        window.showNewOrderDraft = showNewOrderDraft;
+
         window.oidNewOrder = function () {
             if (sessionStorage.getItem(OID_KEY)) {
-                if (!confirm('Start a new order? The current order ID will be cleared from this session.')) return;
+                if (!confirm('Start a new order? The current order will be cleared from this session.')) return;
             }
-            fetch(BASE + '/api/order_lookup.php', { method: 'POST' })
-                .then(r => r.json())
-                .then(res => {
-                    if (!res.ok) { alert('Failed to create order.'); return; }
-                    setOrderDisplay(res.order_id, null);
-                    const sr = document.getElementById('oidStatusRow');
-                    if (sr) {
-                        const cust = document.getElementById('oidCustomer');
-                        const step = document.getElementById('oidStep');
-                        const date = document.getElementById('oidDate');
-                        if (cust) cust.textContent = '';
-                        if (step) step.textContent = 'Step: Marketing Intake';
-                        if (date) date.textContent = '';
-                        sr.style.display = 'flex';
-                    }
-                    if (typeof window.onNewOrder === 'function') window.onNewOrder(res.order_id);
-                    loadOrderById(res.order_id);
-                    alert('New order created: ' + res.order_id);
-                })
-                .catch(() => alert('Could not reach server.'));
+            sessionStorage.removeItem(OID_KEY);
+            if (/marketing-intake\.php/.test(window.location.pathname)) {
+                showNewOrderDraft(); // already here — just reset the form
+            } else {
+                sessionStorage.setItem('ats_new_order', '1');
+                window.location.href = BASE + '/pages/marketing-intake.php';
+            }
         };
 
         // Auto-restore the current/most-recent order on page load
         document.addEventListener('DOMContentLoaded', function () {
             if (!document.getElementById('oidDisplay')) return;
+            // New-order mode: show a blank draft, don't auto-load an existing order
+            if (sessionStorage.getItem('ats_new_order') === '1') {
+                sessionStorage.removeItem('ats_new_order');
+                showNewOrderDraft();
+                return;
+            }
             const stored = sessionStorage.getItem(OID_KEY);
             if (stored) {
                 loadOrderById(stored);

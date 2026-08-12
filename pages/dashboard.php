@@ -20,6 +20,9 @@ include __DIR__ . '/../includes/header.php';
     <div class="page-actions compact-actions">
         <div class="page-actions-left">
             <button type="button" class="primary-btn" id="dashNewOrderTop">+ New Order</button>
+            <?php if (in_array($__user['role'] ?? '', ['commercial', 'commercial_dept', 'admin'], true)): ?>
+            <button type="button" class="ghost-btn" id="dashNewPiTop" style="color:#4f46e5;border-color:#c7d2fe;">+ Start from PI</button>
+            <?php endif; ?>
         </div>
     </div>
     <div class="packing-items-wrap">
@@ -27,6 +30,7 @@ include __DIR__ . '/../includes/header.php';
             <thead>
                 <tr>
                     <th>Order ID</th>
+                    <th>Created By</th>
                     <th>Customer</th>
                     <th>PO Number</th>
                     <th>Sales Person</th>
@@ -88,12 +92,13 @@ include __DIR__ . '/../includes/header.php';
                     id: o.order_id, customer: o.customer_name, poNumber: o.po_number,
                     salesperson: o.salesperson, buyerCode: o.to_buyer, deliveryDate: o.delivery_date,
                     currentStep: o.current_step, savedAt: o.updated_at,
+                    createdBy: o.created_by_name,
                 }));
             }
         } catch (_) {}
 
         if (!orders.length) {
-            body.innerHTML = '<tr><td colspan="10" class="dash-empty" style="text-align:center;padding:20px;color:#94a3b8;">No orders yet — click “+ New Order” to start.</td></tr>';
+            body.innerHTML = '<tr><td colspan="11" class="dash-empty" style="text-align:center;padding:20px;color:#94a3b8;">No orders yet — click “+ New Order” to start.</td></tr>';
             return;
         }
 
@@ -105,6 +110,7 @@ include __DIR__ . '/../includes/header.php';
             const step      = o.currentStep || 'marketing-intake';
             return `<tr>
                 <td><span class="znz-id" style="cursor:pointer;" onclick="loadOrderFromDashboard('${o.id}','${step}')">${o.id || '-'}</span></td>
+                <td>${o.createdBy || '-'}</td>
                 <td>${o.customer || '-'}</td>
                 <td>${o.poNumber || '-'}</td>
                 <td>${o.salesperson || '-'}</td>
@@ -130,7 +136,14 @@ include __DIR__ . '/../includes/header.php';
         renderDash();
         document.getElementById('dashNewOrderTop')?.addEventListener('click', function () {
             sessionStorage.removeItem('ats_current_order_id');
+            sessionStorage.setItem('ats_new_order', '1'); // start a blank draft, no DB row yet
             window.location.href = BASE + '/pages/marketing-intake.php';
+        });
+        // Start directly from PI (commercial) — skips intake/costing/production
+        document.getElementById('dashNewPiTop')?.addEventListener('click', function () {
+            sessionStorage.removeItem('ats_current_order_id');
+            sessionStorage.setItem('ats_new_order', '1'); // blank PI draft, order created on first save
+            window.location.href = BASE + '/pages/sales.php';
         });
     });
 })();

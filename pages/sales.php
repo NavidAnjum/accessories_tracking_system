@@ -1312,12 +1312,39 @@ async function createOrUpdateMasterPiRecord(data) {
     return { orderId, masterPiNum };
 }
 
+// Create an order lazily at the PI (sales) step — used when starting directly from PI.
+async function ensurePiOrder() {
+    let orderId = sessionStorage.getItem('ats_current_order_id') || '';
+    if (orderId) return orderId;
+    try {
+        const r = await fetch(APP_BASE + '/api/order_lookup.php', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ step: 'sales' })
+        });
+        const res = await r.json();
+        if (!res.ok) { alert('Could not create order. Try again.'); return ''; }
+        orderId = res.order_id;
+        sessionStorage.setItem('ats_current_order_id', orderId);
+        sessionStorage.removeItem('ats_new_order');
+        const display = document.getElementById('oidDisplay');
+        if (display) display.textContent = orderId;
+        const stepEl = document.getElementById('oidStep');
+        if (stepEl) stepEl.textContent = 'Step: PI';
+        return orderId;
+    } catch (e) { alert('Server error creating order.'); return ''; }
+}
+
 // â”€â”€ Save PI to database â€” one PI record per PO block â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 savePi = async function() {
     let data;
     try { data = collectPiData(); } catch(e) { console.error('collectPiData error:', e); alert('Form read error: ' + e.message); return; }
     const piType = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
-    const orderId = sessionStorage.getItem('ats_current_order_id') || '';
+    let orderId = sessionStorage.getItem('ats_current_order_id') || '';
+    // Start-from-PI: create the order lazily (at the PI step) on first save
+    if (!orderId) {
+        orderId = await ensurePiOrder();
+        if (!orderId) return;
+    }
 
     if (piType === 'master') {
         if (!data.pos.length) { alert('Please select at least one item for Master PI.'); return; }
@@ -1404,7 +1431,11 @@ async function submitToMarketing() {
     const btn = document.getElementById('universalSaveBtn');
     if (btn) { btn.textContent = 'Submitting...'; btn.disabled = true; }
 
-    const orderId = sessionStorage.getItem('ats_current_order_id') || '';
+    let orderId = sessionStorage.getItem('ats_current_order_id') || '';
+    if (!orderId) {
+        orderId = await ensurePiOrder();
+        if (!orderId) { if (btn) { btn.textContent = 'Submit'; btn.disabled = false; } return; }
+    }
 
     try {
         let savedCount = 0, totalQty = 0, totalVal = 0;
@@ -1888,6 +1919,21 @@ function loadPiCustomers() {
                 const extra = (() => { try { return JSON.parse(c.extra_data || '{}'); } catch(e) { return {}; } })();
                 return (extra.customerCategory || '') === 'Bulk Production';
             });
+            const pendingName = (window._pendingPiCustomer || '').trim();
+            if (pendingName && !_piCustomers.some(c => (c.company_name || '').trim() === pendingName)) {
+                const fallback = (list || []).find(c => (c.company_name || '').trim() === pendingName);
+                if (fallback) {
+                    _piCustomers.push(fallback);
+                } else {
+                    _piCustomers.push({
+                        company_name: pendingName,
+                        address_head_office: '',
+                        factory_address: '',
+                        extra_data: '{}',
+                        stage: 'linked_from_pi'
+                    });
+                }
+            }
             const sel = document.getElementById('piCustomer');
             if (!sel) return;
             const cur = sel.value;
@@ -2017,14 +2063,20 @@ window.onOrderLoad = function(res) {
 
 window.onNewOrder = function(orderId) {
     setPiContentVisible(true);
-    renderOrderPiOverview(orderId);
     clearPiForm();
-    document.getElementById('piNumber').value           = orderId + '-PI';
-    document.getElementById('piNumDisplay').textContent = orderId + '-PI';
-    // Pre-fill first block's PI number
-    const firstPid = document.querySelectorAll('.po-block')[0]?.id.replace('block_','') || '';
-    const el = document.getElementById('piNum_' + firstPid);
-    if (el && !el.value) el.value = orderId + '-PI';
+    if (orderId) {
+        renderOrderPiOverview(orderId);
+        document.getElementById('piNumber').value           = orderId + '-PI';
+        document.getElementById('piNumDisplay').textContent = orderId + '-PI';
+        // Pre-fill first block's PI number
+        const firstPid = document.querySelectorAll('.po-block')[0]?.id.replace('block_','') || '';
+        const el = document.getElementById('piNum_' + firstPid);
+        if (el && !el.value) el.value = orderId + '-PI';
+    } else {
+        // Blank PI draft — the order is created when the first PI is saved
+        const disp = document.getElementById('piNumDisplay');
+        if (disp) disp.textContent = '-';
+    }
 };
 </script>
 

@@ -1276,14 +1276,8 @@ window.onNewOrder = function(orderId) {
         const list = await res.json();
         const sel  = document.getElementById('intakeCustomer');
         if (!sel || !Array.isArray(list)) return;
-        // Show only approved bulk-production customers in order flow
-        const pending = ['sales_person', 'team_leader'];
-        list.filter(c => {
-            if (pending.includes(c.stage)) return false;
-            let extra = {};
-            try { extra = typeof c.extra_data === 'string' ? JSON.parse(c.extra_data || '{}') : (c.extra_data || {}); } catch (_) {}
-            return (extra.customerCategory || '') === 'Bulk Production';
-        }).forEach(c => {
+        // Show only fully-approved (completed) customers in the order flow
+        list.filter(c => (c.stage || 'completed') === 'completed').forEach(c => {
             const opt = document.createElement('option');
             opt.value = c.id;
             opt.textContent = c.company_name;

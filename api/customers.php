@@ -44,20 +44,15 @@ $method = $_SERVER['REQUEST_METHOD'];
 try {
     $db = getDB();
 
-    // ── Team scoping: marketing/team_leader see only their own team ──
-    $teamScoped = isTeamScopedRole();
-    $myTeam     = currentUserTeam();
+    $myTeam = currentUserTeam();
 
     if ($method === 'GET') {
+        // Visibility is open to everyone — all customers are listed / viewable.
+        // Team scoping applies only to WHO CAN APPROVE (handled in customer-profile.php + PUT below).
         if (!empty($_GET['id'])) {
             $stmt = $db->prepare('SELECT * FROM customers WHERE id = ?');
             $stmt->execute([(int) $_GET['id']]);
             $row = $stmt->fetch();
-            // Block cross-team access for team-scoped roles
-            if ($row && $teamScoped && ($row['team'] ?? null) !== $myTeam) {
-                echo json_encode(null);
-                exit;
-            }
             if ($row && $row['signatures']) {
                 $row['signatures'] = json_decode($row['signatures'], true) ?? [];
             } else if ($row) {
@@ -66,12 +61,7 @@ try {
             echo json_encode($row ?: null);
         } else {
             $cols = "id, company_name, customer_type, chairman_name, chairman_mobile, address_head_office, factory_address, extra_data, team, COALESCE(stage, 'completed') as stage, created_at";
-            if ($teamScoped) {
-                $stmt = $db->prepare("SELECT $cols FROM customers WHERE team <=> ? ORDER BY company_name");
-                $stmt->execute([$myTeam]);
-            } else {
-                $stmt = $db->query("SELECT $cols FROM customers ORDER BY company_name");
-            }
+            $stmt = $db->query("SELECT $cols FROM customers ORDER BY company_name");
             echo json_encode($stmt->fetchAll());
         }
         exit;
@@ -182,12 +172,19 @@ try {
             exit;
         }
 
-        $stmt = $db->prepare('SELECT stage, signatures, extra_data FROM customers WHERE id = ?');
+        $stmt = $db->prepare('SELECT stage, signatures, extra_data, team FROM customers WHERE id = ?');
         $stmt->execute([$id]);
         $rec = $stmt->fetch();
         if (!$rec) {
             http_response_code(404);
             echo json_encode(['error' => 'Not found']);
+            exit;
+        }
+
+        // A team leader may only approve customers belonging to their own team.
+        if (currentUserRole() === 'team_leader' && ($rec['team'] ?? null) !== $myTeam) {
+            http_response_code(403);
+            echo json_encode(['error' => 'This customer belongs to another team.']);
             exit;
         }
 
