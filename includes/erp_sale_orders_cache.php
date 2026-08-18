@@ -173,6 +173,24 @@ function erpSaleOrdersNormalize(string $value): string
     return strtolower((string) preg_replace('/[^a-z0-9]+/i', '', $value));
 }
 
+function erpSaleOrdersShouldUseLooseTokens(string $query): bool
+{
+    $query = trim($query);
+    if ($query === '') {
+        return false;
+    }
+
+    $hasLetters = (bool) preg_match('/[a-z]/i', $query);
+    $hasDigits = (bool) preg_match('/\d/', $query);
+    $hasSeparators = (bool) preg_match('/[^a-z0-9]/i', $query);
+
+    if ($hasLetters && $hasDigits && $hasSeparators) {
+        return false;
+    }
+
+    return true;
+}
+
 function erpSaleOrdersSearchBlob(array $row): string
 {
     $fields = [
@@ -312,10 +330,13 @@ function erpSaleOrdersSearchCached(PDO $db, string $query, int $limit = 200): ar
     $normalizedQuery = erpSaleOrdersNormalize($query);
     $normalized = '%' . $normalizedQuery . '%';
 
-    $tokens = preg_split('/[^a-z0-9]+/i', (string) $query) ?: [];
-    $tokens = array_values(array_filter(array_map('trim', $tokens), static function ($token) {
-        return $token !== '';
-    }));
+    $tokens = [];
+    if (erpSaleOrdersShouldUseLooseTokens($query)) {
+        $tokens = preg_split('/[^a-z0-9]+/i', (string) $query) ?: [];
+        $tokens = array_values(array_filter(array_map('trim', $tokens), static function ($token) {
+            return $token !== '';
+        }));
+    }
 
     $plainFields = [
         'customer_po_no',
@@ -368,10 +389,13 @@ function erpSaleOrdersSearchForPiLookup(PDO $db, string $query, int $limit = 500
 
     $plain = '%' . $query . '%';
     $normalized = '%' . erpSaleOrdersNormalize($query) . '%';
-    $tokens = preg_split('/[^a-z0-9]+/i', (string) $query) ?: [];
-    $tokens = array_values(array_filter(array_map('trim', $tokens), static function ($token) {
-        return $token !== '' && strlen($token) >= 3;
-    }));
+    $tokens = [];
+    if (erpSaleOrdersShouldUseLooseTokens($query)) {
+        $tokens = preg_split('/[^a-z0-9]+/i', (string) $query) ?: [];
+        $tokens = array_values(array_filter(array_map('trim', $tokens), static function ($token) {
+            return $token !== '' && strlen($token) >= 3;
+        }));
+    }
 
     $scoreParts = [
         'CASE WHEN customer_po_no LIKE :score_plain_1 THEN 120 ELSE 0 END',

@@ -342,7 +342,7 @@ function onPiTypeChange() {
         }
     }
     const addBtn = document.getElementById('addAnotherPoBtn');
-    if (addBtn) addBtn.style.display = val === 'single' ? 'none' : '';
+    if (addBtn) addBtn.style.display = val === 'summary' ? '' : 'none';
     const termsBox = document.getElementById('salesTermsBox');
     if (termsBox) termsBox.style.display = val === 'summary' ? 'none' : '';
     const piBlocksEditor = document.getElementById('piBlocksEditor');
@@ -351,12 +351,6 @@ function onPiTypeChange() {
     if (masterPanel) masterPanel.style.display = val === 'master' ? 'block' : 'none';
     if (val === 'master') renderMasterSelectedItems();
 
-    // Single PI allows exactly 1 PO â€” remove any extras
-    if (val === 'single') {
-        const blocks = document.querySelectorAll('.po-block');
-        blocks.forEach((b, i) => { if (i > 0) b.remove(); });
-        if (blocks.length > 1) updateSummary();
-    }
 }
 document.addEventListener('DOMContentLoaded', onPiTypeChange);
 function goToPiPrint(excelMode = false) {
@@ -602,10 +596,6 @@ let rowCounters = {};
 
 /* â”€â”€ Add a new PO block â”€â”€ */
 function addPoBlock() {
-    // Single PI: only 1 PO allowed
-    const piType = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
-    if (piType === 'single' && document.querySelectorAll('.po-block').length >= 1) return;
-
     poCount++;
     const pid = 'po' + poCount;
 
@@ -642,8 +632,9 @@ function addPoBlock() {
         <!-- ERP Search -->
         <div class="erp-search-row">
             <input id="erpInput_${pid}" placeholder="Search by PO number or PI number..."
-                   onkeydown="if(event.key==='Enter')searchErp('${pid}')">
-            <button class="primary-btn" style="white-space:nowrap;" onclick="searchErp('${pid}')">Search ERP</button>
+                   onkeydown="if(event.key==='Enter')searchErp('${pid}', window.erpChoiceAction && window.erpChoiceAction['${pid}'] === 'append')">
+            <button class="primary-btn" style="white-space:nowrap;" onclick="searchErp('${pid}', window.erpChoiceAction && window.erpChoiceAction['${pid}'] === 'append')">Search ERP</button>
+            <button class="ghost-btn" style="white-space:nowrap;" onclick="prepareAddPo('${pid}')">+ Add PO</button>
             <button class="ghost-btn" onclick="clearPo('${pid}')">Clear</button>
         </div>
         <div class="erp-banner" id="erpBanner_${pid}">
@@ -829,6 +820,35 @@ function updateSummary() {
 
 /* ERP Search (mock - replace with real ERP API call) */
 window.erpChoiceOptions = window.erpChoiceOptions || {};
+window.erpChoiceAction = window.erpChoiceAction || {};
+
+function getFieldListValue(el) {
+    if (!el) return [];
+    const raw = String(el.dataset.list || '').trim();
+    if (raw) {
+        try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                return parsed.map(v => String(v || '').trim()).filter(Boolean);
+            }
+        } catch (_) {}
+    }
+    const value = String(el.value || '').trim();
+    return value ? [value] : [];
+}
+
+function setFieldListValue(el, values, separator) {
+    if (!el) return [];
+    const unique = [];
+    (values || []).forEach(value => {
+        const normalized = String(value || '').trim();
+        if (!normalized) return;
+        if (!unique.includes(normalized)) unique.push(normalized);
+    });
+    el.dataset.list = JSON.stringify(unique);
+    el.value = unique.join(separator);
+    return unique;
+}
 
 function buildErpLinesForGroupData(erpData) {
     const aggregated = new Map();
@@ -896,12 +916,112 @@ function applyErpSelection(pid, erpData, chosenPo) {
     if (msg) {
         msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">ERP matched PO ${chosenPo || erpData.po}</span> - ${erpData.groups.length} sales order(s) · ${total} merged line(s) loaded.`;
     }
+    window.erpChoiceAction[pid] = 'replace';
+}
+
+function prepareAddPo(pid) {
+    window.erpChoiceAction[pid] = 'append';
+    const input = document.getElementById('erpInput_' + pid);
+    if (input) {
+        input.value = '';
+        input.focus();
+        input.placeholder = 'Enter another PO to append into this same PI...';
+    }
+    const msg = document.getElementById('erpMsg_' + pid);
+    if (msg) {
+        msg.innerHTML = '<span style="color:#2563eb;font-weight:700;">Add PO mode</span> - enter another PO and click Search ERP to append it to this same PI.';
+    }
+}
+
+function appendPoToBlock(pid, po, extra) {
+    const salesOrderEl = document.getElementById('salesOrder_' + pid);
+    const customerPoEl = document.getElementById('customerPo_' + pid);
+    const buyerNameEl = document.getElementById('buyerName_' + pid);
+    const reqDateEl = document.getElementById('reqDate_' + pid);
+    const statusEl = document.getElementById('orderStatus_' + pid);
+    const poLabelEl = document.getElementById('poLabel_' + pid);
+    const tbody = document.getElementById('tbody_' + pid);
+
+    const existingSalesOrders = getFieldListValue(salesOrderEl);
+    const existingCustomerPos = getFieldListValue(customerPoEl);
+    const mergedSalesOrders = setFieldListValue(salesOrderEl, [
+        ...existingSalesOrders,
+        po?.salesOrder || po?.salesOrderNo || extra?.salesOrder || ''
+    ], ', ');
+    const mergedCustomerPos = setFieldListValue(customerPoEl, [
+        ...existingCustomerPos,
+        po?.poNum || ''
+    ], ' / ');
+
+    if (poLabelEl) {
+        poLabelEl.textContent = mergedCustomerPos.join(' / ') || 'New Purchase Order';
+    }
+    if (buyerNameEl && !String(buyerNameEl.value || '').trim()) {
+        buyerNameEl.value = po?.buyer || extra?.buyer || '';
+    }
+    if (reqDateEl && !String(reqDateEl.value || '').trim()) {
+        reqDateEl.value = po?.reqDate || extra?.reqDate || '';
+    }
+    if (statusEl && !String(statusEl.value || '').trim()) {
+        statusEl.value = po?.status || extra?.status || statusEl.value;
+    }
+
+    const existingItems = [];
+    if (tbody) {
+        tbody.querySelectorAll('tr').forEach(tr => {
+            const id = tr.getAttribute('data-row-id') || String(tr.id || '').replace('row_', '');
+            if (!id) return;
+            existingItems.push({
+                desc: document.getElementById('desc_' + id)?.value || '',
+                ply: document.getElementById('ply_' + id)?.value || '',
+                qty: document.getElementById('qty_' + id)?.value || 0,
+                price: document.getElementById('prc_' + id)?.value || 0,
+                total: document.getElementById('amt_' + id)?.value || 0
+            });
+        });
+    }
+
+    fillPoBlock(pid, {
+        poNum: mergedCustomerPos.join(' / '),
+        buyer: buyerNameEl?.value || po?.buyer || extra?.buyer || '',
+        reqDate: reqDateEl?.value || po?.reqDate || extra?.reqDate || '',
+        status: statusEl?.value || po?.status || extra?.status || '',
+        salesOrder: mergedSalesOrders.join(', '),
+        items: [...existingItems, ...(po?.items || [])]
+    }, extra);
 }
 
 function chooseErpOption(pid, optionIndex) {
     const options = window.erpChoiceOptions[pid] || [];
     const option = options[optionIndex];
     if (!option || !option.data) return;
+    if (window.erpChoiceAction[pid] === 'append') {
+        const firstGrp = (option.data.groups || [])[0] || {};
+        appendPoToBlock(pid, {
+            poNum: option.po || option.data.po || '',
+            buyer: firstGrp.buyer || '',
+            items: buildErpLinesForGroupData(option.data),
+            salesOrder: firstGrp.salesOrderNo || '',
+            reqDate: firstGrp.requestDate || firstGrp.shipDate || '',
+            status: firstGrp.status || ''
+        }, {
+            salesOrder: firstGrp.salesOrderNo || '',
+            reqDate: firstGrp.requestDate || firstGrp.shipDate || '',
+            status: firstGrp.status || ''
+        });
+        setPiCustomerIfEmpty(firstGrp.customerName || '');
+        const msg = document.getElementById('erpMsg_' + pid);
+        if (msg) {
+            msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Added PO ${option.po || option.data.po || ''}</span> to this PI block.`;
+        }
+        window.erpChoiceAction[pid] = 'replace';
+        const input = document.getElementById('erpInput_' + pid);
+        if (input) {
+            input.value = '';
+            input.placeholder = 'Search by PO number or PI number...';
+        }
+        return;
+    }
     applyErpSelection(pid, option.data, option.po || '');
 }
 
@@ -1027,6 +1147,29 @@ function renderErpOptions(pid, query, options) {
                         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
                             <div>
                                 <div style="font-weight:800;color:#4f46e5;">${escapeErpOptionHtml(option.po || '')}</div>
+                                <div style="color:#64748b;margin-top:6px;font-size:12px;">
+                                    ${(() => {
+                                        const labelMap = {
+                                            customer_po_no: 'ERP Customer PO',
+                                            remarks: 'Remarks',
+                                            item_description: 'Description',
+                                            item_code: 'Item Code',
+                                            ordered_item: 'Ordered Item'
+                                        };
+                                        const summary = option.matchSummary || {};
+                                        const parts = Object.entries(summary)
+                                            .filter(([, values]) => Array.isArray(values) && values.length)
+                                            .slice(0, 3)
+                                            .map(([field, values]) => {
+                                                const label = labelMap[field] || field;
+                                                const sample = values[0] || '';
+                                                return `<span style="display:inline-block;margin:2px 8px 2px 0;padding:2px 8px;border-radius:999px;background:#f8fafc;border:1px solid #e2e8f0;color:#475569;font-size:11px;">
+                                                    Matched in: <strong>${escapeErpOptionHtml(label)}</strong>${sample ? ` · ${escapeErpOptionHtml(sample)}` : ''}
+                                                </span>`;
+                                            });
+                                        return parts.join('');
+                                    })()}
+                                </div>
                                 <div style="color:#1f2937;margin-top:6px;font-size:12px;font-weight:700;">
                                     Sales Order${(option.salesOrders || []).length === 1 ? '' : 's'}:
                                     ${((option.salesOrders || []).length
@@ -1054,9 +1197,10 @@ function renderErpOptions(pid, query, options) {
     `;
 }
 
-function searchErp(pid) {
+function searchErp(pid, appendMode = false) {
     const query = document.getElementById('erpInput_' + pid)?.value?.trim();
     if (!query) return;
+    window.erpChoiceAction[pid] = appendMode ? 'append' : 'replace';
 
     const msg = document.getElementById('erpMsg_' + pid);
                 if (msg) msg.innerHTML = '<span style="color:#94a3b8;">Searching...</span>';
@@ -1068,15 +1212,19 @@ function searchErp(pid) {
             // â”€â”€ Found as PI number â†’ load all its POs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             if (res.match === 'pi') {
                 const pi = res.pi;
-                (pi.pos || []).forEach((po, i) => {
-                    let targetPid = pid;
-                    if (i > 0) {
-                        addPoBlock();
-                        const blocks = document.querySelectorAll('.po-block');
-                        targetPid = blocks[blocks.length - 1].id.replace('block_', '');
-                    }
-                    fillPoBlock(targetPid, po);
-                });
+                if (appendMode) {
+                    (pi.pos || []).forEach(po => appendPoToBlock(pid, po));
+                } else {
+                    (pi.pos || []).forEach((po, i) => {
+                        let targetPid = pid;
+                        if (i > 0) {
+                            addPoBlock();
+                            const blocks = document.querySelectorAll('.po-block');
+                            targetPid = blocks[blocks.length - 1].id.replace('block_', '');
+                        }
+                        fillPoBlock(targetPid, po);
+                    });
+                }
 
                 if (!document.getElementById('piNumber').value) {
                     document.getElementById('piNumber').value            = pi.pi_number;
@@ -1087,14 +1235,33 @@ function searchErp(pid) {
                 if (!document.getElementById('piDate').value)
                     document.getElementById('piDate').value = pi.pi_date || '';
 
-                if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Loaded PI ${pi.pi_number}</span> - ${(pi.pos||[]).length} PO(s) loaded from database.`;
+                if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Loaded PI ${pi.pi_number}</span> - ${(pi.pos||[]).length} PO(s) ${appendMode ? 'added to this PI block' : 'loaded from database'}.`;
+                if (appendMode) {
+                    window.erpChoiceAction[pid] = 'replace';
+                    const input = document.getElementById('erpInput_' + pid);
+                    if (input) {
+                        input.value = '';
+                        input.placeholder = 'Search by PO number or PI number...';
+                    }
+                }
                 return;
             }
 
             // â”€â”€ Found as PO number inside a saved PI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             if (res.match === 'po') {
-                fillPoBlock(pid, res.po);
-                if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Matched PO ${res.poNum}</span> from saved PI <strong>${res.pi.pi_number}</strong>.`;
+                if (appendMode) {
+                    appendPoToBlock(pid, res.po);
+                    if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Added PO ${res.poNum}</span> from saved PI <strong>${res.pi.pi_number}</strong>.`;
+                    window.erpChoiceAction[pid] = 'replace';
+                    const input = document.getElementById('erpInput_' + pid);
+                    if (input) {
+                        input.value = '';
+                        input.placeholder = 'Search by PO number or PI number...';
+                    }
+                } else {
+                    fillPoBlock(pid, res.po);
+                    if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Matched PO ${res.poNum}</span> from saved PI <strong>${res.pi.pi_number}</strong>.`;
+                }
                 return;
             }
 
@@ -1120,7 +1287,31 @@ function searchErp(pid) {
                         return;
                     }
 
-                    applyErpSelection(pid, erp, erp.po || query);
+                    if (appendMode) {
+                        const firstGrp = (erp.groups || [])[0] || {};
+                        appendPoToBlock(pid, {
+                            poNum: erp.po || query,
+                            buyer: firstGrp.buyer || '',
+                            items: buildErpLinesForGroupData(erp),
+                            salesOrder: firstGrp.salesOrderNo || '',
+                            reqDate: firstGrp.requestDate || firstGrp.shipDate || '',
+                            status: firstGrp.status || ''
+                        }, {
+                            salesOrder: firstGrp.salesOrderNo || '',
+                            reqDate: firstGrp.requestDate || firstGrp.shipDate || '',
+                            status: firstGrp.status || ''
+                        });
+                        setPiCustomerIfEmpty(firstGrp.customerName || '');
+                        if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Added PO ${erp.po || query}</span> to this PI block.`;
+                        window.erpChoiceAction[pid] = 'replace';
+                        const input = document.getElementById('erpInput_' + pid);
+                        if (input) {
+                            input.value = '';
+                            input.placeholder = 'Search by PO number or PI number...';
+                        }
+                    } else {
+                        applyErpSelection(pid, erp, erp.po || query);
+                    }
                 })
                 .catch(() => {
                     if (msg) msg.innerHTML = '<span style="color:#f87171;">ERP server unreachable.</span>';
@@ -1131,7 +1322,6 @@ function searchErp(pid) {
         });
 }
 
-// â”€â”€ Fill a PO block with data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function fillPoBlock(pid, po, extra) {
     document.getElementById('salesOrder_' + pid).value    = po.salesOrder || po.salesOrderNo || extra?.salesOrder || '';
     document.getElementById('customerPo_' + pid).value    = po.poNum || '';
@@ -1273,11 +1463,13 @@ async function hydratePiFromMarketingIntake(mkt, salesSnapshot) {
 }
 
 function clearPo(pid) {
+    window.erpChoiceAction[pid] = 'replace';
     ['salesOrder','customerPo','buyerName','reqDate'].forEach(f => {
         const el = document.getElementById(f + '_' + pid);
         if (el) el.value = '';
     });
     document.getElementById('erpInput_' + pid).value = '';
+    document.getElementById('erpInput_' + pid).placeholder = 'Search by PO number or PI number...';
     document.getElementById('tbody_'    + pid).innerHTML = '';
     document.getElementById('poLabel_'  + pid).textContent = 'New Purchase Order';
     rowCounters[pid] = 0;
@@ -1685,7 +1877,7 @@ async function submitToMarketing() {
 
         // Update UI immediately â€” don't block on snapshot / step update
         document.getElementById('piStatus').textContent = 'Submitted';
-        updatePrintLock('marketing');
+        updatePrintLock('sales', true);
         refreshSavedPiBadge();
         renderOrderPiOverview(orderId);
         if (btn) {
@@ -1752,7 +1944,7 @@ function refreshSavedPiBadge() {
             if (_savedPisCache.length > 0) {
                 badge.style.display = 'inline-block';
                 cnt.textContent = _savedPisCache.length;
-                updatePrintLock('marketing');
+                updatePrintLock('sales', true);
             } else {
                 badge.style.display = 'none';
             }
@@ -1769,7 +1961,7 @@ function renderOrderPiOverview(orderId) {
         .then(r => r.json())
         .then(pis => {
             if (!pis || !pis.length) { overview.style.display = 'none'; return; }
-            updatePrintLock('marketing');
+            updatePrintLock('sales', true);
 
             const masters     = pis.filter(p => p.is_master);
             const individuals = pis.filter(p => !p.is_master);
@@ -2235,11 +2427,11 @@ document.getElementById('masterPiModal').addEventListener('click', function(e) {
 const _STEP_ORDER = ['marketing-intake','costing-review','production','sales','lc','exchange','commercial','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding','po-status'];
 function _stepIdx(s) { return _STEP_ORDER.indexOf(s); }
 
-function updatePrintLock(step) {
+function updatePrintLock(step, forceUnlock = false) {
     const btn = document.getElementById('printPiBtn');
     const excelBtn = document.getElementById('excelPiBtn');
     if (!btn) return;
-    const submitted = _stepIdx(step) > _stepIdx('sales');
+    const submitted = forceUnlock || _stepIdx(step) > _stepIdx('sales');
     btn.disabled = !submitted;
     btn.title    = submitted ? '' : 'Submit PI first to unlock printing';
     btn.style.opacity = submitted ? '' : '0.5';
@@ -2254,8 +2446,15 @@ window.onOrderLoad = async function(res) {
     setPiContentVisible(true);
     resetSubmitBtn();
     const orderId = res.order?.order_id;
-    updatePrintLock(res.order?.current_step || 'sales');
     const salesSnapshot = res.pages?.sales || null;
+    const hasSavedPiData = !!(
+        salesSnapshot &&
+        (
+            (Array.isArray(salesSnapshot.pos) && salesSnapshot.pos.length) ||
+            (Array.isArray(salesSnapshot.pis) && salesSnapshot.pis.length)
+        )
+    );
+    updatePrintLock(res.order?.current_step || 'sales', hasSavedPiData);
     const marketingIntake = res.pages?.['marketing-intake'] || null;
     const fallbackCustomer = salesSnapshot?.customer || marketingIntake?.customer || res.order?.customer_name || '';
     if (salesSnapshot?.piType) {
@@ -2296,8 +2495,7 @@ window.onOrderLoad = async function(res) {
         // Each PI becomes its own PO block
         document.getElementById('poBlocksContainer').innerHTML = '';
         poCount = 0; rowCounters = {};
-        const piType = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
-        const pisToLoad = piType === 'single' ? res.pis.slice(0, 1) : res.pis;
+        const pisToLoad = res.pis;
         pisToLoad.forEach(pi => {
             const po = (pi.pos || [])[0] || {};
             addPoBlock();

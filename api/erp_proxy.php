@@ -347,6 +347,41 @@ function erpProxyPickBestOption(array $options, string $query): ?array
     return null;
 }
 
+function erpProxyFilterPreferredOptions(array $options, string $query): array
+{
+    if (!$options) {
+        return [];
+    }
+
+    $normalizedQuery = erpProxyNormalizeText($query);
+    if ($normalizedQuery === '') {
+        return $options;
+    }
+
+    $exactPoOptions = array_values(array_filter($options, static function (array $option) use ($normalizedQuery) {
+        return erpProxyNormalizeText((string) ($option['po'] ?? '')) === $normalizedQuery;
+    }));
+    if ($exactPoOptions) {
+        return $exactPoOptions;
+    }
+
+    $startsWithPoOptions = array_values(array_filter($options, static function (array $option) use ($normalizedQuery) {
+        return strpos(erpProxyNormalizeText((string) ($option['po'] ?? '')), $normalizedQuery) === 0;
+    }));
+    if ($startsWithPoOptions) {
+        return $startsWithPoOptions;
+    }
+
+    $containsPoOptions = array_values(array_filter($options, static function (array $option) use ($normalizedQuery) {
+        return strpos(erpProxyNormalizeText((string) ($option['po'] ?? '')), $normalizedQuery) !== false;
+    }));
+    if ($containsPoOptions) {
+        return $containsPoOptions;
+    }
+
+    return $options;
+}
+
 try {
     $db = getDB();
     ensureErpSaleOrdersCacheTable($db);
@@ -371,6 +406,35 @@ if (!empty($erpResponse['ok'])) {
     $liveError = $erpResponse['error'] ?? 'Unknown ERP connection error';
 }
 
+$normalizedPo = erpProxyNormalizeText($po);
+if ($liveItems) {
+    $liveOptions = erpProxyGroupOptions($liveItems, $po, 'live');
+    $liveExactOptions = array_values(array_filter($liveOptions, static function (array $option) use ($normalizedPo) {
+        return erpProxyNormalizeText((string) ($option['po'] ?? '')) === $normalizedPo;
+    }));
+
+    if (count($liveExactOptions) > 1) {
+        echo json_encode([
+            'found' => false,
+            'po' => $po,
+            'source' => 'live',
+            'multiple' => true,
+            'options' => $liveExactOptions,
+        ]);
+        exit;
+    }
+
+    if (count($liveExactOptions) === 1 && !empty($liveExactOptions[0]['data'])) {
+        echo json_encode($liveExactOptions[0]['data']);
+        exit;
+    }
+
+    if (count($liveOptions) === 1 && !empty($liveOptions[0]['data'])) {
+        echo json_encode($liveOptions[0]['data']);
+        exit;
+    }
+}
+
 $mergedItems = erpProxyMergeItemsByKey($localItems, $liveItems);
 
 if (!$mergedItems) {
@@ -388,6 +452,7 @@ if (!$mergedItems) {
 }
 
 $options = erpProxyGroupOptions($mergedItems, $po, 'merged');
+$options = erpProxyFilterPreferredOptions($options, $po);
 $exactOptions = array_values(array_filter($options, static function (array $option) use ($po) {
     return strcasecmp((string) ($option['po'] ?? ''), $po) === 0;
 }));
