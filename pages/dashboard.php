@@ -54,16 +54,16 @@ include __DIR__ . '/../includes/header.php';
 
     const STEP_LABELS = {
         'dashboard':'Dashboard','marketing-intake':'Marketing Intake','costing-review':'Costing Review',
-        'sales':'PI','marketing':'Marketing','lc':'LC','po-overview':'PO Status','exchange':'Bill of Exchange',
+        'sales':'PI','marketing':'LC','lc':'LC','po-overview':'PO Status','exchange':'Bill of Exchange',
         'commercial':'Commercial Invoice','packing':'Packing List','delivery':'Delivery Challan',
         'truck':'Truck Challan','origin':'Certificate of Origin','beneficiary':"Beneficiary's Certificate",
         'forwarding':'Forwarding','po-status':'Challan Sheet',
     };
-    const STEP_ORDER = ['marketing-intake','costing-review','sales','marketing','commercial','packing',
-        'delivery','truck','origin','beneficiary','lc','forwarding'];
+    const STEP_ORDER = ['marketing-intake','costing-review','sales','lc','commercial','packing',
+        'delivery','truck','origin','beneficiary','forwarding'];
     const STEP_PAGES = {
         'marketing-intake':'marketing-intake.php','costing-review':'costing-review.php','sales':'sales.php',
-        'marketing':'marketing.php','lc':'lc.php','po-overview':'po-overview.php','exchange':'exchange.php',
+        'marketing':'lc.php','lc':'lc.php','po-overview':'po-overview.php','exchange':'exchange.php',
         'commercial':'commercial.php','packing':'packing.php','delivery':'delivery.php','truck':'truck.php',
         'origin':'origin.php','beneficiary':'beneficiary.php','forwarding':'forwarding.php','po-status':'po-status.php',
     };
@@ -93,6 +93,7 @@ include __DIR__ . '/../includes/header.php';
                     salesperson: o.salesperson, buyerCode: o.to_buyer, deliveryDate: o.delivery_date,
                     currentStep: o.current_step, savedAt: o.updated_at,
                     createdBy: o.created_by_name,
+                    itemCount: o.item_count || 0, totalQty: o.total_qty || 0, totalVal: o.total_val || 0,
                 }));
             }
         } catch (_) {}
@@ -116,7 +117,7 @@ include __DIR__ . '/../includes/header.php';
                 <td>${o.salesperson || '-'}</td>
                 <td>${o.buyerCode || '-'}</td>
                 <td>${o.deliveryDate || '-'}</td>
-                <td>0</td>
+                <td>${o.itemCount || 0}</td>
                 <td>
                     <div class="dash-step-wrap">
                         <span class="step-badge">${stepLabel}</span>
@@ -126,7 +127,6 @@ include __DIR__ . '/../includes/header.php';
                 <td>${saved}</td>
                 <td class="dash-actions">
                     <button class="primary-btn ghost-btn--sm" onclick="loadOrderFromDashboard('${o.id}','${step}')">▶ Go to ${stepLabel}</button>
-                    <button class="ghost-btn ghost-btn--sm dash-del-btn" onclick="deleteOrderFromDashboard('${o.id}')">Del</button>
                 </td>
             </tr>`;
         }).join('');

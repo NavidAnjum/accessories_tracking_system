@@ -57,8 +57,8 @@ function allowedTabs(): array {
         'finance'         => ['customer-profile'],
         'costing'         => ['costing-review'],
         'production'      => ['production'],
-        'commercial_dept' => ['customer-profile','sales','single-pi','summary-pi','master-pi','lc','exchange','commercial','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding','po-status'],
-        'commercial'      => ['customer-profile','sales','single-pi','summary-pi','master-pi','lc','exchange','commercial','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding','po-status'],
+        'commercial_dept' => ['customer-profile','sales','single-pi','summary-pi','master-pi','erp-orders-report','lc','exchange','commercial','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding','po-status'],
+        'commercial'      => ['customer-profile','sales','single-pi','summary-pi','master-pi','erp-orders-report','lc','exchange','commercial','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding','po-status'],
     ];
     // admin and legacy roles see everything
     return $map[$role] ?? [];

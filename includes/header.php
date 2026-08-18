@@ -18,6 +18,7 @@ if (!empty($activePage) && !in_array($activePage, ['dashboard', 'notifications']
             'costing-review'   => 'costing-review.php',
             'production'       => 'production.php',
             'sales'            => 'sales.php',
+            'erp-orders-report'=> 'erp-orders-report.php',
             'lc'               => 'lc.php',
             'exchange'         => 'exchange.php',
             'commercial'       => 'commercial.php',
@@ -135,9 +136,8 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
             ['id' => 'costing-review',   'href' => 'costing-review.php',        'label' => 'Costing Review'],
             ['id' => 'production',       'href' => 'production.php',            'label' => 'Production'],
             ['id' => 'sales',            'href' => 'sales.php',                 'label' => 'PI'],
-            ['id' => 'marketing',        'href' => 'marketing.php',             'label' => 'Marketing'],
+            ['id' => 'erp-orders-report','href' => 'erp-orders-report.php',     'label' => 'ERP Orders'],
             ['id' => 'lc',               'href' => 'lc.php',                    'label' => 'LC'],
-            // ['id' => 'po-overview', 'href' => 'po-overview.php', 'label' => 'PO Status'], // hidden for now
             ['id' => 'exchange',         'href' => 'exchange.php',              'label' => 'Bill of Exchange'],
             ['id' => 'commercial',       'href' => 'commercial.php',            'label' => 'Commercial Invoice'],
             ['id' => 'packing',          'href' => 'packing.php',               'label' => 'Packing List'],
@@ -238,7 +238,14 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
                         if (isManual) alert('Order not found: ' + id);
                         return;
                     }
-                    setOrderDisplay(res.order.order_id, res.order);
+                    const displayOrder = {
+                        ...res.order,
+                        customer_name: res.order?.customer_name
+                            || res.pages?.sales?.customer
+                            || res.pages?.['marketing-intake']?.customer
+                            || ''
+                    };
+                    setOrderDisplay(res.order.order_id, displayOrder);
                     const inp = document.getElementById('oidInput');
                     if (inp) inp.value = '';
                     if (typeof window.onOrderLoad === 'function') window.onOrderLoad(res);
@@ -279,8 +286,8 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
                 if (!confirm('Start a new order? The current order will be cleared from this session.')) return;
             }
             sessionStorage.removeItem(OID_KEY);
-            if (/marketing-intake\.php/.test(window.location.pathname)) {
-                showNewOrderDraft(); // already here — just reset the form
+            if (/(marketing-intake|sales)\.php/.test(window.location.pathname)) {
+                showNewOrderDraft(); // page starts a blank draft in place — just reset the form
             } else {
                 sessionStorage.setItem('ats_new_order', '1');
                 window.location.href = BASE + '/pages/marketing-intake.php';
@@ -317,7 +324,7 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
         'costing-review': 'costing-review.php',
         'production': 'production.php',
         'sales': 'sales.php',
-        'marketing': 'marketing.php',
+        'marketing': 'lc.php',
         'lc': 'lc.php',
         'exchange': 'exchange.php',
         'commercial': 'commercial.php',

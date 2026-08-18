@@ -19,6 +19,19 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 try {
     $db = getDB();
+    $orderColumns = null;
+    $getOrderColumns = static function () use ($db, &$orderColumns): array {
+        if ($orderColumns !== null) {
+            return $orderColumns;
+        }
+        $orderColumns = [];
+        foreach ($db->query("SHOW COLUMNS FROM orders")->fetchAll() as $col) {
+            if (!empty($col['Field'])) {
+                $orderColumns[$col['Field']] = true;
+            }
+        }
+        return $orderColumns;
+    };
 
     // ── POST — create new order ───────────────────────────────────────────────
     if ($method === 'POST') {
@@ -29,20 +42,32 @@ try {
             $startStep = 'marketing-intake';
         }
 
-        // Generate next order_id: ORD-YYYY-MM-DD-NNNN (sequence resets each day)
-        $datePart = date('Y-m-d');
+        // Generate next order_id in monthly format: ORD-YYYY-MM-NNNNN
+        $yearMonth = date('Y-m');
         $stmt  = $db->prepare("SELECT COUNT(*) FROM orders WHERE order_id LIKE ?");
-        $stmt->execute(["ORD-{$datePart}-%"]);
+        $stmt->execute(["ORD-{$yearMonth}-%"]);
         $count = (int)$stmt->fetchColumn();
-        $orderId = sprintf('ORD-%s-%04d', $datePart, $count + 1);
+        $orderId = sprintf('ORD-%s-%05d', $yearMonth, $count + 1);
 
         // Stamp who created the order
         $me     = currentUser();
         $byId   = $me['id']   ?? null;
         $byName = $me['name'] ?? null;
 
-        $db->prepare("INSERT INTO orders (order_id, current_step, created_by_id, created_by_name) VALUES (?, ?, ?, ?)")
-           ->execute([$orderId, $startStep, $byId, $byName]);
+        $cols = $getOrderColumns();
+        $insertCols = ['order_id', 'current_step'];
+        $insertVals = [$orderId, $startStep];
+        if (isset($cols['created_by_id'])) {
+            $insertCols[] = 'created_by_id';
+            $insertVals[] = $byId;
+        }
+        if (isset($cols['created_by_name'])) {
+            $insertCols[] = 'created_by_name';
+            $insertVals[] = $byName;
+        }
+        $placeholders = implode(', ', array_fill(0, count($insertCols), '?'));
+        $sql = 'INSERT INTO orders (' . implode(', ', $insertCols) . ') VALUES (' . $placeholders . ')';
+        $db->prepare($sql)->execute($insertVals);
 
         echo json_encode(['ok' => true, 'order_id' => $orderId, 'current_step' => $startStep, 'created_by' => $byName]);
         exit;

@@ -405,9 +405,12 @@ function goToPiPrint(excelMode = false) {
         </div>
         <div class="field span-3">
             <label for="piCustomer">Customer Name (TO)</label>
-            <select id="piCustomer" onchange="onPiCustomerChange()">
-                <option value="">Select customer</option>
-            </select>
+            <div class="combo-wrap" style="position:relative;">
+                <input id="piCustomer" autocomplete="off" placeholder="Type customer name..."
+                       oninput="onPiCustomerInput()" onfocus="onPiCustomerInput()"
+                       onblur="setTimeout(hidePiCustomerDropdown,150)">
+                <div id="piCustomerDropdown" class="combo-dropdown" style="display:none;"></div>
+            </div>
         </div>
         <div class="field span-3">
             <label for="piBuyer">Buyer (Brand / End Buyer)</label>
@@ -459,6 +462,17 @@ function goToPiPrint(excelMode = false) {
     padding:1px 6px; font-size:10pt; font-family:inherit;
     background:#f5f3ff; color:#1e40af; font-weight:700; outline:none; cursor:pointer;
 }
+.combo-dropdown {
+    position:absolute; top:100%; left:0; right:0; z-index:50;
+    max-height:280px; overflow-y:auto; margin-top:2px;
+    background:#fff; border:1px solid #d1d5db; border-radius:8px;
+    box-shadow:0 8px 24px rgba(0,0,0,.12);
+}
+.combo-item {
+    padding:8px 12px; font-size:14px; cursor:pointer; color:#111827;
+}
+.combo-item:hover { background:#4f46e5; color:#fff; }
+.combo-empty { padding:8px 12px; font-size:13px; color:#9ca3af; }
 </style>
 <script>
 (function(){
@@ -532,7 +546,7 @@ function goToPiPrint(excelMode = false) {
         <button type="button" class="primary-btn" id="universalSaveBtn" onclick="submitToMarketing()">Submit</button>
     </div>
     <div class="page-actions-right">
-        <button type="button" class="primary-btn js-next-page" data-next-page="marketing">Next: Marketing</button>
+        <button type="button" class="primary-btn js-next-page" data-next-page="lc">Next: LC</button>
     </div>
 </div>
 
@@ -661,7 +675,7 @@ function addPoBlock() {
             </div>
             <div class="field span-4">
                 <label>Requested Date</label>
-                <input id="reqDate_${pid}" type="date" readonly>
+                <input id="reqDate_${pid}" type="text" readonly placeholder="YYYY-MM-DD">
             </div>
         </div>
 
@@ -814,6 +828,232 @@ function updateSummary() {
 }
 
 /* ERP Search (mock - replace with real ERP API call) */
+window.erpChoiceOptions = window.erpChoiceOptions || {};
+
+function buildErpLinesForGroupData(erpData) {
+    const aggregated = new Map();
+
+    (erpData.groups || []).flatMap(g => (g.lines || [])).forEach(l => {
+        const status = String(l.lineStatus || '').trim().toUpperCase();
+        const desc = l.item || '';
+        const ply = l.type || l.uom || '';
+        const qty = parseFloat(l.qty || 0) || 0;
+        const price = parseFloat(l.price || 0) || 0;
+
+        if (status === 'CANCELLED') {
+            return;
+        }
+        if (qty <= 0) {
+            return;
+        }
+
+        const key = [desc, ply, price.toFixed(6)].join('|');
+
+        if (!aggregated.has(key)) {
+            aggregated.set(key, {
+                desc,
+                ply,
+                qty: 0,
+                price,
+                total: 0
+            });
+        }
+
+        const current = aggregated.get(key);
+        current.qty += qty;
+        current.total += qty * price;
+    });
+
+    return Array.from(aggregated.values()).map(line => ({
+        desc: line.desc,
+        ply: line.ply,
+        qty: line.qty,
+        price: line.price,
+        total: line.total.toFixed(2)
+    }));
+}
+
+function applyErpSelection(pid, erpData, chosenPo) {
+    if (!erpData || !Array.isArray(erpData.groups) || !erpData.groups.length) return;
+
+    const firstGrp = erpData.groups[0];
+    const allLines = buildErpLinesForGroupData(erpData);
+
+    fillPoBlock(pid, {
+        poNum: chosenPo || firstGrp.customerPo || '',
+        buyer: firstGrp.buyer || '',
+        items: allLines
+    }, {
+        salesOrder: firstGrp.salesOrderNo || '',
+        reqDate: firstGrp.requestDate || firstGrp.shipDate || '',
+        status: firstGrp.status || ''
+    });
+
+    setPiCustomerIfEmpty(firstGrp.customerName || '');
+
+    const total = allLines.length;
+    const msg = document.getElementById('erpMsg_' + pid);
+    if (msg) {
+        msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">ERP matched PO ${chosenPo || erpData.po}</span> - ${erpData.groups.length} sales order(s) · ${total} merged line(s) loaded.`;
+    }
+}
+
+function chooseErpOption(pid, optionIndex) {
+    const options = window.erpChoiceOptions[pid] || [];
+    const option = options[optionIndex];
+    if (!option || !option.data) return;
+    applyErpSelection(pid, option.data, option.po || '');
+}
+
+function escapeErpOptionHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function toggleErpOptionDetails(pid, optionIndex) {
+    const wrap = document.getElementById('erpOptionsWrap_' + pid);
+    if (!wrap) return;
+
+    const cards = wrap.querySelectorAll('.erp-option-card');
+    cards.forEach((card, index) => {
+        const body = card.querySelector('.erp-option-details');
+        const icon = card.querySelector('.erp-option-toggle');
+        const shouldOpen = index === optionIndex && card.getAttribute('data-open') !== '1';
+        card.setAttribute('data-open', shouldOpen ? '1' : '0');
+        if (body) body.style.display = shouldOpen ? 'block' : 'none';
+        if (icon) icon.textContent = shouldOpen ? 'Hide details' : 'Show details';
+    });
+}
+
+function erpOptionPreviewHtml(option, query = '') {
+    const groupData = option?.data || {};
+    const groups = Array.isArray(groupData.groups) ? groupData.groups : [];
+    const salesOrders = groups.map(g => g.salesOrderNo).filter(Boolean);
+    const lines = buildErpLinesForGroupData(groupData);
+    const firstGroup = groups[0] || {};
+    const matchedQuery = String(query || '').trim();
+    const erpPo = String(option?.po || groupData?.po || '').trim();
+    const matchSummary = option?.matchSummary || {};
+
+    const matchSummaryLabels = {
+        customer_po_no: 'ERP Customer PO',
+        remarks: 'Remarks',
+        item_description: 'Description',
+        item_code: 'Item Code',
+        ordered_item: 'Ordered Item'
+    };
+
+    const matchSummaryHtml = Object.entries(matchSummary)
+        .filter(([, values]) => Array.isArray(values) && values.length)
+        .map(([field, values]) => `
+            <div style="padding:10px;border:1px solid #dbe3ff;border-radius:10px;background:#fff;">
+                <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">${escapeErpOptionHtml(matchSummaryLabels[field] || field)}</div>
+                <div style="margin-top:4px;color:#1f2937;font-weight:700;">${values.slice(0, 3).map(value => escapeErpOptionHtml(value)).join('<br>')}</div>
+            </div>
+        `).join('');
+
+    const salesOrderHtml = salesOrders.length
+        ? salesOrders.map(so => `<span style="display:inline-block;margin:2px 6px 2px 0;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#4f46e5;font-size:11px;font-weight:700;">${escapeErpOptionHtml(so)}</span>`).join('')
+        : '<span style="color:#94a3b8;">No sales order</span>';
+
+    const itemsHtml = lines.length
+        ? lines.map(line => `
+            <tr>
+                <td style="padding:6px 8px;border:1px solid #e5e7eb;">${escapeErpOptionHtml(line.desc || '-')}</td>
+                <td style="padding:6px 8px;border:1px solid #e5e7eb;">${escapeErpOptionHtml(line.ply || '-')}</td>
+                <td style="padding:6px 8px;border:1px solid #e5e7eb;text-align:right;">${escapeErpOptionHtml(line.qty || 0)}</td>
+                <td style="padding:6px 8px;border:1px solid #e5e7eb;text-align:right;">${escapeErpOptionHtml(line.price || 0)}</td>
+                <td style="padding:6px 8px;border:1px solid #e5e7eb;text-align:right;">${escapeErpOptionHtml(line.total || '0.00')}</td>
+            </tr>
+        `).join('')
+        : `<tr><td colspan="5" style="padding:8px;border:1px solid #e5e7eb;color:#94a3b8;">No item lines found.</td></tr>`;
+
+    return `
+        <div style="margin-top:12px;padding:12px;border-top:1px solid #dbe3ff;background:#f8fbff;border-radius:12px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:12px;">
+                <div style="padding:10px;border:1px solid #dbe3ff;border-radius:10px;background:#fff;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Matched Search</div>
+                    <div style="margin-top:4px;font-weight:700;color:#1f2937;">${escapeErpOptionHtml(matchedQuery || '-')}</div>
+                </div>
+                <div style="padding:10px;border:1px solid #dbe3ff;border-radius:10px;background:#fff;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">ERP Customer PO</div>
+                    <div style="margin-top:4px;font-weight:700;color:#1f2937;">${escapeErpOptionHtml(erpPo || '-')}</div>
+                </div>
+                <div style="padding:10px;border:1px solid #dbe3ff;border-radius:10px;background:#fff;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Customer</div>
+                    <div style="margin-top:4px;font-weight:700;color:#1f2937;">${escapeErpOptionHtml(option?.customerName || firstGroup?.customerName || '-')}</div>
+                </div>
+            </div>
+            ${matchSummaryHtml ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:12px;">${matchSummaryHtml}</div>` : ''}
+            <div style="font-size:12px;font-weight:700;color:#1f2937;margin-bottom:8px;">Sales Orders</div>
+            <div style="margin-bottom:12px;">${salesOrderHtml}</div>
+            <div style="font-size:12px;font-weight:700;color:#1f2937;margin-bottom:8px;">ERP Item Details</div>
+            <div style="overflow:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff;">
+                    <thead>
+                        <tr>
+                            <th style="padding:6px 8px;border:1px solid #e5e7eb;background:#f8fafc;text-align:left;">Description</th>
+                            <th style="padding:6px 8px;border:1px solid #e5e7eb;background:#f8fafc;text-align:left;">Type</th>
+                            <th style="padding:6px 8px;border:1px solid #e5e7eb;background:#f8fafc;text-align:right;">Qty</th>
+                            <th style="padding:6px 8px;border:1px solid #e5e7eb;background:#f8fafc;text-align:right;">Price</th>
+                            <th style="padding:6px 8px;border:1px solid #e5e7eb;background:#f8fafc;text-align:right;">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>${itemsHtml}</tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function renderErpOptions(pid, query, options) {
+    const msg = document.getElementById('erpMsg_' + pid);
+    if (!msg) return;
+
+    window.erpChoiceOptions[pid] = options || [];
+    msg.innerHTML = `
+        <div style="color:#1d4ed8;font-weight:700;margin-bottom:8px;">Multiple ERP POs matched <strong>${escapeErpOptionHtml(query)}</strong>. Please choose one:</div>
+        <div id="erpOptionsWrap_${pid}" style="display:flex;flex-direction:column;gap:8px;">
+            ${(options || []).map((option, index) => `
+                <div class="erp-option-card"
+                     data-open="0"
+                     style="border:1px solid #dbe3ff;border-radius:14px;background:#fff;padding:12px;">
+                    <div onclick="toggleErpOptionDetails('${pid}', ${index})"
+                         style="cursor:pointer;">
+                        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+                            <div>
+                                <div style="font-weight:800;color:#4f46e5;">${escapeErpOptionHtml(option.po || '')}</div>
+                                <div style="color:#1f2937;margin-top:6px;font-size:12px;font-weight:700;">
+                                    Sales Order${(option.salesOrders || []).length === 1 ? '' : 's'}:
+                                    ${((option.salesOrders || []).length
+                                        ? option.salesOrders.map(so => `<span style="display:inline-block;margin:2px 6px 2px 0;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#4f46e5;font-size:11px;font-weight:700;">${escapeErpOptionHtml(so)}</span>`).join('')
+                                        : '<span style="color:#94a3b8;font-weight:600;">None</span>')}
+                                </div>
+                                <div style="color:#64748b;margin-top:6px;">${escapeErpOptionHtml(option.customerName || '-')} · ${escapeErpOptionHtml(option.groupCount || 0)} sales order(s) · ${escapeErpOptionHtml(option.lineCount || 0)} line(s)</div>
+                            </div>
+                            <div class="erp-option-toggle" style="white-space:nowrap;color:#2563eb;font-size:12px;font-weight:700;">Show details</div>
+                        </div>
+                    </div>
+                    <div class="erp-option-details" style="display:none;">
+                        ${erpOptionPreviewHtml(option, query)}
+                        <div style="margin-top:12px;display:flex;justify-content:flex-end;">
+                            <button type="button"
+                                    class="primary-btn"
+                                    onclick="chooseErpOption('${pid}', ${index})">
+                                Use This PO
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
 function searchErp(pid) {
     const query = document.getElementById('erpInput_' + pid)?.value?.trim();
     if (!query) return;
@@ -865,35 +1105,22 @@ function searchErp(pid) {
                 .then(r => r.json())
                 .then(erp => {
                     if (erp.error) {
-                        if (msg) msg.innerHTML = `<span style="color:#f87171;">ERP error: ${erp.error}</span>`;
+                        if (msg) {
+                            const detail = erp.detail ? `<br><span style="font-size:11px;color:#94a3b8;">${erp.detail}</span>` : '';
+                            msg.innerHTML = `<span style="color:#f87171;">ERP error: ${erp.error}</span>${detail}`;
+                        }
                         return;
                     }
                     if (!erp.found) {
+                        if (erp.multiple && Array.isArray(erp.options) && erp.options.length) {
+                            renderErpOptions(pid, query, erp.options);
+                            return;
+                        }
                         if (msg) msg.innerHTML = `<span style="color:#f87171;">PO <strong>${query}</strong> not found in ERP or saved records.</span>`;
                         return;
                     }
 
-                    // All sales orders for same customer PO â†’ merge all lines into the one searched block
-                    const firstGrp = erp.groups[0];
-                    const allLines = erp.groups.flatMap(g => g.lines).map(l => ({
-                        desc:  l.item,
-                        ply:   l.type,
-                        qty:   l.qty,
-                        price: l.price,
-                        total: (l.qty * l.price).toFixed(2)
-                    }));
-                    fillPoBlock(pid, {
-                        poNum: firstGrp.customerPo,
-                        buyer: firstGrp.buyer || firstGrp.customerName || '',
-                        items: allLines
-                    }, {
-                        salesOrder: firstGrp.salesOrderNo,
-                        reqDate:    firstGrp.requestDate || firstGrp.shipDate,
-                        status:     firstGrp.status,
-                    });
-
-                    const total = erp.groups.reduce((s, g) => s + g.lines.length, 0);
-                    if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">ERP matched PO ${erp.po}</span> - ${erp.groups.length} sales order(s) · ${total} line(s) loaded.`;
+                    applyErpSelection(pid, erp, erp.po || query);
                 })
                 .catch(() => {
                     if (msg) msg.innerHTML = '<span style="color:#f87171;">ERP server unreachable.</span>';
@@ -959,18 +1186,13 @@ async function fetchErpPoData(query) {
         if (erp.error || !erp.found || !Array.isArray(erp.groups) || !erp.groups.length) return null;
 
         const firstGrp = erp.groups[0];
-        const allLines = erp.groups.flatMap(g => (g.lines || [])).map(l => ({
-            desc:  l.item,
-            ply:   l.type || l.uom || '',
-            qty:   l.qty,
-            price: l.price,
-            total: ((parseFloat(l.qty || 0) || 0) * (parseFloat(l.price || 0) || 0)).toFixed(2)
-        }));
+        const allLines = buildErpLinesForGroupData(erp);
 
         return {
             po: {
                 poNum: firstGrp.customerPo || query,
-                buyer: firstGrp.buyer || firstGrp.customerName || '',
+                buyer: firstGrp.buyer || '',
+                customerName: firstGrp.customerName || '',
                 items: allLines
             },
             extra: {
@@ -1029,6 +1251,7 @@ async function hydratePiFromMarketingIntake(mkt, salesSnapshot) {
             status: 'Booked'
         };
         fillPoBlock(pid, sourcePo, sourceExtra);
+        setPiCustomerIfEmpty(erpData?.po?.customerName);
 
         const msg = document.getElementById('erpMsg_' + pid);
         if (msg) {
@@ -1480,7 +1703,12 @@ async function submitToMarketing() {
                 method: 'POST', headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({ order_id: orderId, page_name: 'sales', ...data })
             }).catch(() => {});
-            fetch(APP_BASE + '/api/orders.php?id=' + encodeURIComponent(orderId) + '&step=marketing', { method: 'PUT' })
+            const firstPo = (data.pos && data.pos[0]) || {};
+            const orderParams = new URLSearchParams({ id: orderId, step: 'lc' });
+            if (data.customer) orderParams.set('customer', data.customer);
+            if (data.buyer)    orderParams.set('buyer', data.buyer);
+            if (firstPo.poNum) orderParams.set('po', firstPo.poNum);
+            fetch(APP_BASE + '/api/orders.php?' + orderParams.toString(), { method: 'PUT' })
                 .catch(() => {});
         }
     } catch (e) {
@@ -1916,8 +2144,7 @@ function loadPiCustomers() {
         .then(list => {
             _piCustomers = list.filter(c => {
                 if (['sales_person','team_leader'].includes(c.stage)) return false;
-                const extra = (() => { try { return JSON.parse(c.extra_data || '{}'); } catch(e) { return {}; } })();
-                return (extra.customerCategory || '') === 'Bulk Production';
+                return true;
             });
             const pendingName = (window._pendingPiCustomer || '').trim();
             if (pendingName && !_piCustomers.some(c => (c.company_name || '').trim() === pendingName)) {
@@ -1934,31 +2161,61 @@ function loadPiCustomers() {
                     });
                 }
             }
-            const sel = document.getElementById('piCustomer');
-            if (!sel) return;
-            const cur = sel.value;
-            sel.innerHTML = '<option value="">Select customer</option>' +
-                _piCustomers.map(c => {
-                    const extra = (() => { try { return JSON.parse(c.extra_data || '{}'); } catch(e) { return {}; } })();
-                    const bin   = extra.bin || '';
-                    const addr  = (c.factory_address || c.address_head_office || '').replace(/"/g,'&quot;');
-                    return `<option value="${c.company_name}" data-addr="${addr}" data-bin="${bin.replace(/"/g,'&quot;')}">${c.company_name}</option>`;
-                }).join('');
-            if (cur) sel.value = cur;
+            const inp = document.getElementById('piCustomer');
+            if (!inp) return;
             if (window._pendingPiCustomer) {
-                sel.value = window._pendingPiCustomer;
+                inp.value = window._pendingPiCustomer;
                 window._pendingPiCustomer = '';
                 onPiCustomerChange();
             }
         })
         .catch(() => {});
 }
+function escHtml(s) {
+    return String(s || '').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+}
+function hidePiCustomerDropdown() {
+    const dd = document.getElementById('piCustomerDropdown');
+    if (dd) dd.style.display = 'none';
+}
+function onPiCustomerInput() {
+    const inp = document.getElementById('piCustomer');
+    const dd  = document.getElementById('piCustomerDropdown');
+    if (!inp || !dd) return;
+    const q = (inp.value || '').trim().toLowerCase();
+    const matches = (q
+        ? _piCustomers.filter(c => (c.company_name || '').toLowerCase().includes(q))
+        : _piCustomers).slice(0, 100);
+    if (!matches.length) {
+        dd.innerHTML = '<div class="combo-empty">No match</div>';
+    } else {
+        dd.innerHTML = matches.map(c => {
+            const nm = escHtml(c.company_name);
+            return `<div class="combo-item" onmousedown="pickPiCustomer(this)" data-name="${nm}">${nm}</div>`;
+        }).join('');
+    }
+    dd.style.display = 'block';
+}
+function pickPiCustomer(el) {
+    document.getElementById('piCustomer').value = el.getAttribute('data-name');
+    hidePiCustomerDropdown();
+    onPiCustomerChange();
+}
 function onPiCustomerChange() {
-    const sel = document.getElementById('piCustomer');
-    const opt = sel.options[sel.selectedIndex];
-    const addr = opt?.dataset?.addr || '';
+    const name = (document.getElementById('piCustomer').value || '').trim();
+    const c = _piCustomers.find(x => (x.company_name || '').trim() === name);
+    const addr = c ? (c.factory_address || c.address_head_office || '') : '';
     if (addr) document.getElementById('piBuyerAddress').value = addr;
     buildSalesTerms();
+}
+// Fill the Customer (TO) field from an ERP/PO customer name, only if still blank
+function setPiCustomerIfEmpty(name) {
+    const val = (name || '').trim();
+    if (!val) return;
+    const inp = document.getElementById('piCustomer');
+    if (!inp || inp.value.trim()) return;
+    inp.value = val;
+    onPiCustomerChange();
 }
 loadPiCustomers();
 
@@ -1975,7 +2232,7 @@ document.getElementById('masterPiModal').addEventListener('click', function(e) {
 });
 
 // â”€â”€ Order ID integration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const _STEP_ORDER = ['marketing-intake','costing-review','production','sales','marketing','lc','exchange','commercial','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding','po-status'];
+const _STEP_ORDER = ['marketing-intake','costing-review','production','sales','lc','exchange','commercial','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding','po-status'];
 function _stepIdx(s) { return _STEP_ORDER.indexOf(s); }
 
 function updatePrintLock(step) {
@@ -1993,13 +2250,14 @@ function updatePrintLock(step) {
     }
 }
 
-window.onOrderLoad = function(res) {
+window.onOrderLoad = async function(res) {
     setPiContentVisible(true);
     resetSubmitBtn();
     const orderId = res.order?.order_id;
     updatePrintLock(res.order?.current_step || 'sales');
     const salesSnapshot = res.pages?.sales || null;
     const marketingIntake = res.pages?.['marketing-intake'] || null;
+    const fallbackCustomer = salesSnapshot?.customer || marketingIntake?.customer || res.order?.customer_name || '';
     if (salesSnapshot?.piType) {
         const radio = document.querySelector(`input[name="piTypeChoice"][value="${salesSnapshot.piType}"]`);
         if (radio) radio.checked = true;
@@ -2029,7 +2287,7 @@ window.onOrderLoad = function(res) {
         // Fill shared header fields from first PI
         document.getElementById('piNumber').value           = firstPi.pi_number || '';
         document.getElementById('piNumDisplay').textContent = firstPi.pi_number || '-';
-        document.getElementById('piCustomer').value         = firstPi.customer  || '';
+        document.getElementById('piCustomer').value         = firstPi.customer || fallbackCustomer || '';
         const firstPo = firstPi.pos?.[0] || {};
         document.getElementById('piBuyer').value            = salesSnapshot?.buyer          || firstPo.sharedBuyer          || '';
         document.getElementById('piDate').value             = firstPi.pi_date || '';
@@ -2053,8 +2311,14 @@ window.onOrderLoad = function(res) {
         return;
     }
 
-    if (hydratePiFromMarketingIntake(marketingIntake, salesSnapshot)) {
+    if (await hydratePiFromMarketingIntake(marketingIntake, salesSnapshot)) {
         return;
+    }
+
+    if (fallbackCustomer) {
+        document.getElementById('piCustomer').value = fallbackCustomer;
+        window._pendingPiCustomer = fallbackCustomer;
+        onPiCustomerChange();
     }
 
     // New order: auto-fill is handled by addPoBlock â†’ autoFillPiNum

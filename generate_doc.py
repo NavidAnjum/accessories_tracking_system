@@ -12,7 +12,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='repla
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 BASE_URL   = "http://localhost/ed_module"
-DEMO_ORDER = "ORD-2026-0019"
+DEMO_ORDER = "ORD-2026-0011"
 OUT_DIR    = Path("doc_screenshots")
 VIEWPORT   = {"width": 1440, "height": 900}
 
@@ -82,6 +82,13 @@ ROLES = [
         "color":    (99, 102, 241),
         "docx":     "ATS_Commercial.docx",
         "tagline":  "Handles all export documentation from PI through to final forwarding.",
+        "highlights": [
+            "You can now create an order directly from the PI page — click \"+ New Order\" and the order starts right there, no need to go through Marketing Intake first.",
+            "The Customer field is now a single searchable box — just start typing the customer name and matching companies appear instantly.",
+            "Loading a PO now auto-fills the Customer (TO) from the ERP, so the customer flows through to the order and the dashboard.",
+            "Submitting a PI now records the customer, buyer and PO on the order, so the Order Tracking Dashboard shows PO, buyer and item count instead of blanks.",
+            "Workflow after the PI: once the PI is submitted the order goes to Marketing for approval; after Marketing approves, it comes back to the LC step for you to record the Letter of Credit.",
+        ],
         "pages": [
             {
                 "id":    "sales",
@@ -186,15 +193,31 @@ async def capture_role(pw, role: dict) -> dict:
     return shots
 
 
-async def capture_all():
+async def capture_all(roles):
     from playwright.async_api import async_playwright
     OUT_DIR.mkdir(exist_ok=True)
     result = {}
     async with async_playwright() as pw:
-        for role in ROLES:
+        for role in roles:
             print(f"\n  [{role['name']}]")
             result[role["id"]] = await capture_role(pw, role)
     return result
+
+
+# Friendly aliases so you can pass e.g. "commercial" instead of "commercial_dept".
+ROLE_ALIASES = {"commercial": "commercial_dept"}
+
+
+def select_roles(args):
+    """Return the ROLES to build. With no args, build all. Otherwise match by id/alias."""
+    if not args:
+        return ROLES
+    wanted = {ROLE_ALIASES.get(a.lower(), a.lower()) for a in args}
+    chosen = [r for r in ROLES if r["id"] in wanted]
+    if not chosen:
+        ids = ", ".join([r["id"] for r in ROLES] + list(ROLE_ALIASES))
+        raise SystemExit(f"No matching role for {args}. Available: {ids}")
+    return chosen
 
 
 # ── DOCX builder (one per role) ───────────────────────────────────────────────
@@ -315,6 +338,18 @@ def build_role_docx(role: dict, shots: dict):
         r2.font.size = Pt(11); r2.font.color.rgb = RGBColor(71,85,105)
         para.paragraph_format.space_after = Pt(5)
 
+    # ── What's New (optional per role) ──────────────────────────────────────
+    if role.get("highlights"):
+        doc.add_paragraph()
+        h("What's New", size=13, color=(22,163,74), before=4)
+        for item in role["highlights"]:
+            para = doc.add_paragraph(style="List Bullet")
+            tag = para.add_run("NEW  ")
+            tag.font.bold = True; tag.font.size = Pt(9); tag.font.color.rgb = RGBColor(22,163,74)
+            txt = para.add_run(item)
+            txt.font.size = Pt(11); txt.font.color.rgb = RGBColor(71,85,105)
+            para.paragraph_format.space_after = Pt(4)
+
     doc.add_page_break()
 
     # ── Per-page screenshots ───────────────────────────────────────────────
@@ -343,19 +378,22 @@ def build_role_docx(role: dict, shots: dict):
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
-async def main():
+async def main(roles):
     print("\n=== ATS Role Documentation Generator ===\n")
-    print("Step 1: Capturing screenshots...")
-    all_shots = await capture_all()
+    print("Building: " + ", ".join(r["name"] for r in roles))
+    print("\nStep 1: Capturing screenshots...")
+    all_shots = await capture_all(roles)
 
     print("\nStep 2: Building DOCX files...")
-    for role in ROLES:
+    for role in roles:
         print(f"\n  Building {role['docx']}...")
         build_role_docx(role, all_shots.get(role["id"], {}))
 
     print("\nDone! Files created:")
-    for role in ROLES:
+    for role in roles:
         print(f"  {role['docx']}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Usage: python generate_doc.py [role ...]   (no args = all roles)
+    #   e.g. python generate_doc.py commercial
+    asyncio.run(main(select_roles(sys.argv[1:])))

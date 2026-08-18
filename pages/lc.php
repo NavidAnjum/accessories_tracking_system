@@ -168,7 +168,7 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                     <div class="page-actions">
                         <div class="page-actions-left">
-                            <button type="button" class="ghost-btn js-prev-page" data-prev-page="marketing">Previous</button>
+                            <button type="button" class="ghost-btn js-prev-page" data-prev-page="sales">Previous</button>
                         </div>
                         <div class="page-actions-right">
                             <button type="button" class="primary-btn js-next-page" data-next-page="exchange">Next: Bill of Exchange</button>

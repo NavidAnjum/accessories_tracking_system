@@ -995,7 +995,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const pageName    = document.body.dataset.page;
     if (!actionsLeft || !pageName) return;
     // Skip pages that already have their own dedicated save/submit buttons
-    if (['dashboard', 'marketing-intake', 'sales'].includes(pageName)) return;
+    if (['dashboard', 'marketing-intake', 'sales', 'po-overview'].includes(pageName)) return;
     if (document.getElementById('universalSaveBtn')) return;
 
     const btn = document.createElement('button');

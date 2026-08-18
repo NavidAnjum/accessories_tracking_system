@@ -10,7 +10,7 @@
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -52,8 +52,38 @@ try {
             echo json_encode($row ?: null);
         } else {
             // All orders
-            $stmt = $db->query('SELECT * FROM orders ORDER BY created_at DESC');
-            echo json_encode($stmt->fetchAll());
+            $stmt   = $db->query('SELECT * FROM orders ORDER BY created_at DESC');
+            $orders = $stmt->fetchAll();
+
+            // Enrich with data from the pis table — for PI-created orders the customer,
+            // PO numbers, quantities and item counts live in `pis`, not the orders row.
+            $piRows = $db->query('SELECT order_id, customer, pos, grand_qty, grand_val FROM pis WHERE order_id IS NOT NULL')->fetchAll();
+            $agg = [];
+            foreach ($piRows as $pi) {
+                $oid = $pi['order_id'];
+                if (!isset($agg[$oid])) $agg[$oid] = ['customer'=>'','pos'=>[],'buyer'=>'','qty'=>0,'val'=>0,'items'=>0];
+                if (!$agg[$oid]['customer'] && trim($pi['customer'] ?? '')) $agg[$oid]['customer'] = trim($pi['customer']);
+                $agg[$oid]['qty'] += (float)($pi['grand_qty'] ?? 0);
+                $agg[$oid]['val'] += (float)($pi['grand_val'] ?? 0);
+                foreach ((json_decode($pi['pos'] ?? '[]', true) ?: []) as $po) {
+                    if (!empty($po['poNum'])) $agg[$oid]['pos'][$po['poNum']] = true;
+                    if (!$agg[$oid]['buyer'] && !empty($po['buyer'])) $agg[$oid]['buyer'] = $po['buyer'];
+                    if (is_array($po['items'] ?? null)) $agg[$oid]['items'] += count($po['items']);
+                }
+            }
+            foreach ($orders as &$o) {
+                $a = $agg[$o['order_id']] ?? null;
+                if ($a) {
+                    if (empty($o['customer_name']) && $a['customer']) $o['customer_name'] = $a['customer'];
+                    if (empty($o['po_number'])    && $a['pos'])      $o['po_number']     = implode(', ', array_keys($a['pos']));
+                    if (empty($o['to_buyer'])     && $a['buyer'])     $o['to_buyer']      = $a['buyer'];
+                }
+                $o['total_qty']  = $a['qty']   ?? 0;
+                $o['total_val']  = $a['val']   ?? 0;
+                $o['item_count'] = $a['items'] ?? 0;
+            }
+            unset($o);
+            echo json_encode($orders);
         }
         exit;
     }
@@ -71,8 +101,20 @@ try {
         $curStmt->execute([$id]);
         $current = $curStmt->fetchColumn();
 
-        $stmt = $db->prepare('UPDATE orders SET current_step = ?, updated_at = CURRENT_TIMESTAMP WHERE order_id = ?');
-        $stmt->execute([$step, $id]);
+        // Optional order fields — only overwrite when a non-empty value is supplied,
+        // so a plain step change never blanks out existing details.
+        $sets   = ['current_step = ?', 'updated_at = CURRENT_TIMESTAMP'];
+        $params = [$step];
+        foreach (['customer' => 'customer_name', 'buyer' => 'to_buyer', 'po' => 'po_number', 'salesperson' => 'salesperson'] as $qkey => $col) {
+            $val = isset($_GET[$qkey]) ? trim($_GET[$qkey]) : '';
+            if ($val !== '') {
+                $sets[]   = "$col = ?";
+                $params[] = $val;
+            }
+        }
+        $params[] = $id;
+        $stmt = $db->prepare('UPDATE orders SET ' . implode(', ', $sets) . ' WHERE order_id = ?');
+        $stmt->execute($params);
 
         if ($current !== $step) {
             createStepNotifications($db, $id, $step, (int)(currentUser()['id'] ?? 0) ?: null);
@@ -82,6 +124,42 @@ try {
     }
 
     // ── POST — upsert order + items ───────────────────────────────────────────
+    if ($method === 'DELETE') {
+        $id = $_GET['order_id'] ?? $_GET['id'] ?? null;
+        $id = is_string($id) ? trim($id) : '';
+        if ($id === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'order_id or id is required']);
+            exit;
+        }
+
+        $exists = $db->prepare('SELECT order_id FROM orders WHERE order_id = ?');
+        $exists->execute([$id]);
+        if (!$exists->fetchColumn()) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Order not found']);
+            exit;
+        }
+
+        $db->beginTransaction();
+        try {
+            $db->prepare('DELETE FROM notifications WHERE order_id = ?')->execute([$id]);
+            $db->prepare('DELETE FROM page_data WHERE order_id = ?')->execute([$id]);
+            $db->prepare('DELETE FROM pis WHERE order_id = ?')->execute([$id]);
+            $db->prepare('DELETE FROM order_items WHERE order_id = ?')->execute([$id]);
+            $db->prepare('DELETE FROM orders WHERE order_id = ?')->execute([$id]);
+            $db->commit();
+        } catch (Throwable $e) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw $e;
+        }
+
+        echo json_encode(['ok' => true, 'order_id' => $id]);
+        exit;
+    }
+
     if ($method === 'POST') {
         $body = json_decode(file_get_contents('php://input'), true);
         if (!$body) {
