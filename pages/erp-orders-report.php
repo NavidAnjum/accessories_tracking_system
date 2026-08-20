@@ -43,30 +43,40 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <div class="section-summary">
             <strong>Saved ERP Orders</strong>
-            <span>If no date is selected, the report shows today’s cached ERP orders.</span>
+            <span>Filtered by ERP created date. Defaults to the last 10 days.</span>
         </div>
     </div>
 
     <div class="erp-report-card">
         <div class="erp-report-head">
             <div>
-                <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6366f1;margin-bottom:6px;">Daily Report</div>
-                <div style="font-size:15px;font-weight:800;color:#1f2937;">Browse all cached ERP orders for a selected date</div>
+                <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6366f1;margin-bottom:6px;">Created-Date Report</div>
+                <div style="font-size:15px;font-weight:800;color:#1f2937;">Cached ERP orders by ERP created date</div>
             </div>
             <div class="erp-report-filters">
-                <input type="date" id="erpReportDate">
-                <select id="erpReportDateField">
-                    <option value="ordered_date">Ordered Date</option>
-                    <option value="booked_date">Booked Date</option>
-                    <option value="header_request_date">Request Date</option>
-                    <option value="schedule_ship_date">Ship Date</option>
-                </select>
+                <label style="font-size:12px;color:#64748b;font-weight:700;">From <input type="date" id="erpReportFrom"></label>
+                <label style="font-size:12px;color:#64748b;font-weight:700;">To <input type="date" id="erpReportTo"></label>
                 <button type="button" class="primary-btn" id="erpReportBtn" onclick="loadErpOrdersReport()">Load Report</button>
             </div>
         </div>
-        <div class="erp-report-meta" id="erpReportMeta">Select a date to load ERP order details. Default is today.</div>
-        <div class="erp-report-list" id="erpReportList">
-            <div class="erp-report-empty">No report loaded yet.</div>
+        <div class="erp-report-meta" id="erpReportMeta">Loading the last 10 days of ERP orders…</div>
+        <div class="erp-report-table-wrap">
+            <table class="erp-report-table" id="erpReportTable">
+                <thead>
+                    <tr>
+                        <th>Created</th>
+                        <th>Order No</th>
+                        <th>PO</th>
+                        <th>Item Name</th>
+                        <th style="text-align:right;">Total Qty</th>
+                        <th style="text-align:right;">Price</th>
+                        <th style="text-align:right;">Value</th>
+                    </tr>
+                </thead>
+                <tbody id="erpReportBody">
+                    <tr><td colspan="7" class="erp-report-empty">No report loaded yet.</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </section>
@@ -91,95 +101,99 @@ function erpReportMoney(value) {
     return '$' + num.toFixed(2);
 }
 
+function erpReportNum(value) {
+    return Number(value || 0).toLocaleString();
+}
+
 async function loadErpOrdersReport() {
-    var dateInput = document.getElementById('erpReportDate');
-    var fieldInput = document.getElementById('erpReportDateField');
+    var fromInput = document.getElementById('erpReportFrom');
+    var toInput = document.getElementById('erpReportTo');
     var meta = document.getElementById('erpReportMeta');
-    var list = document.getElementById('erpReportList');
+    var body = document.getElementById('erpReportBody');
     var btn = document.getElementById('erpReportBtn');
 
-    var selectedDate = (dateInput && dateInput.value) ? dateInput.value : new Date().toISOString().slice(0, 10);
-    var selectedField = fieldInput ? fieldInput.value : 'ordered_date';
+    var fromDate = (fromInput && fromInput.value) ? fromInput.value : erpReportDaysAgo(9);
+    var toDate = (toInput && toInput.value) ? toInput.value : erpReportToday();
 
-    if (btn) {
-        btn.disabled = true;
-        btn.textContent = 'Loading...';
-    }
-    if (meta) meta.textContent = 'Loading ERP report for ' + selectedDate + '...';
-    if (list) list.innerHTML = '<div class="erp-report-empty">Loading report...</div>';
+    if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
+    if (meta) meta.textContent = 'Loading ERP orders from ' + fromDate + ' to ' + toDate + '...';
+    if (body) body.innerHTML = '<tr><td colspan="7" class="erp-report-empty">Loading report...</td></tr>';
 
     try {
-        var res = await fetch(APP_BASE + '/api/erp_orders_report.php?date=' + encodeURIComponent(selectedDate) + '&date_field=' + encodeURIComponent(selectedField));
+        var res = await fetch(APP_BASE + '/api/erp_orders_report.php?from=' + encodeURIComponent(fromDate) + '&to=' + encodeURIComponent(toDate));
         var json = await res.json();
 
         if (json.error) {
             if (meta) meta.textContent = 'Could not load report.';
-            if (list) list.innerHTML = '<div class="erp-report-empty" style="color:#ef4444;">' + erpReportEscape(json.error) + '</div>';
+            if (body) body.innerHTML = '<tr><td colspan="7" class="erp-report-empty" style="color:#ef4444;">' + erpReportEscape(json.error) + '</td></tr>';
             return;
         }
 
-        var groups = Array.isArray(json.results) ? json.results : [];
+        var rows = Array.isArray(json.rows) ? json.rows : [];
         if (meta) {
-            meta.textContent = groups.length + ' order group(s), ' + (json.lineCount || 0) + ' line(s), qty ' + Number(json.totalQty || 0).toLocaleString() + ', value ' + erpReportMoney(json.totalValue || 0) + ' for ' + selectedDate + '.';
+            meta.textContent = erpReportNum(json.lineCount || 0) + ' line(s) · Total Qty ' + erpReportNum(json.totalQty || 0)
+                + ' · Total Value ' + erpReportMoney(json.totalValue || 0)
+                + ' · Created ' + erpReportEscape(fromDate) + ' → ' + erpReportEscape(toDate) + '.';
         }
 
-        if (!groups.length) {
-            if (list) list.innerHTML = '<div class="erp-report-empty">No cached ERP orders found for ' + erpReportEscape(selectedDate) + '.</div>';
+        if (!rows.length) {
+            if (body) body.innerHTML = '<tr><td colspan="7" class="erp-report-empty">No cached ERP orders created between ' + erpReportEscape(fromDate) + ' and ' + erpReportEscape(toDate) + '.</td></tr>';
             return;
         }
 
-        list.innerHTML = groups.map(function (group) {
-            var salesOrders = (group.salesOrders || []).map(function (so) {
-                return '<span class="erp-report-chip">' + erpReportEscape(so) + '</span>';
-            }).join('');
-
-            var rows = (group.items || []).map(function (item) {
-                return '<tr>'
-                    + '<td>' + erpReportEscape(item.saleOrderNo || '-') + '</td>'
-                    + '<td>' + erpReportEscape(item.itemCode || item.orderedItem || '-') + '</td>'
-                    + '<td>' + erpReportEscape(item.description || '-') + '</td>'
-                    + '<td>' + erpReportEscape(item.remarks || '-') + '</td>'
-                    + '<td style="text-align:right;">' + erpReportEscape(item.qty || 0) + '</td>'
-                    + '<td style="text-align:right;">' + erpReportEscape(item.price || 0) + '</td>'
-                    + '<td style="text-align:right;">' + erpReportEscape(item.value || 0) + '</td>'
-                    + '<td>' + erpReportEscape(item.delivery || '-') + '</td>'
-                    + '<td>' + erpReportEscape(item.lineStatus || '-') + '</td>'
-                    + '</tr>';
-            }).join('');
-
-            return '<div class="erp-report-group">'
-                + '<div class="erp-report-group-head">'
-                + '<div>'
-                + '<div class="erp-report-po">' + erpReportEscape(group.customerPo || 'No PO') + '</div>'
-                + '<div class="erp-report-sub"><strong>' + erpReportEscape(group.customerName || '-') + '</strong> · Buyer: ' + erpReportEscape(group.buyer || '-') + '</div>'
-                + '<div class="erp-report-sub">Ordered: ' + erpReportEscape(erpReportDateOnly(group.orderedDate)) + ' · Booked: ' + erpReportEscape(erpReportDateOnly(group.bookedDate)) + ' · Request: ' + erpReportEscape(erpReportDateOnly(group.requestDate)) + ' · Ship: ' + erpReportEscape(erpReportDateOnly(group.shipDate)) + '</div>'
-                + '<div class="erp-report-chips">' + salesOrders + '</div>'
-                + '</div>'
-                + '<div class="erp-report-stats">'
-                + '<div class="erp-report-stat"><strong>' + erpReportEscape(group.lineCount || 0) + '</strong><span>Lines</span></div>'
-                + '<div class="erp-report-stat"><strong>' + Number(group.totalQty || 0).toLocaleString() + '</strong><span>Total Qty</span></div>'
-                + '<div class="erp-report-stat"><strong>' + erpReportMoney(group.totalValue || 0) + '</strong><span>Total Value</span></div>'
-                + '</div>'
-                + '</div>'
-                + '<div class="erp-report-table-wrap"><table class="erp-report-table"><thead><tr><th>Sales Order</th><th>Item</th><th>Description</th><th>Remarks</th><th>Qty</th><th>Price</th><th>Value</th><th>Delivery</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-                + '</div>';
+        var prevOrder = null;
+        var html = rows.map(function (r) {
+            var order = r.saleOrderNo || '-';
+            var isNewOrder = order !== prevOrder;
+            prevOrder = order;
+            // Only show Created / Order / PO on the first row of each order block.
+            var edge = isNewOrder ? 'border-top:2px solid #dbe3ff;' : '';
+            var cell = function (content, extra) {
+                var style = edge + (extra || '');
+                return '<td' + (style ? ' style="' + style + '"' : '') + '>' + content + '</td>';
+            };
+            var right = 'text-align:right;';
+            return '<tr>'
+                + cell(isNewOrder ? erpReportEscape(erpReportDateOnly(r.createdDate)) : '')
+                + cell(isNewOrder ? erpReportEscape(order) : '')
+                + cell(isNewOrder ? erpReportEscape(r.customerPo || '-') : '')
+                + cell(erpReportEscape(r.itemName || r.itemCode || '-'))
+                + cell(erpReportNum(r.qty || 0), right)
+                + cell(erpReportEscape(r.price || 0), right)
+                + cell(erpReportMoney(r.value || 0), right)
+                + '</tr>';
         }).join('');
+
+        html += '<tr style="background:#f8fafc;font-weight:800;">'
+            + '<td colspan="4" style="text-align:right;">Totals</td>'
+            + '<td style="text-align:right;">' + erpReportNum(json.totalQty || 0) + '</td>'
+            + '<td></td>'
+            + '<td style="text-align:right;">' + erpReportMoney(json.totalValue || 0) + '</td>'
+            + '</tr>';
+
+        if (body) body.innerHTML = html;
     } catch (error) {
         if (meta) meta.textContent = 'Could not load report.';
-        if (list) list.innerHTML = '<div class="erp-report-empty" style="color:#ef4444;">Could not reach report service.</div>';
+        if (body) body.innerHTML = '<tr><td colspan="7" class="erp-report-empty" style="color:#ef4444;">Could not reach report service.</td></tr>';
     } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.textContent = 'Load Report';
-        }
+        if (btn) { btn.disabled = false; btn.textContent = 'Load Report'; }
     }
 }
 
+function erpReportToday() {
+    return new Date().toISOString().slice(0, 10);
+}
+function erpReportDaysAgo(days) {
+    var d = new Date();
+    d.setDate(d.getDate() - days);
+    return d.toISOString().slice(0, 10);
+}
+
 document.addEventListener('DOMContentLoaded', function () {
-    var dateInput = document.getElementById('erpReportDate');
-    if (dateInput && !dateInput.value) {
-        dateInput.value = new Date().toISOString().slice(0, 10);
-    }
+    var fromInput = document.getElementById('erpReportFrom');
+    var toInput = document.getElementById('erpReportTo');
+    if (fromInput && !fromInput.value) fromInput.value = erpReportDaysAgo(9); // last 10 days inclusive
+    if (toInput && !toInput.value) toInput.value = erpReportToday();
     loadErpOrdersReport();
 });
 </script>

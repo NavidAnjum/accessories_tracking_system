@@ -99,22 +99,11 @@ try {
     ensureErpSaleOrdersCacheTable($db);
     $state = getErpBackfillState($db);
 
-    if (!empty($state['completed'])) {
-        $stats = erpSaleOrdersCacheStats($db);
-        cronBackfillOut([
-            'ok' => true,
-            'stage' => 'already_complete',
-            'job' => ERP_BACKFILL_JOB_NAME,
-            'next_offset' => (int) ($state['next_offset'] ?? 0),
-            'pages_completed' => (int) ($state['pages_completed'] ?? 0),
-            'rows_seen' => (int) ($state['rows_seen'] ?? 0),
-            'rows_saved' => (int) ($state['rows_saved'] ?? 0),
-            'cache_total_rows' => (int) ($stats['total_rows'] ?? 0),
-            'cache_total_pos' => (int) ($stats['total_pos'] ?? 0),
-            'last_synced_at' => $stats['last_synced_at'] ?? null,
-        ]);
-        exit;
-    }
+    // NOTE: the job never permanently stops. The ERP returns orders oldest→newest
+    // across the offset range, so brand-new orders appear at the tail (highest
+    // offset). Once the full crawl has caught up (completed=1), each run re-polls
+    // from next_offset (the tail) forward so newly-created orders keep syncing.
+    $caughtUp = !empty($state['completed']);
 
     $offset = max(0, (int) ($state['next_offset'] ?? 0));
     $limit = max(1, (int) ($state['page_limit'] ?? ERP_SALE_ORDERS_LIMIT));
@@ -193,10 +182,15 @@ try {
         'last_run_at' => date('Y-m-d H:i:s'),
     ]);
 
+    // Stage: still crawling → batch_saved; reached the end → either the first
+    // completion, or a tail re-poll that looked for newly-added orders.
+    $stage = $hasMore ? 'batch_saved' : ($caughtUp ? 'tail_repolled' : 'completed');
+
     $stats = erpSaleOrdersCacheStats($db);
     cronBackfillOut([
         'ok' => true,
-        'stage' => $hasMore ? 'batch_saved' : 'completed',
+        'stage' => $stage,
+        'caught_up' => !$hasMore,
         'job' => ERP_BACKFILL_JOB_NAME,
         'pages_this_run' => $pagesThisRun,
         'processed_offsets' => $processedOffsets,

@@ -13,103 +13,96 @@ requireLogin();
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/erp_sale_orders_cache.php';
 
-$date = trim((string) ($_GET['date'] ?? date('Y-m-d')));
-if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Invalid date format. Use YYYY-MM-DD.']);
-    exit;
+function erpReportValidDate(string $value): bool
+{
+    return (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $value);
 }
 
-$dateField = trim((string) ($_GET['date_field'] ?? 'ordered_date'));
-$allowedDateFields = [
-    'ordered_date' => 'ordered_date',
-    'booked_date' => 'booked_date',
-    'header_request_date' => 'header_request_date',
-    'schedule_ship_date' => 'schedule_ship_date',
-];
-$column = $allowedDateFields[$dateField] ?? 'ordered_date';
+// Date range on the ERP record creation date. Default = last 10 days (inclusive).
+$to   = trim((string) ($_GET['to']   ?? date('Y-m-d')));
+$from = trim((string) ($_GET['from'] ?? date('Y-m-d', strtotime('-9 days'))));
+
+if (!erpReportValidDate($from) || !erpReportValidDate($to)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid date format. Use YYYY-MM-DD for from/to.']);
+    exit;
+}
+if ($from > $to) {
+    [$from, $to] = [$to, $from]; // swap if reversed
+}
 
 try {
     $db = getDB();
     ensureErpSaleOrdersCacheTable($db);
 
+    // Filter on the date part of the ERP creation timestamp.
     $sql = "
-        SELECT *
+        SELECT sale_order_no, customer_po_no, customer_name, buyer,
+               item_code, ordered_item, item_description,
+               ordered_qty, shipped_qty, unit_selling_price, line_order_value,
+               line_status, header_creation_date
         FROM erp_sale_orders_cache
-        WHERE LEFT(COALESCE($column, ''), 10) = :report_date
-        ORDER BY customer_po_no ASC, sale_order_no ASC, line_id ASC, id ASC
+        WHERE header_creation_date IS NOT NULL
+          AND LEFT(header_creation_date, 10) BETWEEN :from AND :to
+        ORDER BY header_creation_date DESC, customer_po_no ASC, sale_order_no ASC, line_id ASC, id ASC
     ";
     $stmt = $db->prepare($sql);
-    $stmt->execute([':report_date' => $date]);
-    $rows = $stmt->fetchAll();
+    $stmt->execute([':from' => $from, ':to' => $to]);
+    $dbRows = $stmt->fetchAll();
 
-    $groups = [];
+    // Aggregate ERP line/shipment rows so the same order + item shows once,
+    // with quantities and values summed (Total Qty). Rows stay grouped by order.
+    $agg = [];
     $totalQty = 0.0;
     $totalValue = 0.0;
 
-    foreach ($rows as $row) {
-        $groupKey = trim((string) ($row['customer_po_no'] ?? ''));
-        if ($groupKey === '') {
-            $groupKey = 'NO-PO';
-        }
+    foreach ($dbRows as $row) {
+        $qty   = (float) ($row['ordered_qty'] ?? 0);
+        $price = (float) ($row['unit_selling_price'] ?? 0);
+        $value = (float) ($row['line_order_value'] ?? ($qty * $price));
 
-        if (!isset($groups[$groupKey])) {
-            $groups[$groupKey] = [
-                'customerPo' => (string) ($row['customer_po_no'] ?? ''),
-                'customerName' => (string) ($row['customer_name'] ?? ''),
-                'buyer' => (string) ($row['buyer'] ?? ''),
-                'orderType' => (string) ($row['order_type'] ?? ''),
-                'operatingUnit' => (string) ($row['operating_unit'] ?? ''),
-                'status' => (string) ($row['header_status'] ?? ''),
-                'orderedDate' => (string) ($row['ordered_date'] ?? ''),
-                'bookedDate' => (string) ($row['booked_date'] ?? ''),
-                'requestDate' => (string) ($row['header_request_date'] ?? ''),
-                'shipDate' => (string) ($row['schedule_ship_date'] ?? ''),
-                'salesOrders' => [],
-                'items' => [],
-                'lineCount' => 0,
-                'totalQty' => 0.0,
-                'totalValue' => 0.0,
+        $saleOrderNo = (string) ($row['sale_order_no'] ?? '');
+        $customerPo  = (string) ($row['customer_po_no'] ?? '');
+        $itemName    = (string) ($row['item_description'] ?? ($row['ordered_item'] ?? ''));
+        $key = $saleOrderNo . '|' . $customerPo . '|' . $itemName;
+
+        if (!isset($agg[$key])) {
+            $agg[$key] = [
+                'createdDate' => substr((string) ($row['header_creation_date'] ?? ''), 0, 10),
+                'saleOrderNo' => $saleOrderNo,
+                'customerPo'  => $customerPo,
+                'customerName'=> (string) ($row['customer_name'] ?? ''),
+                'buyer'       => (string) ($row['buyer'] ?? ''),
+                'itemName'    => $itemName,
+                'itemCode'    => (string) ($row['item_code'] ?? ''),
+                'qty'         => 0.0,
+                'value'       => 0.0,
+                'price'       => $price,
+                'lines'       => 0,
             ];
         }
+        $agg[$key]['qty']   += $qty;
+        $agg[$key]['value'] += $value;
+        $agg[$key]['lines'] += 1;
 
-        $saleOrderNo = trim((string) ($row['sale_order_no'] ?? ''));
-        if ($saleOrderNo !== '' && !in_array($saleOrderNo, $groups[$groupKey]['salesOrders'], true)) {
-            $groups[$groupKey]['salesOrders'][] = $saleOrderNo;
-        }
-
-        $qty = (float) ($row['ordered_qty'] ?? 0);
-        $value = (float) ($row['line_order_value'] ?? 0);
-
-        $groups[$groupKey]['items'][] = [
-            'saleOrderNo' => $saleOrderNo,
-            'itemCode' => (string) ($row['item_code'] ?? ''),
-            'orderedItem' => (string) ($row['ordered_item'] ?? ''),
-            'description' => (string) ($row['item_description'] ?? ''),
-            'remarks' => (string) ($row['remarks'] ?? ''),
-            'qty' => $qty,
-            'shippedQty' => (float) ($row['shipped_qty'] ?? 0),
-            'price' => (float) ($row['unit_selling_price'] ?? 0),
-            'value' => $value,
-            'delivery' => (string) ($row['delivery_name'] ?? ''),
-            'lineStatus' => (string) ($row['line_status'] ?? ''),
-        ];
-        $groups[$groupKey]['lineCount']++;
-        $groups[$groupKey]['totalQty'] += $qty;
-        $groups[$groupKey]['totalValue'] += $value;
-
-        $totalQty += $qty;
+        $totalQty   += $qty;
         $totalValue += $value;
     }
 
+    // Effective unit price = summed value / summed qty (falls back to line price).
+    $rows = array_values($agg);
+    foreach ($rows as &$r) {
+        $r['price'] = $r['qty'] > 0 ? round($r['value'] / $r['qty'], 4) : $r['price'];
+    }
+    unset($r);
+
     echo json_encode([
-        'date' => $date,
-        'dateField' => $dateField,
-        'groupCount' => count($groups),
-        'lineCount' => count($rows),
-        'totalQty' => $totalQty,
+        'from'       => $from,
+        'to'         => $to,
+        'lineCount'  => count($rows),
+        'totalQty'   => $totalQty,
         'totalValue' => $totalValue,
-        'results' => array_values($groups),
+        'rows'       => $rows,
     ]);
 } catch (Throwable $e) {
     http_response_code(500);

@@ -28,6 +28,8 @@ function ensureErpSaleOrdersCacheTable(PDO $db): void
             booked_date VARCHAR(40) NULL,
             header_request_date VARCHAR(40) NULL,
             schedule_ship_date VARCHAR(40) NULL,
+            header_creation_date VARCHAR(40) NULL,
+            line_creation_date VARCHAR(40) NULL,
             ordered_qty DECIMAL(18,4) NULL,
             shipped_qty DECIMAL(18,4) NULL,
             unit_selling_price DECIMAL(18,6) NULL,
@@ -46,9 +48,39 @@ function ensureErpSaleOrdersCacheTable(PDO $db): void
             KEY idx_erp_sale_orders_sale_order (sale_order_no),
             KEY idx_erp_sale_orders_header_id (header_id),
             KEY idx_erp_sale_orders_line_id (line_id),
-            KEY idx_erp_sale_orders_synced_at (synced_at)
+            KEY idx_erp_sale_orders_synced_at (synced_at),
+            KEY idx_erp_sale_orders_header_created (header_creation_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
+
+    // Add columns to tables that were created before these fields existed.
+    // (MySQL 5.7 has no "ADD COLUMN IF NOT EXISTS", so check information_schema.)
+    ensureErpSaleOrdersCacheColumns($db);
+}
+
+function ensureErpSaleOrdersCacheColumns(PDO $db): void
+{
+    $wanted = [
+        'header_creation_date' => "ADD COLUMN header_creation_date VARCHAR(40) NULL AFTER schedule_ship_date",
+        'line_creation_date'   => "ADD COLUMN line_creation_date VARCHAR(40) NULL AFTER header_creation_date",
+    ];
+
+    $stmt = $db->prepare("
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'erp_sale_orders_cache'
+    ");
+    $stmt->execute();
+    $existing = array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+    $alters = [];
+    foreach ($wanted as $col => $clause) {
+        if (!in_array($col, $existing, true)) {
+            $alters[] = $clause;
+        }
+    }
+    if ($alters) {
+        $db->exec('ALTER TABLE erp_sale_orders_cache ' . implode(', ', $alters));
+    }
 }
 
 function erpSaleOrdersFetchPage(int $offset = 0, int $limit = ERP_SALE_ORDERS_LIMIT): array
@@ -222,14 +254,16 @@ function erpSaleOrdersUpsertItems(PDO $db, array $items, int $offset = 0, int $p
             cache_key, org_id, operating_unit, header_id, line_id, sale_order_no,
             customer_po_no, customer_name, buyer, order_type, header_status, line_status,
             ordered_item, item_code, item_description, remarks, ordered_date, booked_date,
-            header_request_date, schedule_ship_date, ordered_qty, shipped_qty,
+            header_request_date, schedule_ship_date, header_creation_date, line_creation_date,
+            ordered_qty, shipped_qty,
             unit_selling_price, line_order_value, delivery_name, search_blob,
             search_blob_normalized, source_offset, source_page_size, raw_json, synced_at
         ) VALUES (
             :cache_key, :org_id, :operating_unit, :header_id, :line_id, :sale_order_no,
             :customer_po_no, :customer_name, :buyer, :order_type, :header_status, :line_status,
             :ordered_item, :item_code, :item_description, :remarks, :ordered_date, :booked_date,
-            :header_request_date, :schedule_ship_date, :ordered_qty, :shipped_qty,
+            :header_request_date, :schedule_ship_date, :header_creation_date, :line_creation_date,
+            :ordered_qty, :shipped_qty,
             :unit_selling_price, :line_order_value, :delivery_name, :search_blob,
             :search_blob_normalized, :source_offset, :source_page_size, :raw_json, NOW()
         )
@@ -253,6 +287,8 @@ function erpSaleOrdersUpsertItems(PDO $db, array $items, int $offset = 0, int $p
             booked_date = VALUES(booked_date),
             header_request_date = VALUES(header_request_date),
             schedule_ship_date = VALUES(schedule_ship_date),
+            header_creation_date = VALUES(header_creation_date),
+            line_creation_date = VALUES(line_creation_date),
             ordered_qty = VALUES(ordered_qty),
             shipped_qty = VALUES(shipped_qty),
             unit_selling_price = VALUES(unit_selling_price),
@@ -294,6 +330,8 @@ function erpSaleOrdersUpsertItems(PDO $db, array $items, int $offset = 0, int $p
             ':booked_date' => (string) ($row['booked_date'] ?? ''),
             ':header_request_date' => (string) ($row['header_request_date'] ?? ''),
             ':schedule_ship_date' => (string) ($row['schedule_ship_date'] ?? ''),
+            ':header_creation_date' => (string) ($row['header_creation_date'] ?? ''),
+            ':line_creation_date' => (string) ($row['line_creation_date'] ?? ''),
             ':ordered_qty' => is_numeric($row['ordered_qty'] ?? null) ? (float) $row['ordered_qty'] : null,
             ':shipped_qty' => is_numeric($row['shipped_qty'] ?? null) ? (float) $row['shipped_qty'] : null,
             ':unit_selling_price' => is_numeric($row['unit_selling_price'] ?? ($row['price'] ?? null)) ? (float) ($row['unit_selling_price'] ?? $row['price']) : null,
