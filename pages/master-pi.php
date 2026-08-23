@@ -53,17 +53,18 @@ require_once __DIR__ . '/../includes/print-brand.php';
 #mpiWrap { background:#d1d5db; padding:30px 0; min-height:500px; }
 .mpi-doc {
     position:relative; box-sizing:border-box;
-    width:210mm; height:297mm; max-width:900px; margin:0 auto;
+    width:210mm; height:297mm; max-width:900px; margin:0 auto 10px;
     font-family:'Times New Roman',Times,serif;
     font-size:11pt; color:#000; background:#fff;
     padding:14mm 14mm 30mm; box-shadow:0 4px 24px rgba(0,0,0,.15);
     overflow:hidden;
 }
 .mpi-doc .zzal-print-brand--footer { position:absolute; left:14mm; right:14mm; bottom:8mm; margin:0!important; padding-top:6px!important; }
+.mpi-continuation { display:none; }
 
 /* Header */
 .mpi-hd {
-    display:flex; align-items:center;
+    display:none; align-items:center;
     border-bottom:3px solid #1a3a6e;
     padding-bottom:10px; margin-bottom:0;
 }
@@ -251,7 +252,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
         </div>
 
         <!-- Signatures -->
-        <div class="mpi-sig-area">
+        <div class="mpi-sig-area" id="mpiSigArea">
             <div class="mpi-sig-bottom">
                 <div class="mpi-sig-bottom-label">SIGNATURE OF BUYER</div>
                 <div class="mpi-sig-bottom-label">SIGNATURE OF SELLER</div>
@@ -263,6 +264,25 @@ require_once __DIR__ . '/../includes/print-brand.php';
 
     </div><!-- #mpiContent -->
 </div><!-- .mpi-doc -->
+<div class="mpi-doc mpi-continuation" id="mpiContinuation">
+    <?= zzal_print_brand_header() ?>
+    <div class="mpi-title">PROFORMA &nbsp;&nbsp;&nbsp; INVOICE</div>
+    <div class="mpi-meta">
+        <div><strong>PROFOMA INVOICE NO :</strong> <span id="mpiContNum">-</span></div>
+        <div><strong>Date :</strong> <span id="mpiContDate">-</span></div>
+    </div>
+    <div>
+        <div class="mpi-terms-title">Terms &amp; Conditions:</div>
+        <ol class="mpi-terms-list" id="mpiTermsCont" start="12"></ol>
+    </div>
+    <div class="mpi-sig-area" style="margin-top:28mm;">
+        <div class="mpi-sig-bottom">
+            <div class="mpi-sig-bottom-label">SIGNATURE OF BUYER</div>
+            <div class="mpi-sig-bottom-label">SIGNATURE OF SELLER</div>
+        </div>
+    </div>
+    <?= zzal_print_brand_footer() ?>
+</div>
 </div><!-- #mpiWrap -->
 
 <script>
@@ -294,6 +314,15 @@ function mpiFormatDate(d) {
     const dt = new Date(d);
     if (isNaN(dt)) return d;
     return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function mpiRenderTerms(terms) {
+    const firstPageTerms = terms.slice(0, 11);
+    const continuedTerms = terms.slice(11);
+    document.getElementById('mpiTerms').innerHTML = firstPageTerms.map(t => `<li>${t}</li>`).join('');
+    document.getElementById('mpiTermsCont').innerHTML = continuedTerms.map(t => `<li>${t}</li>`).join('');
+    document.getElementById('mpiTermsCont').start = firstPageTerms.length + 1;
+    document.getElementById('mpiContinuation').style.display = continuedTerms.length ? 'block' : 'none';
+    document.getElementById('mpiSigArea').style.display = continuedTerms.length ? 'none' : 'block';
 }
 
 /* ── Build PI checklist ───────────────────────────────────────── */
@@ -361,8 +390,12 @@ function renderMasterPi() {
 
     // PI number = first selected PI
     const firstPi = selectedPis[0];
-    document.getElementById('mpiNum').textContent  = firstPi.pi_number || order.order_id + '-MPI';
-    document.getElementById('mpiDate').textContent = mpiFormatDate(firstPi.pi_date || salesPg.piDate || order.created_at?.slice(0,10) || '');
+    const masterPiNum = firstPi.pi_number || order.order_id + '-MPI';
+    const masterPiDate = mpiFormatDate(firstPi.pi_date || salesPg.piDate || order.created_at?.slice(0,10) || '');
+    document.getElementById('mpiNum').textContent  = masterPiNum;
+    document.getElementById('mpiDate').textContent = masterPiDate;
+    document.getElementById('mpiContNum').textContent  = masterPiNum;
+    document.getElementById('mpiContDate').textContent = masterPiDate;
 
     // Buyer / TO
     const firstPo0 = firstPi.pos?.[0] || {};
@@ -433,7 +466,7 @@ function renderMasterPi() {
     terms[11] = `Beneficiary Bin No : <strong>000230256-0103</strong>`;
     terms[12] = `H.S. Code : <strong>${hsCode}</strong>`;
     terms[15] = `${docMust} Mustbe`;
-    document.getElementById('mpiTerms').innerHTML = terms.map(t => `<li>${t}</li>`).join('');
+    mpiRenderTerms(terms);
 }
 
 /* ── Hook into order loader ────────────────────────────────────── */
@@ -459,8 +492,12 @@ function renderMasterPiFromCustom(groups, res) {
     document.getElementById('mpiEmpty').style.display   = 'none';
     document.getElementById('mpiContent').style.display = 'block';
 
-    document.getElementById('mpiNum').textContent  = firstGrp.piNumber || firstPi.pi_number || order.order_id + '-MPI';
-    document.getElementById('mpiDate').textContent = mpiFormatDate(firstPi.pi_date || salesPg.piDate || '');
+    const customPiNum = firstGrp.piNumber || firstPi.pi_number || order.order_id + '-MPI';
+    const customPiDate = mpiFormatDate(firstPi.pi_date || salesPg.piDate || '');
+    document.getElementById('mpiNum').textContent  = customPiNum;
+    document.getElementById('mpiDate').textContent = customPiDate;
+    document.getElementById('mpiContNum').textContent  = customPiNum;
+    document.getElementById('mpiContDate').textContent = customPiDate;
 
     const buyer    = salesPg.buyer || firstGrp.sharedBuyer || firstPo.sharedBuyer || '—';
     const custName = salesPg.customer || intake.customer || order.customer_name || '—';
@@ -521,7 +558,7 @@ function renderMasterPiFromCustom(groups, res) {
     terms[11] = `Beneficiary Bin No : <strong>000230256-0103</strong>`;
     terms[12] = `H.S. Code : <strong>${hsCode}</strong>`;
     terms[15] = `${docMust} Mustbe`;
-    document.getElementById('mpiTerms').innerHTML = terms.map(t => `<li>${t}</li>`).join('');
+    mpiRenderTerms(terms);
 }
 
 function downloadMasterPiExcel() {

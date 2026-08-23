@@ -74,7 +74,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
     position:relative;
     box-sizing:border-box;
     width:210mm;
-    height:297mm;
+    height:296mm;
     max-width:820px;
     margin:0 auto 18px;
     background:#fff;
@@ -171,7 +171,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
     #ciWrap { background:none !important; padding:0 !important; }
     html, body {
         width:210mm !important;
-        min-height:297mm !important;
+        min-height:0 !important;
         margin:0 !important;
         padding:0 !important;
         overflow:visible !important;
@@ -181,7 +181,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
         margin:0;
         max-width:210mm;
         width:210mm !important;
-        height:297mm !important;
+        height:296mm !important;
         padding:14mm 14mm 30mm !important;
         overflow:hidden;
     }

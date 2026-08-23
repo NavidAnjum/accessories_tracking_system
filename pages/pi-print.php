@@ -19,11 +19,12 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .pi-po-sel { display:none; }
 
 /* ── PI Document ─────────────────────────────────────────────────── */
-.pi-wrap { position:relative; box-sizing:border-box; width:210mm; height:297mm; max-width:900px; margin:24px auto; font-family:'Times New Roman',Times,serif; font-size:11pt; color:#000; background:#fff; padding:14mm 14mm 30mm; box-shadow:0 2px 20px rgba(0,0,0,.12); overflow:hidden; }
+.pi-wrap { position:relative; box-sizing:border-box; width:210mm; height:297mm; max-width:900px; margin:24px auto 10px; font-family:'Times New Roman',Times,serif; font-size:11pt; color:#000; background:#fff; padding:14mm 14mm 30mm; box-shadow:0 2px 20px rgba(0,0,0,.12); overflow:hidden; }
 .pi-wrap .zzal-print-brand--footer { position:absolute; left:14mm; right:14mm; bottom:8mm; margin:0!important; padding-top:6px!important; }
+.pi-continuation { display:none; }
 
 /* Header */
-.pi-header { display:flex; align-items:center; border-bottom:3px solid #1a3a6e; padding-bottom:10px; margin-bottom:6px; }
+.pi-header { display:none; align-items:center; border-bottom:3px solid #1a3a6e; padding-bottom:10px; margin-bottom:6px; }
 .pi-logo { width:64px; height:64px; background:#1a3a6e; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:18px; font-weight:900; border-radius:4px; flex-shrink:0; margin-right:14px; letter-spacing:1px; }
 .pi-logo span { font-size:7px; font-weight:400; letter-spacing:2px; margin-top:1px; }
 .pi-company { flex:1; }
@@ -167,7 +168,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
         </ol>
     </div>
 
-        <div class="pi-sigs">
+        <div class="pi-sigs" id="piSigs">
             <div class="pi-sig-box">
                 <div class="pi-sig-line"></div>
                 <div class="pi-sig-label">SIGNATURE OF BUYER</div>
@@ -181,6 +182,29 @@ require_once __DIR__ . '/../includes/print-brand.php';
         <?= zzal_print_brand_footer() ?>
 
     </div><!-- .pi-wrap -->
+    <div class="pi-wrap pi-continuation" id="piContinuation">
+        <?= zzal_print_brand_header() ?>
+        <div class="pi-title-line">PROFORMA &nbsp; INVOICE</div>
+        <div class="pi-meta">
+            <div><b>PROFOMA INVOICE NO :</b> <span id="piContDocNum">-</span></div>
+            <div><b>Date :</b> <span id="piContDocDate">-</span></div>
+        </div>
+        <div class="pi-terms">
+            <h3>Terms &amp; Conditions:</h3>
+            <ol id="piTermsCont" start="12"></ol>
+        </div>
+        <div class="pi-sigs" style="margin-top:28mm;">
+            <div class="pi-sig-box">
+                <div class="pi-sig-line"></div>
+                <div class="pi-sig-label">SIGNATURE OF BUYER</div>
+            </div>
+            <div class="pi-sig-box" style="text-align:right;">
+                <div class="pi-sig-line" style="margin-left:auto;margin-right:0;margin-top:40px;"></div>
+                <div class="pi-sig-label">Authorised Signature</div>
+            </div>
+        </div>
+        <?= zzal_print_brand_footer() ?>
+    </div>
 </div><!-- #piWrap -->
 
 <script>
@@ -260,6 +284,8 @@ function renderPi() {
 
     document.getElementById('piDocNum').textContent   = piNum;
     document.getElementById('piDocDate').textContent  = displayDate;
+    document.getElementById('piContDocNum').textContent   = piNum;
+    document.getElementById('piContDocDate').textContent  = displayDate;
     document.getElementById('piDocBuyer').textContent = buyer;
     document.getElementById('piDocTo').innerHTML      = `<b>${custName}</b>${custAddr ? '<br>' + custAddr : ''}`;
 
@@ -364,8 +390,14 @@ function renderPi() {
     terms[12] = `H.S.Code : <b>${hsCode}</b>`;
     terms[13] = `${docMust} Mustbe`;
 
+    const firstPageTerms = terms.slice(0, 11);
+    const continuedTerms = terms.slice(11);
     const ol = document.getElementById('piTermsList');
-    ol.innerHTML = terms.map(t => `<li>${t}</li>`).join('');
+    ol.innerHTML = firstPageTerms.map(t => `<li>${t}</li>`).join('');
+    document.getElementById('piTermsCont').innerHTML = continuedTerms.map(t => `<li>${t}</li>`).join('');
+    document.getElementById('piTermsCont').start = firstPageTerms.length + 1;
+    document.getElementById('piContinuation').style.display = continuedTerms.length ? 'block' : 'none';
+    document.getElementById('piSigs').style.display = continuedTerms.length ? 'none' : 'flex';
 
     // Populate PO selector for Single PI
     const sel = document.getElementById('piPoSel');

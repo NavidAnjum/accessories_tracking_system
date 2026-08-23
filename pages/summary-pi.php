@@ -42,7 +42,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 
 /* Header */
 .mspi-hd {
-    display:flex; align-items:center;
+    display:none; align-items:center;
     border-bottom:3px solid #1a3a6e;
     padding-bottom:10px; margin-bottom:0;
 }

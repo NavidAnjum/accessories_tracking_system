@@ -32,17 +32,18 @@ require_once __DIR__ . '/../includes/print-brand.php';
 #spiWrap { background:#d1d5db; padding:30px 0; min-height:500px; }
 .spi-doc {
     position:relative; box-sizing:border-box;
-    width:210mm; height:297mm; max-width:900px; margin:0 auto;
+    width:210mm; height:297mm; max-width:900px; margin:0 auto 10px;
     font-family:'Times New Roman',Times,serif;
     font-size:11pt; color:#000; background:#fff;
     padding:14mm 14mm 30mm; box-shadow:0 4px 24px rgba(0,0,0,.15);
     overflow:hidden;
 }
 .spi-doc .zzal-print-brand--footer { position:absolute; left:14mm; right:14mm; bottom:8mm; margin:0!important; padding-top:6px!important; }
+.spi-continuation { display:none; }
 
 /* Header */
 .spi-hd {
-    display:flex; align-items:center;
+    display:none; align-items:center;
     border-bottom:3px solid #1a3a6e;
     padding-bottom:10px; margin-bottom:0;
 }
@@ -241,7 +242,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
         </div>
 
         <!-- Signature area -->
-        <div class="spi-sig-area" style="margin-top:80px;">
+        <div class="spi-sig-area" id="spiSigArea" style="margin-top:80px;">
             <div class="spi-sig-right-block" style="margin-bottom:8px;"></div>
             <div class="spi-sig-bottom">
                 <div class="spi-sig-bottom-label">SIGNATURE OF BUYER</div>
@@ -254,6 +255,26 @@ require_once __DIR__ . '/../includes/print-brand.php';
 
     </div><!-- #spiContent -->
 </div><!-- .spi-doc -->
+<div class="spi-doc spi-continuation" id="spiContinuation">
+    <?= zzal_print_brand_header() ?>
+    <div class="spi-title">PROFORMA &nbsp;&nbsp;&nbsp; INVOICE</div>
+    <div class="spi-meta">
+        <div><strong>PROFOMA INVOICE NO :</strong> <span id="spiContNum">-</span></div>
+        <div><strong>Date :</strong> <span id="spiContDate">-</span></div>
+    </div>
+    <div>
+        <div class="spi-terms-title">Terms &amp; Conditions:</div>
+        <ol class="spi-terms-list" id="spiTermsCont" start="16"></ol>
+    </div>
+    <div class="spi-sig-area" style="margin-top:28mm;">
+        <div class="spi-sig-right-block" style="margin-bottom:8px;"></div>
+        <div class="spi-sig-bottom">
+            <div class="spi-sig-bottom-label">SIGNATURE OF BUYER</div>
+            <div class="spi-sig-bottom-label">SIGNATURE OF SELLER</div>
+        </div>
+    </div>
+    <?= zzal_print_brand_footer() ?>
+</div>
 </div><!-- #spiWrap -->
 
 <script>
@@ -341,6 +362,8 @@ function renderSinglePi() {
     const piDate = pi.pi_date   || salesPg.piDate || order.created_at?.slice(0,10) || '';
     document.getElementById('spiNum').textContent  = piNum;
     document.getElementById('spiDate').textContent = spiFormatDate(piDate);
+    document.getElementById('spiContNum').textContent  = piNum;
+    document.getElementById('spiContDate').textContent = spiFormatDate(piDate);
 
     // Buyer (end brand) + Customer (TO)
     const buyer    = salesPg.buyer || po.sharedBuyer || po.buyer || po.endBuyer || intake.pos?.[0]?.endBuyer || '—';
@@ -426,7 +449,13 @@ function renderSinglePi() {
     terms[11] = `Beneficiary Bin No : <strong>000230256-0103</strong>`;
     terms[12] = `H.S. Code : <strong>${hsCode}</strong>`;
     terms[15] = `${docMust} Mustbe`;
-    document.getElementById('spiTerms').innerHTML = terms.map(t=>`<li>${t}</li>`).join('');
+    const firstPageTerms = terms.slice(0, 11);
+    const continuedTerms = terms.slice(11);
+    document.getElementById('spiTerms').innerHTML = firstPageTerms.map(t=>`<li>${t}</li>`).join('');
+    document.getElementById('spiTermsCont').innerHTML = continuedTerms.map(t=>`<li>${t}</li>`).join('');
+    document.getElementById('spiTermsCont').start = firstPageTerms.length + 1;
+    document.getElementById('spiContinuation').style.display = continuedTerms.length ? 'block' : 'none';
+    document.getElementById('spiSigArea').style.display = continuedTerms.length ? 'none' : 'block';
 }
 async function downloadSinglePiExcel() {
     const res = _spiOrderData;
