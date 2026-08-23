@@ -28,6 +28,9 @@ include __DIR__ . '/../includes/header.php';
                             <span>Check and prepare the LC step before Bill of Exchange.</span>
                         </div>
                     </div>
+                    <div id="lcApprovalNotice" style="display:none;background:#fef3c7;border:1px solid #fcd34d;color:#92400e;padding:12px 16px;border-radius:10px;margin-bottom:14px;font-size:13px;font-weight:600;">
+                        ⚠ This order is still awaiting <strong>Marketing approval</strong>. Prepare the LC only after Marketing approves the PI.
+                    </div>
                     <div class="source-glance">
                         <div class="source-glance-item"><span>Matched Sales Order</span><strong data-bind="salesOrder">-</strong></div>
                         <div class="source-glance-item"><span>Customer PO</span><strong data-bind="customerPo">-</strong></div>
@@ -47,6 +50,10 @@ include __DIR__ . '/../includes/header.php';
                         <div class="field span-6">
                             <label for="paymentTerms">Payment Terms</label>
                             <input id="paymentTerms" name="paymentTerms" placeholder="e.g. 120 Days LC">
+                        </div>
+                        <div class="field span-6">
+                            <label for="lcBuyer">LC Buyer</label>
+                            <input id="lcBuyer" name="lcBuyer" placeholder="Buyer on the LC…">
                         </div>
                         <div class="field span-6">
                             <label for="shippingTerms">Shipping Terms</label>
@@ -244,6 +251,16 @@ document.addEventListener('DOMContentLoaded', function () {
 window.onOrderLoad = (function(_prev) {
     return function(res) {
         if (typeof _prev === 'function') _prev(res);
+
+        // Guard: warn if the order hasn't been approved by Marketing yet (step is before LC).
+        const WF = ['marketing-intake','costing-review','sales','marketing','lc','exchange','commercial','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding','po-status'];
+        const step = res.order?.current_step || '';
+        const notice = document.getElementById('lcApprovalNotice');
+        if (notice) {
+            const idx = WF.indexOf(step);
+            notice.style.display = (idx > -1 && idx < WF.indexOf('lc')) ? 'block' : 'none';
+        }
+
         // Restore the UP table from the saved LC page snapshot
         const lcSnap = res.pages?.lc || {};
         if (lcSnap.lcUpTableData) lcRestoreUpTable(lcSnap.lcUpTableData);
@@ -263,7 +280,11 @@ window.onOrderLoad = (function(_prev) {
 
         setGlance('salesOrder', firstPo.salesOrder || firstPo.salesOrderNo || '-');
         setGlance('customerPo', firstPo.poNum || firstPo.customerPo || '-');
-        setGlance('buyerName', firstPo.buyer || firstPo.endBuyer || '-');
+        const buyerVal = firstPo.buyer || firstPo.endBuyer || sales.buyer || '';
+        setGlance('buyerName', buyerVal || '-');
+        // Auto-fill the editable LC Buyer field (only if not already saved/typed).
+        const lcBuyerEl = document.getElementById('lcBuyer');
+        if (lcBuyerEl && !lcBuyerEl.value && buyerVal) lcBuyerEl.value = buyerVal;
 
         const custName = sales.customer || bestPi.customer || intake.customer || '';
         if (custName) {

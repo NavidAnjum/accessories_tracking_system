@@ -414,6 +414,12 @@ function goToPiPrint(excelMode = false) {
             <label for="piDate">PI Date</label>
             <input id="piDate" type="date">
         </div>
+        <div class="field span-3">
+            <label for="piMarketingUser">Marketing Person (Approver)</label>
+            <select id="piMarketingUser">
+                <option value="">— Select marketing person —</option>
+            </select>
+        </div>
         <div class="field span-6">
             <label for="piBuyerAddress">Customer Address</label>
             <textarea id="piBuyerAddress" rows="2" placeholder="Auto-filled from customer profile..."></textarea>
@@ -1597,6 +1603,9 @@ function collectSalesPageData() {
             productLine: '',
             piDate: document.getElementById('piDate').value,
             buyerAddress: document.getElementById('piBuyerAddress').value.trim(),
+            marketingUserId: document.getElementById('piMarketingUser')?.value || '',
+            marketingUserName: (document.getElementById('piMarketingUser')?.selectedOptions?.[0]?.textContent || '').trim(),
+            hsCode: document.getElementById('termHsCode')?.value || '4819.10.00',
             consigneeBank: '',
             advisingBank: '',
             pos,
@@ -1663,6 +1672,9 @@ function collectSalesPageData() {
         productLine,
         piDate,
         buyerAddress,
+        marketingUserId: document.getElementById('piMarketingUser')?.value || '',
+        marketingUserName: (document.getElementById('piMarketingUser')?.selectedOptions?.[0]?.textContent || '').trim(),
+        hsCode: document.getElementById('termHsCode')?.value || '4819.10.00',
         consigneeBank,
         advisingBank,
         pos,
@@ -1843,6 +1855,13 @@ async function submitToMarketing() {
         if (missingNum !== -1) { alert('Please enter a PI Number for PI ' + (missingNum + 1) + '.'); return; }
     }
 
+    // A marketing approver must be chosen so the approval goes to the right person.
+    if (!data.marketingUserId) {
+        alert('Please select the Marketing Person (Approver) before submitting.');
+        document.getElementById('piMarketingUser')?.focus();
+        return;
+    }
+
     const btn = document.getElementById('universalSaveBtn');
     if (btn) { btn.textContent = 'Submitting...'; btn.disabled = true; }
 
@@ -1896,10 +1915,14 @@ async function submitToMarketing() {
                 body: JSON.stringify({ order_id: orderId, page_name: 'sales', ...data })
             }).catch(() => {});
             const firstPo = (data.pos && data.pos[0]) || {};
-            const orderParams = new URLSearchParams({ id: orderId, step: 'lc' });
+            // PI submit hands the order to Marketing for approval (not straight to LC).
+            // Marketing approval then advances it to LC and notifies Commercial + Production.
+            const orderParams = new URLSearchParams({ id: orderId, step: 'marketing' });
             if (data.customer) orderParams.set('customer', data.customer);
             if (data.buyer)    orderParams.set('buyer', data.buyer);
             if (firstPo.poNum) orderParams.set('po', firstPo.poNum);
+            // Route the approval notification to the selected marketing person.
+            if (data.marketingUserId) orderParams.set('marketing_user', data.marketingUserId);
             fetch(APP_BASE + '/api/orders.php?' + orderParams.toString(), { method: 'PUT' })
                 .catch(() => {});
         }
@@ -1915,6 +1938,10 @@ async function submitToMarketing() {
 
 function clearPiForm() {
     if (!confirm('Clear the current PI form?')) return;
+    resetPiFormFields();
+}
+// Reset the PI form without prompting (used by the New Order flow, which already confirmed).
+function resetPiFormFields() {
     document.getElementById('poBlocksContainer').innerHTML = '';
     document.getElementById('piNumber').value = '';
     document.getElementById('piNumDisplay').textContent = '-';
@@ -1934,13 +1961,19 @@ let _savedPisCache         = [];
 
 function refreshSavedPiBadge() {
     const orderId = sessionStorage.getItem('ats_current_order_id') || '';
-    const url = orderId ? APP_BASE + '/api/pis.php?order_id=' + encodeURIComponent(orderId) : APP_BASE + '/api/pis.php';
-    fetch(url)
+    const badge = document.getElementById('savedPiCountBadge');
+    const cnt   = document.getElementById('savedPiCount');
+    // A new/unsaved order has no order id yet — it has zero saved PIs.
+    // (Never fall back to fetching ALL PIs, or a fresh order shows a stale count.)
+    if (!orderId) {
+        _savedPisCache = [];
+        if (badge) badge.style.display = 'none';
+        return;
+    }
+    fetch(APP_BASE + '/api/pis.php?order_id=' + encodeURIComponent(orderId))
         .then(r => r.json())
         .then(pis => {
             _savedPisCache = (pis || []).filter(p => !p.is_master);
-            const badge = document.getElementById('savedPiCountBadge');
-            const cnt   = document.getElementById('savedPiCount');
             if (_savedPisCache.length > 0) {
                 badge.style.display = 'inline-block';
                 cnt.textContent = _savedPisCache.length;
@@ -2411,6 +2444,31 @@ function setPiCustomerIfEmpty(name) {
 }
 loadPiCustomers();
 
+// ── Marketing person (approver) dropdown ──────────────────────────────────
+let _piMarketingUsers = [];
+function loadMarketingUsers() {
+    fetch(APP_BASE + '/api/users.php?role=marketing')
+        .then(r => r.json())
+        .then(list => {
+            _piMarketingUsers = Array.isArray(list) ? list : [];
+            const sel = document.getElementById('piMarketingUser');
+            if (!sel) return;
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">— Select marketing person —</option>' +
+                _piMarketingUsers.map(u => {
+                    const team = u.team ? ' (' + u.team + ')' : '';
+                    return `<option value="${u.id}">${(u.name || '').replace(/</g,'&lt;')}${team}</option>`;
+                }).join('');
+            if (cur) sel.value = cur;
+        })
+        .catch(() => {});
+}
+function setPiMarketingUser(id) {
+    const sel = document.getElementById('piMarketingUser');
+    if (sel && id != null) sel.value = String(id);
+}
+loadMarketingUsers();
+
 // Init
 addPoBlock();
 document.getElementById('piDate').value = new Date().toISOString().split('T')[0];
@@ -2467,6 +2525,7 @@ window.onOrderLoad = async function(res) {
     if (salesSnapshot?.buyer) document.getElementById('piBuyer').value = salesSnapshot.buyer;
     if (salesSnapshot?.piDate) document.getElementById('piDate').value = salesSnapshot.piDate;
     if (salesSnapshot?.buyerAddress) document.getElementById('piBuyerAddress').value = salesSnapshot.buyerAddress;
+    if (salesSnapshot?.marketingUserId) setPiMarketingUser(salesSnapshot.marketingUserId);
     if (salesSnapshot?.piNum) {
         document.getElementById('piNumber').value = salesSnapshot.piNum;
         document.getElementById('piNumDisplay').textContent = salesSnapshot.piNum;
@@ -2525,7 +2584,7 @@ window.onOrderLoad = async function(res) {
 
 window.onNewOrder = function(orderId) {
     setPiContentVisible(true);
-    clearPiForm();
+    resetPiFormFields();
     if (orderId) {
         renderOrderPiOverview(orderId);
         document.getElementById('piNumber').value           = orderId + '-PI';
@@ -2535,7 +2594,10 @@ window.onNewOrder = function(orderId) {
         const el = document.getElementById('piNum_' + firstPid);
         if (el && !el.value) el.value = orderId + '-PI';
     } else {
-        // Blank PI draft — the order is created when the first PI is saved
+        // Blank PI draft — the order is created when the first PI is saved.
+        // Clear any leftover PIs list / saved badge from the previously loaded order.
+        renderOrderPiOverview(null);
+        refreshSavedPiBadge();
         const disp = document.getElementById('piNumDisplay');
         if (disp) disp.textContent = '-';
     }

@@ -34,7 +34,9 @@ function notificationStepRoles(string $step): array {
         'production'       => ['production'],
         'sales'            => ['commercial', 'commercial_dept'],
         'marketing'        => ['marketing'],
-        'lc'               => ['commercial', 'commercial_dept'],
+        // Marketing approval advances the order to LC — notify Commercial AND
+        // Production (Production then enters the approved PI into the ERP).
+        'lc'               => ['commercial', 'commercial_dept', 'production'],
         'exchange'         => ['commercial', 'commercial_dept'],
         'commercial'       => ['commercial', 'commercial_dept'],
         'packing'          => ['commercial', 'commercial_dept'],
@@ -86,10 +88,18 @@ function notificationStepLabel(string $step): string {
     return $map[$step] ?? ucwords(str_replace('-', ' ', $step));
 }
 
-function createStepNotifications(PDO $db, string $orderId, string $step, ?int $sourceUserId = null): void {
+function createStepNotifications(PDO $db, string $orderId, string $step, ?int $sourceUserId = null, ?int $assignedUserId = null): void {
     ensureNotificationsTable($db);
 
-    $users = notificationTargetUsers($db, $step);
+    // If a specific marketing person was chosen on the PI, route the marketing
+    // approval notification to that person (plus admins) instead of the whole team.
+    if ($assignedUserId && $step === 'marketing') {
+        $stmt = $db->prepare("SELECT id, role FROM users WHERE (id = ? OR role = 'admin') AND COALESCE(is_active, 1) = 1");
+        $stmt->execute([$assignedUserId]);
+        $users = $stmt->fetchAll();
+    } else {
+        $users = notificationTargetUsers($db, $step);
+    }
     if (empty($users)) return;
 
     $stmt = $db->prepare("SELECT order_id, customer_name, salesperson FROM orders WHERE order_id = ?");

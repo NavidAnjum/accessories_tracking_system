@@ -74,15 +74,15 @@ include __DIR__ . '/../includes/header.php';
                                 </div>
                                 <div class="commercial-meta-row">
                                     <span>Place of Loading</span>
-                                    <strong><input id="placeLoading" name="placeLoading" placeholder="e.g. Supplier's factory"></strong>
+                                    <strong><input id="placeLoading" name="placeLoading" value="Supplier's Factory" readonly title="Fixed value"></strong>
                                 </div>
                                 <div class="commercial-meta-row">
                                     <span>Place of Delivery</span>
-                                    <strong><input id="placeDelivery" name="placeDelivery" placeholder="e.g. Bangladesh"></strong>
+                                    <strong><input id="placeDelivery" name="placeDelivery" value="Opener's Factory" readonly title="Fixed value"></strong>
                                 </div>
                                 <div class="commercial-meta-row">
                                     <span>Carrier</span>
-                                    <strong><input id="commercialCarrier" name="commercialCarrier" placeholder="e.g. By Truck"></strong>
+                                    <strong><input id="commercialCarrier" name="commercialCarrier" value="Bangladesh, By Truck" readonly title="Fixed value"></strong>
                                 </div>
                             </section>
 

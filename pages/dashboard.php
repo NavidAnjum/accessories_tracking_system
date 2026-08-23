@@ -4,7 +4,9 @@ $activePage   = 'dashboard';
 $navSection   = 'order';
 $pageSubtitle = 'All orders tracked by ZNZ ID — click Load to resume any order.';
 include __DIR__ . '/../includes/header.php';
+$__u = currentUser();
 ?>
+<script>window.__ATS_USER = { id: <?= (int)($__u['id'] ?? 0) ?>, role: '<?= htmlspecialchars($__u['role'] ?? '', ENT_QUOTES) ?>' };</script>
 
 <section class="form-card page-screen active" data-page="dashboard">
     <div class="section-head">
@@ -33,6 +35,8 @@ include __DIR__ . '/../includes/header.php';
                     <th>Created By</th>
                     <th>Customer</th>
                     <th>PO Number</th>
+                    <th>PI Number</th>
+                    <th>LC Number</th>
                     <th>Sales Person</th>
                     <th>Buyer</th>
                     <th>Delivery Date</th>
@@ -54,16 +58,16 @@ include __DIR__ . '/../includes/header.php';
 
     const STEP_LABELS = {
         'dashboard':'Dashboard','marketing-intake':'Marketing Intake','costing-review':'Costing Review',
-        'sales':'PI','marketing':'LC','lc':'LC','po-overview':'PO Status','exchange':'Bill of Exchange',
+        'sales':'PI','marketing':'Marketing','lc':'LC','po-overview':'PO Status','exchange':'Bill of Exchange',
         'commercial':'Commercial Invoice','packing':'Packing List','delivery':'Delivery Challan',
         'truck':'Truck Challan','origin':'Certificate of Origin','beneficiary':"Beneficiary's Certificate",
         'forwarding':'Forwarding','po-status':'Challan Sheet',
     };
-    const STEP_ORDER = ['marketing-intake','costing-review','sales','lc','commercial','packing',
+    const STEP_ORDER = ['marketing-intake','costing-review','sales','marketing','lc','commercial','packing',
         'delivery','truck','origin','beneficiary','forwarding'];
     const STEP_PAGES = {
         'marketing-intake':'marketing-intake.php','costing-review':'costing-review.php','sales':'sales.php',
-        'marketing':'lc.php','lc':'lc.php','po-overview':'po-overview.php','exchange':'exchange.php',
+        'marketing':'marketing.php','lc':'lc.php','po-overview':'po-overview.php','exchange':'exchange.php',
         'commercial':'commercial.php','packing':'packing.php','delivery':'delivery.php','truck':'truck.php',
         'origin':'origin.php','beneficiary':'beneficiary.php','forwarding':'forwarding.php','po-status':'po-status.php',
     };
@@ -90,6 +94,8 @@ include __DIR__ . '/../includes/header.php';
                 const db = await res.json();
                 orders = (db || []).map(o => ({
                     id: o.order_id, customer: o.customer_name, poNumber: o.po_number,
+                    piNumber: o.pi_number, lcNumber: o.lc_number,
+                    marketingUserId: o.marketing_user_id,
                     salesperson: o.salesperson, buyerCode: o.to_buyer, deliveryDate: o.delivery_date,
                     currentStep: o.current_step, savedAt: o.updated_at,
                     createdBy: o.created_by_name,
@@ -98,8 +104,14 @@ include __DIR__ . '/../includes/header.php';
             }
         } catch (_) {}
 
+        // Marketing users only see orders assigned to them (their PI approvals).
+        const U = window.__ATS_USER || {};
+        if (U.role === 'marketing') {
+            orders = orders.filter(o => String(o.marketingUserId || '') === String(U.id));
+        }
+
         if (!orders.length) {
-            body.innerHTML = '<tr><td colspan="11" class="dash-empty" style="text-align:center;padding:20px;color:#94a3b8;">No orders yet — click “+ New Order” to start.</td></tr>';
+            body.innerHTML = '<tr><td colspan="13" class="dash-empty" style="text-align:center;padding:20px;color:#94a3b8;">No orders yet — click “+ New Order” to start.</td></tr>';
             return;
         }
 
@@ -114,6 +126,8 @@ include __DIR__ . '/../includes/header.php';
                 <td>${o.createdBy || '-'}</td>
                 <td>${o.customer || '-'}</td>
                 <td>${o.poNumber || '-'}</td>
+                <td>${o.piNumber || '-'}</td>
+                <td>${o.lcNumber || '-'}</td>
                 <td>${o.salesperson || '-'}</td>
                 <td>${o.buyerCode || '-'}</td>
                 <td>${o.deliveryDate || '-'}</td>

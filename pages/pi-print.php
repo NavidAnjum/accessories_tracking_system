@@ -133,19 +133,17 @@ include __DIR__ . '/../includes/header.php';
             <tr>
                 <th style="width:40px;">SL NO</th>
                 <th>Description of goods</th>
-                <th style="width:55px;">PLY</th>
                 <th style="width:100px;">Quantity/<br>Pcs/con</th>
                 <th style="width:90px;">Unit Price</th>
                 <th style="width:110px;">Total Amount<br>(USD)</th>
             </tr>
         </thead>
         <tbody id="piDocBody">
-            <tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">Load an order to generate PI</td></tr>
+            <tr><td colspan="5" style="text-align:center;color:#999;padding:20px;">Load an order to generate PI</td></tr>
         </tbody>
         <tfoot>
             <tr class="total-row">
                 <td colspan="2" style="text-align:right;font-weight:700;">TOTAL</td>
-                <td></td>
                 <td class="center" id="piDocTotalQty">—</td>
                 <td></td>
                 <td class="right" id="piDocTotalVal">—</td>
@@ -269,7 +267,7 @@ function renderPi() {
             const style    = po.style    || '';
             if (orderRef || poNum) {
                 const refTr = document.createElement('tr');
-                refTr.innerHTML = `<td></td><td colspan="5"><span class="pi-ref">
+                refTr.innerHTML = `<td></td><td colspan="4"><span class="pi-ref">
                     ${orderRef ? 'ORDER REF: ' + orderRef + '<br>' : ''}
                     ${poNum    ? 'PO # ' + poNum + (style ? ' Style# ' + style + '/' : '') : ''}
                 </span></td>`;
@@ -285,7 +283,6 @@ function renderPi() {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `<td class="center">${sl}</td>
                     <td>${item.desc || item.itemName || '—'}</td>
-                    <td class="center">${item.ply || '—'}</td>
                     <td class="center">${qty.toLocaleString()}</td>
                     <td class="right">${prc ? formatUSD(prc) : '—'}</td>
                     <td class="right">${tot ? formatUSD(tot) : '—'}</td>`;
@@ -301,7 +298,7 @@ function renderPi() {
                 const allPoNums    = piPos.map(p => p.poNum || p.customerPo).filter(Boolean).join('/');
                 if (allOrderRefs || allPoNums) {
                     const refTr = document.createElement('tr');
-                    refTr.innerHTML = `<td></td><td colspan="5"><span class="pi-ref">
+                    refTr.innerHTML = `<td></td><td colspan="4"><span class="pi-ref">
                         ${allOrderRefs ? 'ORDER REF: ' + allOrderRefs + '<br>' : ''}
                         ${allPoNums   ? 'PO # ' + allPoNums : ''}
                     </span></td>`;
@@ -318,7 +315,6 @@ function renderPi() {
                         const tr = document.createElement('tr');
                         tr.innerHTML = `<td class="center">${sl}</td>
                             <td>${item.desc || item.itemName || '—'}</td>
-                            <td class="center">${item.ply || '—'}</td>
                             <td class="center">${qty.toLocaleString()}</td>
                             <td class="right">${prc ? formatUSD(prc) : '—'}</td>
                             <td class="right">${tot ? formatUSD(tot) : '—'}</td>`;
@@ -330,7 +326,7 @@ function renderPi() {
     }
 
     if (!sl) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:14px;">No items found in this PI</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;padding:14px;">No items found in this PI</td></tr>';
     }
 
     document.getElementById('piDocTotalQty').textContent = totalQty.toLocaleString();

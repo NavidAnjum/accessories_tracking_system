@@ -299,9 +299,10 @@ function ciBuildPages() {
     const lcDate = ciDate(comm.commercialLcDate || exch.masterLcDate || lc.lcDate || '');
     const proformaNo = comm.proformaNo || sales.piNum || '-';
     const proformaDate = ciDate(comm.proformaDate || sales.piDate || '');
-    const placeLoading = comm.placeLoading || "Supplier's factory";
-    const placeDelivery = comm.placeDelivery || 'Bangladesh';
-    const carrier = comm.commercialCarrier || exch.carrierNameMaster || 'By Truck';
+    // §4 — these three are fixed/static, never taken from saved data.
+    const placeLoading = "Supplier's Factory";
+    const placeDelivery = "Opener's Factory";
+    const carrier = 'Bangladesh, By Truck';
     const applicantsText = comm.commercialApplicantsText || '';
 
     let html = '';
@@ -312,7 +313,6 @@ function ciBuildPages() {
         const rowsHtml = items.length
             ? items.map((item, idx) => {
                 const desc = item.desc || item.itemName || '-';
-                const ply = item.ply || '-';
                 const qty = parseFloat(item.qty || 0) || 0;
                 const price = parseFloat(item.price || item.unitPrc || 0) || 0;
                 const amt = parseFloat(item.total || (qty * price)) || 0;
@@ -321,13 +321,12 @@ function ciBuildPages() {
                 return `<tr>
                     <td class="center">${idx + 1}</td>
                     <td>${ciEsc(desc)}</td>
-                    <td class="center">${ciEsc(ply)}</td>
                     <td class="right">${ciEsc(ciQty(qty))}</td>
                     <td class="right">$ ${ciEsc(ciMoney(price, 4))}</td>
                     <td class="right">$ ${ciEsc(ciMoney(amt, 2))}</td>
                 </tr>`;
             }).join('')
-            : '<tr><td colspan="6" class="center">No items found</td></tr>';
+            : '<tr><td colspan="5" class="center">No items found</td></tr>';
 
         if (!items.length) {
             totalQty = parseFloat(doc.po?.qty || 0) || 0;
@@ -385,7 +384,6 @@ function ciBuildPages() {
                     <tr>
                         <th style="width:42px;">SL NO.</th>
                         <th>Description of Goods</th>
-                        <th style="width:54px;">PLY</th>
                         <th style="width:78px;">Quantity</th>
                         <th style="width:90px;">Price $</th>
                         <th style="width:100px;">Amount $</th>
@@ -394,7 +392,7 @@ function ciBuildPages() {
                 <tbody>
                     ${rowsHtml}
                     <tr>
-                        <td colspan="3" class="right"><strong>Total</strong></td>
+                        <td colspan="2" class="right"><strong>Total</strong></td>
                         <td class="right"><strong>${ciEsc(ciQty(totalQty))}</strong></td>
                         <td></td>
                         <td class="right"><strong>$ ${ciEsc(ciMoney(totalAmt, 2))}</strong></td>

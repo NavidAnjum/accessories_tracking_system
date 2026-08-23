@@ -56,13 +56,14 @@ try {
             $orders = $stmt->fetchAll();
 
             // Enrich with data from the pis table — for PI-created orders the customer,
-            // PO numbers, quantities and item counts live in `pis`, not the orders row.
-            $piRows = $db->query('SELECT order_id, customer, pos, grand_qty, grand_val FROM pis WHERE order_id IS NOT NULL')->fetchAll();
+            // PO numbers, PI numbers, quantities and item counts live in `pis`, not the orders row.
+            $piRows = $db->query('SELECT order_id, pi_number, customer, pos, grand_qty, grand_val FROM pis WHERE order_id IS NOT NULL')->fetchAll();
             $agg = [];
             foreach ($piRows as $pi) {
                 $oid = $pi['order_id'];
-                if (!isset($agg[$oid])) $agg[$oid] = ['customer'=>'','pos'=>[],'buyer'=>'','qty'=>0,'val'=>0,'items'=>0];
+                if (!isset($agg[$oid])) $agg[$oid] = ['customer'=>'','pos'=>[],'pis'=>[],'buyer'=>'','qty'=>0,'val'=>0,'items'=>0];
                 if (!$agg[$oid]['customer'] && trim($pi['customer'] ?? '')) $agg[$oid]['customer'] = trim($pi['customer']);
+                if (!empty($pi['pi_number'])) $agg[$oid]['pis'][$pi['pi_number']] = true;
                 $agg[$oid]['qty'] += (float)($pi['grand_qty'] ?? 0);
                 $agg[$oid]['val'] += (float)($pi['grand_val'] ?? 0);
                 foreach ((json_decode($pi['pos'] ?? '[]', true) ?: []) as $po) {
@@ -71,6 +72,25 @@ try {
                     if (is_array($po['items'] ?? null)) $agg[$oid]['items'] += count($po['items']);
                 }
             }
+
+            // LC numbers live in the `lc` page_data JSON (key: lcNumber).
+            $lcByOrder = [];
+            $lcRows = $db->query("SELECT order_id, JSON_UNQUOTE(JSON_EXTRACT(data, '$.lcNumber')) AS lc_number FROM page_data WHERE page_name = 'lc'")->fetchAll();
+            foreach ($lcRows as $lc) {
+                $val = trim((string)($lc['lc_number'] ?? ''));
+                if ($val !== '' && strtolower($val) !== 'null') $lcByOrder[$lc['order_id']] = $val;
+            }
+
+            // Assigned marketing person lives in the `sales` page_data (key: marketingUserId/Name).
+            $mkByOrder = [];
+            $mkRows = $db->query("SELECT order_id, JSON_UNQUOTE(JSON_EXTRACT(data, '$.marketingUserId')) AS mid, JSON_UNQUOTE(JSON_EXTRACT(data, '$.marketingUserName')) AS mname FROM page_data WHERE page_name = 'sales'")->fetchAll();
+            foreach ($mkRows as $mk) {
+                $id = trim((string)($mk['mid'] ?? ''));
+                if ($id !== '' && strtolower($id) !== 'null') {
+                    $mkByOrder[$mk['order_id']] = ['id' => $id, 'name' => trim((string)($mk['mname'] ?? ''))];
+                }
+            }
+
             foreach ($orders as &$o) {
                 $a = $agg[$o['order_id']] ?? null;
                 if ($a) {
@@ -78,6 +98,10 @@ try {
                     if (empty($o['po_number'])    && $a['pos'])      $o['po_number']     = implode(', ', array_keys($a['pos']));
                     if (empty($o['to_buyer'])     && $a['buyer'])     $o['to_buyer']      = $a['buyer'];
                 }
+                $o['pi_number']  = $a && $a['pis'] ? implode(', ', array_keys($a['pis'])) : '';
+                $o['lc_number']  = $lcByOrder[$o['order_id']] ?? '';
+                $o['marketing_user_id']   = $mkByOrder[$o['order_id']]['id']   ?? '';
+                $o['marketing_user_name'] = $mkByOrder[$o['order_id']]['name'] ?? '';
                 $o['total_qty']  = $a['qty']   ?? 0;
                 $o['total_val']  = $a['val']   ?? 0;
                 $o['item_count'] = $a['items'] ?? 0;
@@ -117,7 +141,10 @@ try {
         $stmt->execute($params);
 
         if ($current !== $step) {
-            createStepNotifications($db, $id, $step, (int)(currentUser()['id'] ?? 0) ?: null);
+            // Optional: route the marketing-approval notification to a specific person.
+            $assignedUserId = isset($_GET['marketing_user']) && $_GET['marketing_user'] !== ''
+                ? (int)$_GET['marketing_user'] : null;
+            createStepNotifications($db, $id, $step, (int)(currentUser()['id'] ?? 0) ?: null, $assignedUserId);
         }
         echo json_encode(['ok' => true, 'order_id' => $id, 'current_step' => $step]);
         exit;

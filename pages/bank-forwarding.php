@@ -27,13 +27,13 @@ include __DIR__ . '/../includes/header.php';
                         </div>
 
                         <div class="forwarding-meta">
-                            <div><span>Date:</span><strong id="forwardingDateText">—</strong></div>
+                            <div><span>Date:</span><input id="forwardingDate" name="forwardingDate" type="date" style="border:none;border-bottom:1.5px solid #d1d5db;font:inherit;font-weight:700;padding:2px 4px;outline:none;"></div>
                             <div><span>Reference No.:</span><strong id="forwardingReferenceText">—</strong></div>
                         </div>
 
                         <div class="forwarding-address">
                             <p>To</p>
-                            <strong id="forwardingManagerText">The Manager</strong>
+                            <strong id="forwardingManagerText">The Manager,</strong>
                             <strong id="forwardingBankNameText">—</strong>
                             <strong id="forwardingBankAddressText">—</strong>
                         </div>

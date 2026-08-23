@@ -44,8 +44,10 @@ include __DIR__ . '/../includes/header.php';
 .boe-head { text-align:center; margin-bottom:18px; }
 .boe-company { font-size:15px; font-weight:700; }
 .boe-address { font-size:10px; margin-top:2px; }
-.boe-lc-line { font-size:10px; text-align:left; margin-top:10px; }
-.boe-title { text-align:center; font-size:24px; font-weight:700; margin:28px 0 10px; }
+.boe-lc-line { font-size:12px; text-align:left; margin-top:10px; }
+.boe-title { text-align:center; font-size:24px; font-weight:700; margin:28px 0 4px; }
+.boe-copyno { text-align:center; font-size:13px; font-weight:700; margin-bottom:12px; }
+.boe-inwords { font-size:11px; font-weight:700; margin:4px 0 14px; }
 .boe-meta {
     display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
     font-size:12px; font-weight:700; margin-bottom:14px;
@@ -237,14 +239,14 @@ function renderBoePages() {
         const contractNo = exch.exportSalesContractNo || '-';
         const contractDate = boeFmtDate(exch.exportSalesContractDate || '-');
         const vatBin = exch.beneficiaryVatBin || exch.applicantVatBin || '-';
-        const hsCode = exch.hsCodeMaster || '-';
+        // §3.2 HS Code comes from the PI (sales), not manual entry on the exchange page.
+        const hsCode = sales.hsCode || exch.hsCodeMaster || '-';
         const tenor = exch.lcTenorMaster || lc.paymentTerms || '120';
         const displayPi = doc.pi?.pi_number || doc.po?.piNum || sales.piNum || '-';
 
         for (let copyNo = 1; copyNo <= copies; copyNo++) {
             html += `
             <div class="boe-page">
-                <div class="boe-watermark">${copyNo}</div>
                 <div class="boe-head">
                     <div class="boe-company">${boeEsc(topCompany)}</div>
                     <div class="boe-address">${boeEsc(topAddress)}</div>
@@ -252,11 +254,13 @@ function renderBoePages() {
                 </div>
 
                 <div class="boe-title">Bill of Exchange</div>
+                <div class="boe-copyno">${copyNo}</div>
 
                 <div class="boe-meta">
                     <div>Exchange for USD ${boeEsc(boeFmtMoney(amount))}</div>
                     <div>Date: ${boeEsc(boeFmtDate(exch.exchangeDate || new Date().toISOString().slice(0,10)))}</div>
                 </div>
+                <div class="boe-inwords">In Words: USD ${boeEsc(words)}</div>
 
                 <div class="boe-body">
                     At ${boeEsc(tenor)} Days of this ${copyNo === 1 ? 'First' : copyNo === 2 ? 'Second' : copyNo + 'th'} of exchange (${copyNo === 1 ? 'first' : copyNo === 2 ? 'second' : copyNo + 'th'} of the same tenor unpaid) please pay to the order of ${boeEsc(payToText || '-')} the same of USD: ${boeEsc(words)}. Export Sales Contract No. ${boeEsc(contractNo)} Dated ${boeEsc(contractDate)}, Beneficiary's Vat/bin: ${boeEsc(vatBin)} and H.S Code No: ${boeEsc(hsCode)}.

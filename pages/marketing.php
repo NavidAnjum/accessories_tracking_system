@@ -2,9 +2,9 @@
 $pageTitle   = 'Marketing';
 $activePage  = 'marketing';
 $navSection  = 'order';
-$pageSubtitle = 'Marketing reviews commercial documents.';
-header('Location: lc.php');
-exit;
+$pageSubtitle = 'Marketing reviews and approves the PI before it proceeds to LC.';
+include __DIR__ . '/../includes/header.php';
+?>
 
 <style>
 /* â”€â”€ Order Summary Panel â”€â”€ */
@@ -199,10 +199,9 @@ exit;
     <div class="page-actions">
         <div class="page-actions-left">
             <button type="button" class="ghost-btn js-prev-page" data-prev-page="sales">Previous</button>
-            <button type="button" class="primary-btn" id="universalSaveBtn" onclick="submitToLc()">Submit</button>
         </div>
         <div class="page-actions-right">
-            <button type="button" class="primary-btn js-next-page" data-next-page="lc">Next: LC -></button>
+            <button type="button" class="primary-btn" id="universalSaveBtn" onclick="submitToLc()">✅ Approve PI &amp; Send to LC</button>
         </div>
     </div>
 </section>
