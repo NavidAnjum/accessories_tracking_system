@@ -63,6 +63,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
     .pi-ctrl, nav, .order-id-bar, .form-stack > *:not(#piWrap) { display:none !important; }
     body, html { background:#fff !important; }
     .pi-wrap { box-shadow:none; margin:0; padding:18px 24px; }
+    .pi-header { display:none !important; }
     .app-shell { display:block !important; }
     .form-stack { padding:0 !important; }
 }
@@ -110,6 +111,8 @@ require_once __DIR__ . '/../includes/print-brand.php';
 <!-- ── PI Document ── -->
 <div id="piWrap" style="background:#e8eaf0; padding:20px 0;">
 <div class="pi-wrap" id="piDocument">
+
+    <?= zzal_print_brand_header() ?>
 
     <div class="pi-header">
         <div class="pi-logo">ZZAL<span>ACCESSORIES</span></div>

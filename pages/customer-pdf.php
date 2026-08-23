@@ -2,6 +2,7 @@
 // customer-pdf.php — printable Customer Profile (Save as PDF via browser print)
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/print-brand.php';
 requireLogin();
 
 $id = (int)($_GET['id'] ?? 0);
@@ -54,7 +55,9 @@ $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChec
 <style>
     * { box-sizing: border-box; }
     body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e1e2e; margin: 0; background: #e5e7eb; }
-    .sheet { background: #fff; max-width: 820px; margin: 20px auto; padding: 36px 40px; box-shadow: 0 4px 24px rgba(0,0,0,.12); }
+    .sheet { background: #fff; max-width: 820px; margin: 20px auto; padding: 36px 40px; box-shadow: 0 4px 24px rgba(0,0,0,.12); display:flex; flex-direction:column; }
+    .brand-header { margin-bottom: 10px; }
+    .brand-footer { margin-top:auto; }
     .doc-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #4f46e5; padding-bottom: 14px; margin-bottom: 8px; }
     .doc-head h1 { font-size: 22px; margin: 0; color: #1e1e2e; }
     .doc-head .sub { font-size: 12px; color: #6b7280; margin-top: 3px; }
@@ -93,6 +96,7 @@ $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChec
 </div>
 
 <div class="sheet">
+    <div class="brand-header"><?= zzal_print_brand_header() ?></div>
     <div class="doc-head">
         <div>
             <h1><?= h($company) ?></h1>
@@ -232,6 +236,7 @@ $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChec
             </div>
         <?php endforeach; ?>
     </div>
+    <div class="brand-footer"><?= zzal_print_brand_footer() ?></div>
 </div>
 
 <script>

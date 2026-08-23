@@ -124,6 +124,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
     .mspi-ctrl, nav.page-nav, .order-id-bar { display:none !important; }
     #mspiWrap { background:none !important; padding:0 !important; }
     .mspi-doc { box-shadow:none; padding:12mm 15mm; max-width:100%; }
+    .mspi-hd { display:none !important; }
     body, html, .app-shell { background:#fff !important; }
     .form-stack { padding:0 !important; }
     .no-print { display:none !important; }
@@ -156,6 +157,8 @@ require_once __DIR__ . '/../includes/print-brand.php';
 <div class="mspi-doc" id="mspiDocument">
     <div class="mspi-empty" id="mspiEmpty">Load an order to generate the Summary PI</div>
     <div id="mspiContent" style="display:none;">
+
+        <?= zzal_print_brand_header() ?>
 
         <!-- Header: Logo + Company Name -->
         <div class="mspi-hd">

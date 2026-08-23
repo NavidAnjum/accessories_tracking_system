@@ -136,6 +136,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
     .spi-ctrl, nav.page-nav, .order-id-bar { display:none !important; }
     #spiWrap { background:none !important; padding:0 !important; }
     .spi-doc  { box-shadow:none; padding:12mm 15mm; max-width:100%; }
+    .spi-hd { display:none !important; }
     body, html, .app-shell { background:#fff !important; }
     .form-stack { padding:0 !important; }
     .no-print { display:none !important; }
@@ -175,6 +176,8 @@ require_once __DIR__ . '/../includes/print-brand.php';
 <div class="spi-doc" id="spiDocument">
     <div class="spi-empty" id="spiEmpty">Load an order to generate the Proforma Invoice</div>
     <div id="spiContent" style="display:none;">
+
+        <?= zzal_print_brand_header() ?>
 
         <!-- Header: Logo + Company Name -->
         <div class="spi-hd">

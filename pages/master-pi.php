@@ -139,6 +139,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
     .mpi-ctrl, nav.page-nav, .order-id-bar { display:none !important; }
     #mpiWrap { background:none !important; padding:0 !important; }
     .mpi-doc { box-shadow:none; padding:12mm 15mm; max-width:100%; }
+    .mpi-hd { display:none !important; }
     body, html, .app-shell { background:#fff !important; }
     .form-stack { padding:0 !important; }
     .no-print { display:none !important; }
@@ -185,6 +186,8 @@ require_once __DIR__ . '/../includes/print-brand.php';
 <div class="mpi-doc" id="mpiDocument">
     <div class="mpi-empty" id="mpiEmpty">Load an order to generate the Master PI</div>
     <div id="mpiContent" style="display:none;">
+
+        <?= zzal_print_brand_header() ?>
 
         <!-- Header -->
         <div class="mpi-hd">

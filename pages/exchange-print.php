@@ -147,7 +147,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
     display:flex;
     flex-direction:column;
     background:#fff; box-shadow:0 4px 24px rgba(0,0,0,.14);
-    padding:14mm 14mm 16mm;
+    padding:14mm 14mm 34mm;
     font-family:'Times New Roman',Times,serif; color:#111; font-size:11pt; line-height:1.45;
     break-after:page;
     page-break-after:always;
@@ -158,7 +158,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .boe-watermark {
     position:absolute;
     left:50%;
-    top:20%;
+    top:25%;
     transform:translate(-50%, -50%);
     font-size:170px;
     font-weight:700;
@@ -197,11 +197,11 @@ require_once __DIR__ . '/../includes/print-brand.php';
 }
 .boe-left-bottom { display:flex; flex-direction:column; gap:24px; min-height:100px; }
 .boe-page .zzal-print-brand--footer {
-    position:static;
+    position:absolute;
     left:14mm;
     right:14mm;
-    bottom:auto;
-    margin-top:auto;
+    bottom:14mm;
+    margin:0;
     padding-top:8px;
 }
 .boe-to { font-size:10.5px; white-space:pre-line; }
@@ -217,11 +217,11 @@ require_once __DIR__ . '/../includes/print-brand.php';
         box-shadow:none;
         box-sizing:border-box;
         width:210mm;
-        height:auto;          /* was 297mm — fixed A4 height overflowed to a 2nd page under browser print margins */
-        min-height:250mm;     /* fill most of the sheet so the footer drops to the bottom, but stay under a margined A4 (no overflow) */
+        height:297mm;
+        min-height:297mm;
         max-width:210mm;
         margin:0;
-        overflow:visible;
+        overflow:hidden;
         display:flex;
         flex-direction:column;
         break-after:page;
@@ -231,13 +231,13 @@ require_once __DIR__ . '/../includes/print-brand.php';
     }
     .boe-page:last-child { break-after:auto; page-break-after:auto; }
     .boe-page .zzal-print-brand--footer {
-        position:static;
-        left:14mm;
-        right:14mm;
-        bottom:auto;
-        margin-top:auto;
-        padding-top:8px;
-    }
+    position:absolute;
+    left:14mm;
+    right:14mm;
+    bottom:14mm;
+    margin:0;
+    padding-top:8px;
+}
     .form-stack, body, html, .app-shell { background:#fff !important; }
     .boe-page, .boe-page * { color:#111 !important; }
     .boe-watermark { color:rgba(120,120,120,.12) !important; }
@@ -565,3 +565,4 @@ document.getElementById('boeCopies')?.addEventListener('change', renderBoePages)
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
+
