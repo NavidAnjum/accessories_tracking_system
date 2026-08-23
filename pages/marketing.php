@@ -179,15 +179,11 @@ include __DIR__ . '/../includes/header.php';
         <div class="source-glance-item"><span>Consignee Bank</span><strong data-pi-bind="consigneeBank">-</strong></div>
     </div>
     <div class="form-grid">
-        <div class="field span-4">
-            <label for="marketingOwner">Marketing Owner</label>
-            <input id="marketingOwner" name="marketingOwner" placeholder="e.g. Marketing Team">
-        </div>
-        <div class="field span-4">
+        <div class="field span-6">
             <label for="requestedDate">Requested Date</label>
             <input id="requestedDate" name="requestedDate" type="date">
         </div>
-        <div class="field span-4">
+        <div class="field span-6">
             <label for="deliveryDate">Scheduled Shipment Date</label>
             <input id="deliveryDate" name="deliveryDate" type="date">
         </div>
@@ -235,8 +231,7 @@ function renderSalesSnapshot(salesData, order, mktData) {
         const salesRows = (items || []).map((item, i) => `
             <tr>
                 <td style="color:#64748b;text-align:center;">${i+1}</td>
-                <td>${escapeHtml(item.desc || 'â€”')}</td>
-                <td style="text-align:center;">${escapeHtml(item.ply || 'â€”')}</td>
+                <td>${escapeHtml(item.desc || '-')}</td>
                 <td style="text-align:right;">${parseFloat(item.qty||0).toLocaleString()}</td>
                 <td style="text-align:right;">$${parseFloat(item.price||0).toFixed(4)}</td>
                 <td style="text-align:right;font-weight:700;color:#4f46e5;">$${parseFloat(item.total||0).toFixed(2)}</td>
@@ -245,14 +240,13 @@ function renderSalesSnapshot(salesData, order, mktData) {
         const intakeRows = (mktRows || []).map((row, i) => `
             <tr style="background:#f8fff8;">
                 <td style="color:#64748b;text-align:center;">${i+1}</td>
-                <td>${escapeHtml(row.itemName || 'â€”')}<br><span style="font-size:10px;color:#94a3b8;">${escapeHtml(row.prodLine || '')}</span></td>
-                <td style="text-align:center;">${escapeHtml(row.artSize || 'â€”')}</td>
+                <td>${escapeHtml(row.itemName || '-')}<br><span style="font-size:10px;color:#94a3b8;">${escapeHtml(row.prodLine || '')}</span></td>
                 <td style="text-align:right;">${parseFloat(row.qty||0).toLocaleString()}</td>
                 <td style="text-align:right;">$${parseFloat(row.unitPrc||0).toFixed(4)}</td>
                 <td style="text-align:right;font-weight:700;color:#16a34a;">$${(parseFloat(row.qty||0)*parseFloat(row.unitPrc||0)).toFixed(2)}</td>
             </tr>`).join('');
 
-        if (!salesRows && !intakeRows) return '<tr><td colspan="6" style="color:#94a3b8;text-align:center;padding:10px;">No item rows</td></tr>';
+        if (!salesRows && !intakeRows) return '<tr><td colspan="5" style="color:#94a3b8;text-align:center;padding:10px;">No item rows</td></tr>';
         let out = '';
         if (salesRows) out += salesRows;
         if (intakeRows && !salesRows) out += intakeRows;
@@ -262,16 +256,16 @@ function renderSalesSnapshot(salesData, order, mktData) {
     holder.innerHTML = `
         <div class="mkt-sales-block">
             <div class="mkt-sales-grid">
-                <div class="mkt-sales-field"><label>PI Number</label><div>${escapeHtml(salesData.piNum || 'â€”')}</div></div>
-                <div class="mkt-sales-field"><label>PI Date</label><div>${escapeHtml(salesData.piDate || 'â€”')}</div></div>
-                <div class="mkt-sales-field"><label>Customer</label><div>${escapeHtml(salesData.customer || order?.customer_name || 'â€”')}</div></div>
-                <div class="mkt-sales-field"><label>Product Line</label><div>${escapeHtml(salesData.productLine || 'â€”')}</div></div>
+                <div class="mkt-sales-field"><label>PI Number</label><div>${escapeHtml(salesData.piNum || '-')}</div></div>
+                <div class="mkt-sales-field"><label>PI Date</label><div>${escapeHtml(salesData.piDate || '-')}</div></div>
+                <div class="mkt-sales-field"><label>Customer</label><div>${escapeHtml(salesData.customer || order?.customer_name || '-')}</div></div>
+                <div class="mkt-sales-field"><label>Product Line</label><div>${escapeHtml(salesData.productLine || '-')}</div></div>
                 <div class="mkt-sales-field"><label>Matched Sales Order</label><div>${escapeHtml(salesOrderVal)}</div></div>
                 <div class="mkt-sales-field"><label>Customer PO</label><div>${escapeHtml(customerPoVal)}</div></div>
                 <div class="mkt-sales-field"><label>Buyer</label><div>${escapeHtml(buyerVal)}</div></div>
                 <div class="mkt-sales-field"><label>Total POs</label><div>${escapeHtml(pos.length)}</div></div>
-                <div class="mkt-sales-field wide"><label>Buyer / Consignee Address</label><div>${escapeHtml(salesData.buyerAddress || 'â€”')}</div></div>
-                <div class="mkt-sales-field wide"><label>Consignee Bank</label><div>${escapeHtml(salesData.consigneeBank || 'â€”')}</div></div>
+                <div class="mkt-sales-field wide"><label>Buyer / Consignee Address</label><div>${escapeHtml(salesData.buyerAddress || '-')}</div></div>
+                <div class="mkt-sales-field wide"><label>Consignee Bank</label><div>${escapeHtml(salesData.consigneeBank || '-')}</div></div>
             </div>
             <div class="mkt-sales-po-wrap">
                 ${pos.map((po, idx) => {
@@ -282,15 +276,15 @@ function renderSalesSnapshot(salesData, order, mktData) {
                     <div class="mkt-sales-po">
                         <div class="mkt-sales-po-top" onclick="toggleMktSalesPo('${poId}')" style="cursor:pointer;">
                             <span class="mkt-sales-po-tag">PO ${idx + 1}</span>
-                            <strong style="font-size:13px;color:#1e1e2e;">${escapeHtml(po.poNum || 'â€”')}</strong>
-                            <span style="font-size:12px;color:#64748b;">${escapeHtml(po.buyer || 'â€”')}</span>
+                            <strong style="font-size:13px;color:#1e1e2e;">${escapeHtml(po.poNum || '-')}</strong>
+                            <span style="font-size:12px;color:#64748b;">${escapeHtml(po.buyer || '-')}</span>
                             <span style="margin-left:auto;font-size:12px;color:#6366f1;font-weight:700;">${itemCount} item${itemCount!==1?'s':''}</span>
-                            <span id="${poId}_arrow" style="font-size:12px;color:#94a3b8;">â–¼</span>
+                            <span id="${poId}_arrow" style="font-size:12px;color:#94a3b8;">?</span>
                         </div>
                         <div class="mkt-sales-po-meta">
-                            <div><strong>Sales Order</strong>${escapeHtml(po.salesOrder || 'â€”')}</div>
-                            <div><strong>Requested Date</strong>${escapeHtml(po.reqDate || 'â€”')}</div>
-                            <div><strong>Status</strong>${escapeHtml(po.status || 'â€”')}</div>
+                            <div><strong>Sales Order</strong>${escapeHtml(po.salesOrder || '-')}</div>
+                            <div><strong>Requested Date</strong>${escapeHtml(po.reqDate || '-')}</div>
+                            <div><strong>Status</strong>${escapeHtml(po.status || '-')}</div>
                             <div><strong>Items</strong>${escapeHtml(itemCount)}</div>
                         </div>
                         <div id="${poId}" style="display:none;margin-top:10px;">
@@ -299,7 +293,6 @@ function renderSalesSnapshot(salesData, order, mktData) {
                                     <tr>
                                         <th style="width:32px;">#</th>
                                         <th>Description / Item</th>
-                                        <th style="text-align:center;">Type / Art Size</th>
                                         <th style="text-align:right;">Qty</th>
                                         <th style="text-align:right;">Price $</th>
                                         <th style="text-align:right;">Amount $</th>
@@ -320,7 +313,7 @@ function toggleMktSalesPo(id) {
     if (!body) return;
     const open = body.style.display !== 'none';
     body.style.display = open ? 'none' : 'block';
-    if (arrow) arrow.textContent = open ? 'â–¼' : 'â–²';
+    if (arrow) arrow.textContent = open ? '?' : '?';
 }
 
 function removeMarketingSalesOrderFields() {
@@ -357,10 +350,10 @@ function loadMktSummary(orderId, order, salesData, mktData) {
     // Populate source-glance fields
     if (order) {
         const binds = {
-            salesOrder:   order.po_number      || 'â€”',
-            customerPo:   order.po_number      || 'â€”',
-            buyerName:    order.to_buyer       || 'â€”',
-            customerName: order.customer_name  || 'â€”',
+            salesOrder:   order.po_number      || '-',
+            customerPo:   order.po_number      || '-',
+            buyerName:    order.to_buyer       || '-',
+            customerName: order.customer_name  || '-',
         };
         binds.salesOrder = salesData?.pos?.map(po => po.salesOrder).filter(Boolean).join(', ') || binds.salesOrder;
         binds.customerPo = salesData?.pos?.map(po => po.poNum).filter(Boolean).join(', ') || binds.customerPo;
@@ -374,12 +367,12 @@ function loadMktSummary(orderId, order, salesData, mktData) {
     // Meta chips
     const metaRow = document.getElementById('mktMetaRow');
     const meta = [
-        { label: 'Customer',    val: order?.customer_name  || 'â€”' },
-        { label: 'Buyer',       val: order?.to_buyer       || 'â€”' },
-        { label: 'PO Number',   val: order?.po_number      || 'â€”' },
-        { label: 'TRIMS / IPO', val: order?.trims_ipo      || 'â€”' },
-        { label: 'Step',        val: (order?.current_step  || 'â€”').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()) },
-        { label: 'Date',        val: order?.intake_date    || 'â€”' },
+        { label: 'Customer',    val: order?.customer_name  || '-' },
+        { label: 'Buyer',       val: order?.to_buyer       || '-' },
+        { label: 'PO Number',   val: order?.po_number      || '-' },
+        { label: 'TRIMS / IPO', val: order?.trims_ipo      || '-' },
+        { label: 'Step',        val: (order?.current_step  || '-').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()) },
+        { label: 'Date',        val: order?.intake_date    || '-' },
     ];
     metaRow.innerHTML = meta.map(m => `
         <div class="mkt-chip">
@@ -391,7 +384,7 @@ function loadMktSummary(orderId, order, salesData, mktData) {
     removeMarketingSalesOrderFields();
 
     // Fetch PIs for this order
-    document.getElementById('mktPiList').innerHTML = '<p class="mkt-empty" style="color:#94a3b8;">Loading PIsâ€¦</p>';
+    document.getElementById('mktPiList').innerHTML = '<p class="mkt-empty" style="color:#94a3b8;">Loading PIs...</p>';
     fetch(APP_BASE + '/api/pis.php?order_id=' + encodeURIComponent(orderId))
         .then(r => r.json())
         .then(pis => {
@@ -421,7 +414,7 @@ function loadMktSummary(orderId, order, salesData, mktData) {
 
                 const cardId = 'mktPiCard_' + pi.id;
 
-                // Build PO blocks â€” each PO has its own header + item rows table
+                // Build PO blocks - each PO has its own header + item rows table
                 const poBlocks = (pi.pos || []).map((po, pIdx) => {
                     const poQty = parseFloat(po.qty || 0);
                     const poVal = parseFloat(po.val || 0);
@@ -432,8 +425,7 @@ function loadMktSummary(orderId, order, salesData, mktData) {
                     const itemRows = (po.items || []).map((item, i) => `
                         <tr>
                             <td style="color:#64748b;text-align:center;">${i + 1}</td>
-                            <td>${item.desc || 'â€”'}</td>
-                            <td style="text-align:center;">${item.ply || 'â€”'}</td>
+                            <td>${item.desc || '-'}</td>
                             <td style="text-align:right;">${parseFloat(item.qty||0).toLocaleString()}</td>
                             <td style="text-align:right;">$${parseFloat(item.price||0).toFixed(4)}</td>
                             <td style="text-align:right;font-weight:700;color:#4f46e5;">$${parseFloat(item.total||0).toFixed(2)}</td>
@@ -443,27 +435,26 @@ function loadMktSummary(orderId, order, salesData, mktData) {
                     <div style="margin-bottom:${pIdx < (pi.pos||[]).length-1 ? '12px' : '0'};">
                         <div style="display:flex;align-items:center;gap:10px;background:#f1f5ff;border-radius:8px 8px 0 0;padding:8px 12px;border:1.5px solid #d1d5ff;border-bottom:none;">
                             <span style="background:#6366f1;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;">PO ${pIdx+1}</span>
-                            <strong style="font-size:13px;color:#1e1e2e;">${po.poNum || 'â€”'}</strong>
+                            <strong style="font-size:13px;color:#1e1e2e;">${po.poNum || '-'}</strong>
                             ${sourceBadge}
                             <span style="font-size:12px;color:#64748b;margin-left:4px;">${po.buyer || ''}</span>
                             <span style="margin-left:auto;font-size:12px;color:#64748b;">${poQty.toLocaleString()} pcs</span>
                             <strong style="font-size:13px;color:#4f46e5;">$${poVal.toFixed(2)}</strong>
                         </div>
                         <table class="mkt-po-table" style="border:1.5px solid #d1d5ff;border-top:none;border-radius:0 0 8px 8px;overflow:hidden;">
-                            <thead>
-                                <tr>
-                                    <th style="width:32px;">#</th>
-                                    <th>Description of Goods</th>
-                                    <th style="text-align:center;">Ply / Type</th>
-                                    <th style="text-align:right;">Quantity</th>
-                                    <th style="text-align:right;">Price $</th>
-                                    <th style="text-align:right;">Amount $</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${itemRows || '<tr><td colspan="6" style="color:#94a3b8;text-align:center;padding:10px;">No item rows</td></tr>'}
+                                <thead>
+                                    <tr>
+                                        <th style="width:32px;">#</th>
+                                        <th>Description of Goods</th>
+                                        <th style="text-align:right;">Quantity</th>
+                                        <th style="text-align:right;">Price $</th>
+                                        <th style="text-align:right;">Amount $</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                ${itemRows || '<tr><td colspan="5" style="color:#94a3b8;text-align:center;padding:10px;">No item rows</td></tr>'}
                                 <tr style="background:#f8f9ff;border-top:2px solid #e0e3ff;">
-                                    <td colspan="3" style="text-align:right;font-weight:700;color:#64748b;font-size:11px;">SUBTOTAL</td>
+                                    <td colspan="2" style="text-align:right;font-weight:700;color:#64748b;font-size:11px;">SUBTOTAL</td>
                                     <td style="text-align:right;font-weight:800;color:#1e1e2e;">${poQty.toLocaleString()}</td>
                                     <td></td>
                                     <td style="text-align:right;font-weight:800;color:#4f46e5;">$${poVal.toFixed(2)}</td>
@@ -479,11 +470,11 @@ function loadMktSummary(orderId, order, salesData, mktData) {
                         <span class="mkt-pi-badge ${badgeCls}">${badgeLabel}</span>
                         <div class="mkt-pi-num">${pi.pi_number}</div>
                         <div class="mkt-pi-meta">
-                            ${pi.customer || 'â€”'} Â· ${pi.product_line || ''} Â· ${(pi.pos||[]).length} PO(s) Â· ${qty.toLocaleString()} pcs
+                            ${pi.customer || '-'} ? ${pi.product_line || ''} ? ${(pi.pos||[]).length} PO(s) ? ${qty.toLocaleString()} pcs
                             ${subText ? '<br><span style="font-size:11px;color:#7c3aed;">' + subText + '</span>' : ''}
                         </div>
                         <div class="mkt-pi-val">$${val.toFixed(2)}</div>
-                        <span class="mkt-pi-toggle" id="${cardId}_arrow">â–¼</span>
+                        <span class="mkt-pi-toggle" id="${cardId}_arrow">?</span>
                     </div>
                     <div class="mkt-po-table-wrap" id="${cardId}" style="display:none;">
                         ${poBlocks}
@@ -496,7 +487,7 @@ function loadMktSummary(orderId, order, salesData, mktData) {
                 const fakePi = {
                     id: 'custom_master',
                     pi_number: salesData?.piNum || (orderId + '-MASTER'),
-                    customer: salesData?.customer || order?.customer_name || 'â€”',
+                    customer: salesData?.customer || order?.customer_name || '-',
                     product_line: '',
                     grand_qty: salesData?.grandQty || 0,
                     grand_val: salesData?.grandVal || 0,
@@ -562,7 +553,7 @@ function loadMktSummary(orderId, order, salesData, mktData) {
             document.getElementById('mktGtVal').textContent = '$' + grandVal.toFixed(2);
         })
         .catch(() => {
-            document.getElementById('mktPiList').innerHTML = '<p class="mkt-empty">Could not load PIs â€” check server connection.</p>';
+            document.getElementById('mktPiList').innerHTML = '<p class="mkt-empty">Could not load PIs - check server connection.</p>';
         });
 }
 
@@ -572,7 +563,7 @@ function toggleMktPiCard(id) {
     if (!body) return;
     const open = body.style.display !== 'none';
     body.style.display  = open ? 'none'  : 'block';
-    if (arrow) arrow.textContent = open ? 'â–¼' : 'â–²';
+    if (arrow) arrow.textContent = open ? '?' : '?';
 }
 
 async function submitToLc() {
@@ -581,7 +572,7 @@ async function submitToLc() {
     if (!orderId) { alert('No order loaded.'); return; }
 
     const btn = document.getElementById('universalSaveBtn');
-    if (btn) { btn.textContent = 'â³ Savingâ€¦'; btn.disabled = true; }
+    if (btn) { btn.textContent = ' Saving...'; btn.disabled = true; }
 
     try {
         const fields = {};
@@ -595,12 +586,12 @@ async function submitToLc() {
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ order_id: orderId, page_name: pageName, ...fields }),
         });
-        // Hand off to LC (advances the workflow + notifies LC dept) but stay on this page â€”
+        // Hand off to LC (advances the workflow + notifies LC dept) but stay on this page -
         // marketing users can't open lc.php, so navigating there would bounce them to intake.
         await fetch(APP_BASE + '/api/orders.php?id=' + encodeURIComponent(orderId) + '&step=lc', { method: 'PUT' })
             .catch(() => {});
         if (btn) {
-            btn.textContent = 'âœ… Submitted to LC';
+            btn.textContent = ' Submitted to LC';
             btn.style.background = '#16a34a';
             btn.disabled = false;
             setTimeout(() => { btn.textContent = 'ðŸ“¤ Submit'; btn.style.background = ''; }, 3000);
@@ -626,5 +617,6 @@ if (_mktStoredId) loadMktSummary(_mktStoredId, null, null);
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
+
 
 

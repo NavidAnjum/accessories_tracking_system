@@ -152,8 +152,16 @@ window.onOrderLoad = function(res) {
     const comm  = res.pages?.commercial || {};
     const exch  = res.pages?.exchange   || {};
     const lc    = res.pages?.lc         || {};
+    const sales = res.pages?.sales      || {};
 
     const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.textContent = val; };
+    const pick = (...vals) => {
+        const found = vals.find(v => {
+            const text = String(v || '').trim();
+            return text.length > 0;
+        });
+        return found || '';
+    };
 
     // Beneficiary from commercial page data
     set('packingBeneficiaryName',    comm.commercialBeneficiaryName    || '—');
@@ -163,6 +171,20 @@ window.onOrderLoad = function(res) {
 
     // Consignee from order
     set('packingConsigneeName', order.customer_name || comm.commercialConsigneeName || '—');
+    set('packingAdvisingBank', pick(
+        comm.commercialAdvisingBank,
+        exch.payToBankAddress,
+        exch.payToBankName,
+        lc.reimbursementBank,
+        sales.advisingBank
+    ));
+    set('packingConsigneeBank', pick(
+        comm.commercialConsigneeBankAddress,
+        sales.consigneeBank,
+        exch.negotiatingBankAddress,
+        exch.beneficiaryBankAddress,
+        lc.negotiatingBeneficiaryBank
+    ));
 
     // Notes from exchange page data
     const lcNo   = exch.masterLcNo   || lc.lcNumber || '';

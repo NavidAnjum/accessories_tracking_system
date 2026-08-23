@@ -170,6 +170,179 @@ include __DIR__ . '/../includes/header.php';
                 </section>
 
 <script>
+const EXCHANGE_BANKS = {
+    ncc: {
+        key: 'ncc',
+        name: 'National Credit & Commerce Bank Plc.',
+        address: 'Motijheel main Branch, 6 Motijheel C/A, Dhaka-1000, Bangladesh.',
+        account: '0002-0259000092',
+        swift: 'NCCLBDDHNBB',
+        routing: '160150137'
+    },
+    dbbl: {
+        key: 'dbbl',
+        name: 'Dutch-Bangla Bank Plc.',
+        address: 'Local Office, 1, Dilkusha C/A, Dhaka-1000, Bangladesh.',
+        account: 'ERQ-101.117.1382',
+        swift: 'DBBLBDDHCTS',
+        routing: '090273889'
+    }
+};
+const EXCHANGE_DEFAULT_HS_CODE = '4819.10.00';
+const EXCHANGE_BENEFICIARY_VAT_BIN = '000230256-0103';
+
+function exchangeSplitLines(val) {
+    return String(val ?? '')
+        .split(/\r?\n|,(?=\s*[A-Z0-9])/)
+        .map(v => v.trim())
+        .filter(Boolean);
+}
+
+function exchangeRenderBankBlock(bank) {
+    if (!bank) return '';
+    return [bank.name, bank.address, bank.account, bank.swift, bank.routing]
+        .filter(Boolean)
+        .join('\n');
+}
+
+function exchangeResolveBank(text, fallbackKey = 'ncc') {
+    const raw = String(text ?? '').trim();
+    const lower = raw.toLowerCase();
+    let key = fallbackKey in EXCHANGE_BANKS ? fallbackKey : 'ncc';
+    let matched = false;
+
+    if (lower.includes('dutch-bangla') || lower.includes('dbbl')) {
+        key = 'dbbl';
+        matched = true;
+    } else if (lower.includes('national credit') || lower.includes('ncc')) {
+        key = 'ncc';
+        matched = true;
+    }
+
+    const bank = EXCHANGE_BANKS[key] || EXCHANGE_BANKS.ncc;
+    const lines = exchangeSplitLines(raw);
+    const fullText = raw || exchangeRenderBankBlock(bank);
+    const name = matched ? bank.name : (lines[0] || bank.name);
+    const address = matched ? bank.address : (lines.slice(1).join('\n') || bank.address);
+    const account = matched ? bank.account : (lines[2] || '');
+    const swift = matched ? bank.swift : '';
+    const routing = matched ? bank.routing : '';
+
+    return {
+        key,
+        name,
+        address,
+        account,
+        swift,
+        routing,
+        raw,
+        display: fullText,
+        fullText,
+        lines: lines.length ? lines : exchangeSplitLines(exchangeRenderBankBlock(bank))
+    };
+}
+
+function exchangeAmountWords(amount) {
+    const centsTotal = Math.round((parseFloat(amount || 0) || 0) * 100);
+    const ones = ['Zero','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+    const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+    const chunk = num => {
+        if (num < 20) return ones[num];
+        if (num < 100) return tens[Math.floor(num / 10)] + (num % 10 ? ' ' + ones[num % 10] : '');
+        if (num < 1000) return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + chunk(num % 100) : '');
+        if (num < 1000000) return chunk(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 ? ' ' + chunk(num % 1000) : '');
+        return chunk(Math.floor(num / 1000000)) + ' Million' + (num % 1000000 ? ' ' + chunk(num % 1000000) : '');
+    };
+    const dollars = Math.floor(centsTotal / 100);
+    const cents = centsTotal % 100;
+    let out = chunk(dollars) + ' USD';
+    if (cents) out += ' and ' + chunk(cents) + ' Cents';
+    return out + ' Only';
+}
+
+function exchangeSetValue(id, value, force = false) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const nextVal = value ?? '';
+    if (force || !String(el.value || '').trim()) {
+        el.value = nextVal;
+    }
+}
+
+function exchangeSyncAmountWords(force = false) {
+    const amountEl = document.getElementById('receivedAmount') || document.getElementById('exchangeAmount');
+    const wordsEl  = document.getElementById('tenorWordsMaster');
+    const preview  = document.getElementById('exchangePreviewText');
+    const amount   = parseFloat(amountEl?.value || 0) || 0;
+    const words    = amount ? exchangeAmountWords(amount) : '';
+
+    if (wordsEl && (force || !String(wordsEl.value || '').trim() || wordsEl.dataset.autoWords === wordsEl.value)) {
+        wordsEl.value = words;
+        wordsEl.dataset.autoWords = words;
+    }
+
+    if (preview) {
+        const lcNo = document.getElementById('masterLcNo')?.value || '-';
+        const bank = document.getElementById('payToBankName')?.value || '-';
+        preview.value = amount
+            ? `Exchange for USD ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${words}). LC No: ${lcNo}. Pay to: ${bank}.`
+            : '';
+    }
+}
+
+function syncExchangeDerivedFields(res, force = false) {
+    const order = res.order || {};
+    const lc = res.pages?.lc || {};
+    const sales = res.pages?.sales || {};
+    const intake = res.pages?.['marketing-intake'] || {};
+
+    const allPis = res.pis || [];
+    const masterPi = allPis.find(p => p.is_master) || allPis[0] || {};
+    const allPos = masterPi?.pos?.length ? masterPi.pos
+        : sales.pos?.length ? sales.pos
+        : intake.pos || [];
+
+    const uniq = (...keys) => [...new Set(allPos.flatMap(p => keys.map(key => p?.[key]).filter(Boolean)))].join(', ');
+    const salesOrderVal = uniq('salesOrder', 'salesOrderNo') || order.sales_order_no || '';
+    const customerPoVal = uniq('poNum', 'customerPo') || order.customer_po || '';
+    const buyerVal = lc.lcBuyer || uniq('buyer', 'buyerName', 'sharedBuyer', 'endBuyer') || sales.buyer || order.buyer_name || '';
+    const customerVal = order.customer_name || sales.customer || masterPi.customer || '';
+    const hsCodeVal = sales.hsCode || intake.hsCode || EXCHANGE_DEFAULT_HS_CODE;
+    const beneficiaryVatBin = lc.beneficiaryVatBin || EXCHANGE_BENEFICIARY_VAT_BIN;
+
+    const issuingBank = exchangeResolveBank(lc.lcIssuingBank || document.getElementById('applicantBank')?.value || '');
+    const reimbursementBank = exchangeResolveBank(lc.reimbursementBank || document.getElementById('payToBankName')?.value || issuingBank.fullText || '');
+    const negotiatedBankText = lc.negotiatingBeneficiaryBank || document.getElementById('beneficiaryBankAddress')?.value || reimbursementBank.fullText || '';
+
+    exchangeSetValue('salesOrder', salesOrderVal, force);
+    exchangeSetValue('customerPo', customerPoVal, force);
+    exchangeSetValue('buyerName', buyerVal, force);
+    exchangeSetValue('customerName', customerVal, force);
+
+    exchangeSetValue('masterLcNo', lc.lcNumber || '', force);
+    exchangeSetValue('masterLcDate', lc.lcDate || '', force);
+    exchangeSetValue('applicantBank', issuingBank.fullText || '', force);
+    exchangeSetValue('payToBankName', reimbursementBank.name || reimbursementBank.fullText || '', force);
+    exchangeSetValue('payToBankAddress', reimbursementBank.address || reimbursementBank.fullText || '', force);
+    exchangeSetValue('beneficiaryBankAddress', negotiatedBankText, force);
+    exchangeSetValue('negotiatingBankAddress', negotiatedBankText, force);
+    exchangeSetValue('beneficiaryVatBin', beneficiaryVatBin, force);
+    exchangeSetValue('hsCodeMaster', hsCodeVal, force);
+
+    const tenorEl = document.getElementById('lcTenorMaster');
+    if (tenorEl && !String(tenorEl.value || '').trim() && lc.paymentTerms) {
+        tenorEl.value = lc.paymentTerms;
+    }
+
+    const amountEl = document.getElementById('receivedAmount') || document.getElementById('exchangeAmount');
+    if (amountEl && !String(amountEl.value || '').trim()) {
+        const savedAmount = res.pages?.exchange?.receivedAmount || res.pages?.exchange?.exchangeAmount || res.pages?.commercial?.commercialTotalAmount || '';
+        if (savedAmount) amountEl.value = savedAmount;
+    }
+
+    exchangeSyncAmountWords(force);
+}
+
 async function openExchangePrint() {
     const orderId = window.getCurrentOrderId ? window.getCurrentOrderId() : '';
     if (!orderId) { alert('Load an order first.'); return; }
@@ -197,39 +370,24 @@ async function openExchangeExcel() {
 }
 
 window.onOrderLoad = function(res) {
-    const order = res.order || {};
-    const lc    = res.pages?.lc || {};
-
-    const allPis   = res.pis || [];
-    const masterPi = allPis.find(p => p.is_master) || allPis[0];
-    const allPos   = masterPi?.pos?.length ? masterPi.pos
-                   : res.pages?.sales?.pos?.length ? res.pages.sales.pos
-                   : res.pages?.['marketing-intake']?.pos || [];
-
-    const uniq = key => [...new Set(allPos.map(p => p[key]).filter(Boolean))].join(', ');
-    const salesOrderVal = uniq('salesOrder') || order.sales_order_no || '';
-    const customerPoVal = uniq('poNum') || order.customer_po || '';
-    const buyerVal      = uniq('buyer') || order.buyer_name || '';
-    const customerVal   = order.customer_name || masterPi?.customer || res.pages?.sales?.customer || '';
-
-    const fill = (id, val) => {
-        const el = document.getElementById(id);
-        if (el && !el.value && val) el.value = val;
-    };
-
-    fill('salesOrder', salesOrderVal);
-    fill('customerPo', customerPoVal);
-    fill('buyerName', buyerVal);
-    fill('customerName', customerVal);
-
-    fill('masterLcNo', lc.lcNumber || '');
-    fill('masterLcDate', lc.lcDate || '');
-    fill('lcTenorMaster', lc.paymentTerms || '');
-    fill('applicantBank', lc.lcIssuingBank || '');
-    fill('payToBankName', lc.reimbursementBank || '');
-    fill('beneficiaryBankAddress', lc.negotiatingBeneficiaryBank || '');
-    fill('negotiatingBankAddress', lc.negotiatingBeneficiaryBank || '');
+    window._exchangeRes = res;
+    syncExchangeDerivedFields(res, true);
 };
+
+document.addEventListener('ats:orderloaded', function () {
+    if (!window._exchangeRes) return;
+    setTimeout(() => syncExchangeDerivedFields(window._exchangeRes, true), 0);
+});
+
+document.addEventListener('input', function (e) {
+    if (e.target && (e.target.id === 'receivedAmount' || e.target.id === 'exchangeAmount')) {
+        exchangeSyncAmountWords(false);
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    exchangeSyncAmountWords(false);
+});
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

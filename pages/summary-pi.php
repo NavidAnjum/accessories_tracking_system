@@ -3,6 +3,7 @@ $pageTitle  = 'Summary PI';
 $activePage = 'summary-pi';
 $navSection = 'order';
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/print-brand.php';
 ?>
 <style>
 /* ── Controls ─────────────────────────────────────────────────────── */
@@ -216,11 +217,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
 
         <!-- Footer bar -->
-        <div class="mspi-footer-bar">
-            <strong>Corporate Office:</strong> Adamjee Court (4th &amp; 5th Floor), 115-120, motijheel C/A, Dhaka-1000, Bangladesh.<br>
-            <strong>Phone:</strong> +880-2-7176207-8, 7176356, 71766348, &nbsp;<strong>Fax:</strong> +880-2-9564252, 9565282, 7167293. &nbsp;<strong>Web:</strong> www.znzfab.com<br>
-            <strong>Factory:</strong> Mawna, Sreepur, Gazipur. &nbsp;<strong>E-mail:</strong> znzal@znzfab.com
-        </div>
+        <?= zzal_print_brand_footer() ?>
 
     </div><!-- #mspiContent -->
 </div><!-- .mspi-doc -->

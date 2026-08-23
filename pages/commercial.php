@@ -156,6 +156,46 @@ include __DIR__ . '/../includes/header.php';
                 </section>
 
 <script>
+const COMMERCIAL_BANKS = {
+    ncc: {
+        name: 'National Credit & Commerce Bank Plc.',
+        address: 'Motijheel main Branch, 6 Motijheel C/A, Dhaka-1000, Bangladesh.',
+        account: '0002-0259000092',
+        swift: 'NCCLBDDHNBB',
+        routing: '160150137'
+    },
+    dbbl: {
+        name: 'Dutch-Bangla Bank Plc.',
+        address: 'Local Office, 1, Dilkusha C/A, Dhaka-1000, Bangladesh.',
+        account: 'ERQ-101.117.1382',
+        swift: 'DBBLBDDHCTS',
+        routing: '090273889'
+    }
+};
+
+function commercialBankBlock(key) {
+    const bank = COMMERCIAL_BANKS[key] || COMMERCIAL_BANKS.ncc;
+    return [bank.name, bank.address, `Account No: ${bank.account}`, `Swift Code: ${bank.swift}`, `Bank Routing No: ${bank.routing}`].join('\n');
+}
+
+function commercialNormalizeBank(text, fallbackKey = 'ncc') {
+    const raw = String(text ?? '').trim();
+    const lower = raw.toLowerCase();
+    const looksLikeLabel = !raw || /^(reimbursment|reimbursement|negotiating|benificiary|beneficiary)\b/i.test(raw) || /bank details|auto-filled|full bank/i.test(lower);
+    if (looksLikeLabel) {
+        return commercialBankBlock(fallbackKey in COMMERCIAL_BANKS ? fallbackKey : 'ncc');
+    }
+
+    if (lower.includes('dutch-bangla') || lower.includes('dbbl')) {
+        return commercialBankBlock('dbbl');
+    }
+    if (lower.includes('national credit') || lower.includes('ncc')) {
+        return commercialBankBlock('ncc');
+    }
+
+    return raw;
+}
+
 async function openCommercialPrint() {
     const orderId = window.getCurrentOrderId ? window.getCurrentOrderId() : '';
     if (!orderId) { alert('Load an order first.'); return; }
@@ -200,10 +240,25 @@ window.onOrderLoad = function(res) {
     const bestPi   = allPis.find(p => p.is_master) || allPis[0];
     const allPos   = resolved.pos || [];
     const uniq     = key => [...new Set(allPos.map(p => p[key]).filter(Boolean))].join(', ');
+    const uniqAny  = (...keys) => {
+        for (const key of keys) {
+            const val = uniq(key);
+            if (val) return val;
+        }
+        return '';
+    };
+    const buyerVal = lc.lcBuyer
+        || uniqAny('buyer', 'buyerName', 'sharedBuyer', 'endBuyer')
+        || sales.buyer
+        || order.to_buyer
+        || order.buyer_end_buyer
+        || bestPi?.buyer
+        || order.buyer_name
+        || '';
     const binds = {
         salesOrder:   uniq('salesOrder') || order.sales_order_no || '',
         customerPo:   uniq('poNum')      || order.customer_po    || '',
-        buyerName:    uniq('buyer')      || order.buyer_name     || '',
+        buyerName:    buyerVal,
         customerName: order.customer_name || sales.customer || resolved.customer || bestPi?.customer || '',
     };
     document.querySelectorAll('[data-bind]').forEach(el => {
@@ -224,39 +279,46 @@ window.onOrderLoad = function(res) {
     }
 
     // Issuing bank from exchange page
-    if (exch.applicantBank) {
-        const el = document.getElementById('commercialIssuingBankAddress');
-        if (el && !el.value) el.value = exch.applicantBank;
-        // Try to extract bank name (first line up to comma)
-        const nameEl = document.getElementById('commercialIssuingBankName');
-        if (nameEl && !nameEl.value) {
-            nameEl.value = exch.applicantBank.split(',')[0].trim();
-        }
+    const issuingBankVal = commercialNormalizeBank(exch.applicantBank || lc.lcIssuingBank || '', 'ncc');
+    const issuingBankName = issuingBankVal.split('\n')[0] || '';
+    const issuingBankAddr = issuingBankVal;
+    const issuingAddrEl = document.getElementById('commercialIssuingBankAddress');
+    if (issuingAddrEl && (!issuingAddrEl.value || /bank address/i.test(issuingAddrEl.value) || /issuing bank/i.test(issuingAddrEl.value))) {
+        issuingAddrEl.value = issuingBankAddr;
+    }
+    const nameEl = document.getElementById('commercialIssuingBankName');
+    if (nameEl && (!nameEl.value || /bank name/i.test(nameEl.value))) {
+        nameEl.value = issuingBankName;
     }
 
     // Restore bank fields directly from Exchange / LC like before
-    const advisingBankVal =
+    const advisingBankVal = commercialNormalizeBank(
+        exch.payToBankAddress ||
         exch.payToBankName ||
         lc.reimbursementBank ||
-        '';
-    const consigneeBankVal =
-        exch.beneficiaryBankAddress ||
+        '',
+        'ncc'
+    );
+    const consigneeBankVal = commercialNormalizeBank(
         exch.negotiatingBankAddress ||
+        exch.beneficiaryBankAddress ||
         lc.negotiatingBeneficiaryBank ||
-        '';
+        '',
+        'dbbl'
+    );
 
     const advisingEl = document.getElementById('commercialAdvisingBank');
-    if (advisingEl && !advisingEl.value && advisingBankVal) {
+    if (advisingEl && (!advisingEl.value || /auto-filled|bank/i.test(advisingEl.value))) {
         advisingEl.value = advisingBankVal;
     }
 
     const consigneeBankEl = document.getElementById('commercialConsigneeBankAddress');
-    if (consigneeBankEl && !consigneeBankEl.value && consigneeBankVal) {
+    if (consigneeBankEl && (!consigneeBankEl.value || /auto-filled|bank/i.test(consigneeBankEl.value))) {
         consigneeBankEl.value = consigneeBankVal;
     }
 
     // Buyer name (first PO across master PI or all PIs)
-    const buyerDisplay = uniq('buyer') || order.buyer_name || '';
+    const buyerDisplay = buyerVal || '';
     const bn = document.getElementById('commercialBuyerName');
     if (bn && buyerDisplay) bn.textContent = buyerDisplay;
 

@@ -3,6 +3,7 @@ $pageTitle  = 'Print Proforma Invoice';
 $activePage = 'sales';
 $navSection = 'order';
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/print-brand.php';
 ?>
 <style>
 /* ── Controls (hidden on print) ─────────────────────────────────── */
@@ -160,18 +161,20 @@ include __DIR__ . '/../includes/header.php';
         </ol>
     </div>
 
-    <div class="pi-sigs">
-        <div class="pi-sig-box">
-            <div class="pi-sig-line"></div>
-            <div class="pi-sig-label">SIGNATURE OF BUYER</div>
+        <div class="pi-sigs">
+            <div class="pi-sig-box">
+                <div class="pi-sig-line"></div>
+                <div class="pi-sig-label">SIGNATURE OF BUYER</div>
+            </div>
+            <div class="pi-sig-box" style="text-align:right;">
+                <div class="pi-sig-line" style="margin-left:auto;margin-right:0;margin-top:40px;"></div>
+                <div class="pi-sig-label">Authorised Signature</div>
+            </div>
         </div>
-        <div class="pi-sig-box" style="text-align:right;">
-            <div class="pi-sig-line" style="margin-left:auto;margin-right:0;margin-top:40px;"></div>
-            <div class="pi-sig-label">Authorised Signature</div>
-        </div>
-    </div>
 
-</div><!-- .pi-wrap -->
+        <?= zzal_print_brand_footer() ?>
+
+    </div><!-- .pi-wrap -->
 </div><!-- #piWrap -->
 
 <script>

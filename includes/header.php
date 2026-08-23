@@ -251,7 +251,7 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
                     if (inp) inp.value = '';
                     if (typeof window.onOrderLoad === 'function') window.onOrderLoad(res);
                 })
-                .catch(() => alert('Could not reach server.'));
+                .catch(() => { if (isManual) alert('Could not reach server.'); });
         }
 
         window.getCurrentOrderId = () => sessionStorage.getItem(OID_KEY) || '';
@@ -306,11 +306,11 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
             }
             const stored = sessionStorage.getItem(OID_KEY);
             if (stored) {
-                loadOrderById(stored);
+                loadOrderById(stored, false);
             } else {
                 fetch(BASE + '/api/orders.php?last=1')
                     .then(r => r.json())
-                    .then(row => { if (row?.order_id) loadOrderById(row.order_id); })
+                    .then(row => { if (row?.order_id) loadOrderById(row.order_id, false); })
                     .catch(() => {});
             }
         });

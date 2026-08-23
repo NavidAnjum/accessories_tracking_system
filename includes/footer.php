@@ -240,7 +240,7 @@
                     window.onOrderLoad(res);
                 }
             })
-            .catch(() => alert('Could not reach server.'));
+            .catch(() => { if (isManual) alert('Could not reach server.'); });
     }
 
     function oidNewOrder() {
@@ -266,12 +266,12 @@
         if (!window.__oidBarReady) {
             const stored = sessionStorage.getItem(OID_KEY);
             if (stored && document.getElementById('oidDisplay')) {
-                loadOrderById(stored);
+                loadOrderById(stored, false);
             } else if (!stored && document.getElementById('oidDisplay')) {
                 // Auto-load the most recently saved order for this user
                 fetch(window.APP_BASE + '/api/orders.php?last=1')
                     .then(r => r.json())
-                    .then(row => { if (row?.order_id) loadOrderById(row.order_id); })
+                    .then(row => { if (row?.order_id) loadOrderById(row.order_id, false); })
                     .catch(() => {});
             }
         }

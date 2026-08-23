@@ -3,6 +3,7 @@ $pageTitle  = 'Commercial Invoice Print';
 $activePage = 'commercial';
 $navSection = 'order';
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/print-brand.php';
 ?>
 <style>
 .ci-ctrl {
@@ -80,6 +81,8 @@ include __DIR__ . '/../includes/header.php';
     color:#111;
     font-size:10px;
     line-height:1.25;
+    display:flex;
+    flex-direction:column;
     page-break-after:always;
 }
 .ci-page:last-child { page-break-after:auto; }
@@ -166,7 +169,7 @@ include __DIR__ . '/../includes/header.php';
     margin-bottom:4px;
 }
 .ci-bottom-bar {
-    margin-top:52px;
+    margin-top:auto;
     padding-top:4px;
     border-top:1px solid #000;
     font-size:9px;
@@ -197,6 +200,7 @@ include __DIR__ . '/../includes/header.php';
 
 <script>
 const CI_COMPANY_NAME = 'Zaber & Zubair Accessories Ltd.';
+const CI_BRAND_FOOTER = <?php echo json_encode(zzal_print_brand_footer(), JSON_UNESCAPED_SLASHES); ?>;
 
 function ciEsc(val) {
     return String(val ?? '-')
@@ -220,6 +224,42 @@ function ciLines(val) {
 
 function ciPlainText(val) {
     return ciSplit(val).join(', ');
+}
+
+const CI_BANKS = {
+    ncc: {
+        name: 'National Credit & Commerce Bank Plc.',
+        address: 'Motijheel main Branch, 6 Motijheel C/A, Dhaka-1000, Bangladesh.',
+        account: '0002-0259000092',
+        swift: 'NCCLBDDHNBB',
+        routing: '160150137'
+    },
+    dbbl: {
+        name: 'Dutch-Bangla Bank Plc.',
+        address: 'Local Office, 1, Dilkusha C/A, Dhaka-1000, Bangladesh.',
+        account: 'ERQ-101.117.1382',
+        swift: 'DBBLBDDHCTS',
+        routing: '090273889'
+    }
+};
+
+function ciResolveBank(text, fallbackKey = 'ncc') {
+    const raw = String(text ?? '').trim();
+    const lower = raw.toLowerCase();
+    const looksLikeLabel = !raw || /^(reimbursment|reimbursement|negotiating|benificiary|beneficiary)\b/i.test(raw) || /bank details|auto-filled|full bank/i.test(lower);
+    const bank = CI_BANKS[fallbackKey] || CI_BANKS.ncc;
+    if (looksLikeLabel) {
+        return [bank.name, bank.address, `Account No: ${bank.account}`, `Swift Code: ${bank.swift}`, `Bank Routing No: ${bank.routing}`].join('\n');
+    }
+    if (lower.includes('dutch-bangla') || lower.includes('dbbl')) {
+        const b = CI_BANKS.dbbl;
+        return [b.name, b.address, `Account No: ${b.account}`, `Swift Code: ${b.swift}`, `Bank Routing No: ${b.routing}`].join('\n');
+    }
+    if (lower.includes('national credit') || lower.includes('ncc')) {
+        const b = CI_BANKS.ncc;
+        return [b.name, b.address, `Account No: ${b.account}`, `Swift Code: ${b.swift}`, `Bank Routing No: ${b.routing}`].join('\n');
+    }
+    return raw;
 }
 
 function ciMoney(num, digits = 2) {
@@ -287,12 +327,12 @@ function ciBuildPages() {
     const beneficiaryName = comm.commercialBeneficiaryName || CI_COMPANY_NAME;
     const beneficiaryAddress = comm.commercialBeneficiaryAddress || '';
     const factoryAddress = comm.commercialFactoryAddress || '';
-    const advisingBank = comm.commercialAdvisingBank || exch.payToBankName || lc.reimbursementBank || '';
+    const advisingBank = ciResolveBank(comm.commercialAdvisingBank || exch.payToBankName || lc.reimbursementBank || '', 'ncc');
     const consigneeName = comm.commercialConsigneeName || order.customer_name || sales.customer || '';
     const consigneeAddress = comm.commercialConsigneeAddress || sales.buyerAddress || '';
-    const consigneeBank = comm.commercialConsigneeBankAddress || exch.beneficiaryBankAddress || exch.negotiatingBankAddress || lc.negotiatingBeneficiaryBank || '';
-    const issuingBankName = comm.commercialIssuingBankName || (ciPlainText(exch.applicantBank || lc.lcIssuingBank || '').split(',')[0] || '');
-    const issuingBankAddress = comm.commercialIssuingBankAddress || exch.applicantBank || lc.lcIssuingBank || '';
+    const consigneeBank = ciResolveBank(comm.commercialConsigneeBankAddress || exch.beneficiaryBankAddress || exch.negotiatingBankAddress || lc.negotiatingBeneficiaryBank || '', 'dbbl');
+    const issuingBankAddress = ciResolveBank(comm.commercialIssuingBankAddress || exch.applicantBank || lc.lcIssuingBank || '', 'ncc');
+    const issuingBankName = comm.commercialIssuingBankName || (issuingBankAddress.split('\n')[0] || '');
     const invoiceNo = comm.invoiceNo || sales.piNum || order.order_id || '-';
     const invoiceDate = ciDate(comm.invoiceDate || sales.piDate || order.created_at?.slice(0,10) || '');
     const lcNo = comm.commercialLcNo || exch.masterLcNo || lc.lcNumber || '-';
@@ -409,9 +449,7 @@ function ciBuildPages() {
                 <div>Authorized signature</div>
             </div>
 
-            <div class="ci-bottom-bar">
-                Corporate Office: Adamjee Court (4th &amp; 5th Floor), 115-120, Motijheel C/A, Dhaka-1000, Bangladesh.
-            </div>
+            ${CI_BRAND_FOOTER}
         </div>`;
     });
 

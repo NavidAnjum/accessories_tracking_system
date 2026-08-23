@@ -67,14 +67,13 @@ include __DIR__ . '/../includes/header.php';
                                     <tr>
                                         <th>SL No.</th>
                                         <th>Description of Goods</th>
-                                        <th>Ply</th>
                                         <th>Quantity</th>
                                     </tr>
                                 </thead>
                                 <tbody id="deliveryItemsBody"></tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="3">Total</td>
+                                        <td colspan="2">Total</td>
                                         <td id="deliveryTotalQty">—</td>
                                     </tr>
                                 </tfoot>
@@ -164,8 +163,27 @@ window.onOrderLoad = function(res) {
     const comm  = res.pages?.commercial || {};
     const exch  = res.pages?.exchange   || {};
     const lc    = res.pages?.lc         || {};
+    const sales = res.pages?.sales      || {};
 
     const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.textContent = val; };
+    const setDate = (id, val) => {
+        if (!val) return;
+        const el = document.getElementById(id);
+        if (!el) return;
+        const raw = String(val).trim().slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+            el.textContent = `${raw.slice(8, 10)}.${raw.slice(5, 7)}.${raw.slice(0, 4)}`;
+        } else {
+            el.textContent = raw;
+        }
+    };
+    const pick = (...vals) => {
+        const found = vals.find(v => {
+            const text = String(v || '').trim();
+            return text.length > 0;
+        });
+        return found || '';
+    };
 
     set('deliveryBeneficiaryName',    comm.commercialBeneficiaryName    || '—');
     set('deliveryBeneficiaryAddress', comm.commercialBeneficiaryAddress || '—');
@@ -173,8 +191,22 @@ window.onOrderLoad = function(res) {
     set('deliveryFooterCompany',      comm.commercialBeneficiaryName    || '—');
     set('deliveryConsigneeName',      order.customer_name || comm.commercialConsigneeName || '—');
     set('deliveryInvoiceNo',          comm.invoiceNo   || comm.proformaNo || '—');
+    set('deliveryAdvisingBank', pick(
+        comm.commercialAdvisingBank,
+        exch.payToBankAddress,
+        exch.payToBankName,
+        lc.reimbursementBank
+    ));
+    set('deliveryConsigneeBank', pick(
+        comm.commercialConsigneeBankAddress,
+        sales.consigneeBank,
+        exch.negotiatingBankAddress,
+        exch.beneficiaryBankAddress,
+        lc.negotiatingBeneficiaryBank
+    ));
     set('deliveryCarrierText',        exch.carrierNameMaster || comm.commercialCarrier || '—');
-    set('deliveryPackingText',        exch.packingDetailsMaster || '—');
+    set('deliveryPackingText',        'Standard Poly Packing Rolls');
+    setDate('deliveryDateText', pick(comm.invoiceDate, comm.proformaDate, comm.certificateDate, comm.originDate, order.created_at));
 
     const lcNo   = exch.masterLcNo   || lc.lcNumber || '';
     const lcDate = exch.masterLcDate || lc.lcDate   || '';
@@ -216,7 +248,6 @@ window.onOrderLoad = function(res) {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `<td style="text-align:center;">${sl}</td>
                     <td>${item.desc || item.itemName || '—'}</td>
-                    <td style="text-align:center;">${item.ply || '—'}</td>
                     <td style="text-align:right;">${qty.toLocaleString()}</td>`;
                 tbody.appendChild(tr);
             });

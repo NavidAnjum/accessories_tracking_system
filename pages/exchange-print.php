@@ -2,9 +2,112 @@
 $pageTitle  = 'Bill of Exchange Print';
 $activePage = 'exchange';
 $navSection = 'order';
+$isPdfMode = isset($_GET['pdf']) && $_GET['pdf'] === '1';
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/print-brand.php';
 ?>
 <style>
+.zzal-print-brand {
+    margin: 0;
+    padding: 0;
+    color: #111;
+    font-family: Arial, Helvetica, sans-serif;
+}
+.zzal-print-brand--header {
+    display:grid;
+    grid-template-columns:58px 1fr;
+    align-items:center;
+    column-gap:14px;
+    row-gap:6px;
+    margin:0 0 12px;
+}
+.zzal-print-brand__logo {
+    width:48px;
+    height:48px;
+    border:2px solid #2d9cdb;
+    color:#2d9cdb;
+    display:block;
+    font-weight:700;
+    text-align:center;
+    letter-spacing:.02em;
+    position:relative;
+    font-family:Georgia, "Times New Roman", serif;
+    overflow:hidden;
+}
+.zzal-print-brand__z {
+    position:absolute;
+    top:2px;
+    left:8px;
+    font-size:28px;
+    line-height:.8;
+    color:#2d9cdb;
+    font-style:italic;
+    font-weight:700;
+}
+.zzal-print-brand__z2 {
+    position:absolute;
+    top:9px;
+    left:17px;
+    font-size:28px;
+    line-height:.8;
+    color:#7b5a68;
+    font-style:italic;
+    font-weight:700;
+}
+.zzal-print-brand__al {
+    position:absolute;
+    top:16px;
+    right:5px;
+    font-size:8px;
+    font-weight:700;
+    color:#7b5a68;
+}
+.zzal-print-brand__zzal {
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:0;
+    width:100%;
+    font-size:12px;
+    line-height:1;
+    color:#fff;
+    background:#2d9cdb;
+    padding:1px 0 2px;
+    letter-spacing:.04em;
+}
+.zzal-print-brand__title-wrap { flex:1; }
+.zzal-print-brand__title {
+    font-size:26px;
+    font-weight:700;
+    text-align:left;
+    letter-spacing:.01em;
+    line-height:1;
+    text-transform:uppercase;
+    color:#7b5a68;
+    font-family:Georgia, "Times New Roman", serif;
+}
+.zzal-print-brand__header-line {
+    grid-column:1 / -1;
+    height:2px;
+    background:#2d9cdb;
+    box-shadow:0 1px 0 #b9deef inset, 0 -1px 0 #1f84ba inset;
+}
+.zzal-print-brand--footer {
+    margin-top:auto;
+}
+.zzal-print-brand__divider {
+    height:1px;
+    background:#111;
+    margin:0 auto 8px;
+}
+.zzal-print-brand__footer-line {
+    text-align:center;
+    font-size:9px;
+    line-height:1.4;
+    margin:0 0 2px;
+}
+.boe-page .zzal-print-brand--header { margin-bottom:16px; }
+
 .boe-ctrl {
     background:#1e1e3a; padding:14px 24px;
     display:flex; gap:18px; align-items:center; flex-wrap:wrap;
@@ -25,53 +128,129 @@ include __DIR__ . '/../includes/header.php';
     border-radius:8px; padding:10px 22px; font-size:13px; font-weight:700; cursor:pointer;
 }
 .boe-excel-btn:hover { background:#1d4ed8; }
+.boe-pdf-btn {
+    background:#0ea5e9; color:#fff; border:none;
+    border-radius:8px; padding:10px 22px; font-size:13px; font-weight:700; cursor:pointer;
+}
+.boe-pdf-btn:hover { background:#0284c7; }
 
 #boeWrap { background:#d1d5db; padding:28px 0; min-height:520px; }
 .boe-empty { text-align:center; padding:60px 20px; color:#94a3b8; font-family:sans-serif; }
 .boe-page {
     position:relative;
-    max-width:820px; min-height:1120px; margin:0 auto 18px;
+    box-sizing:border-box;
+    width:210mm;
+    height:297mm;
+    max-width:210mm;
+    margin:0 auto 18px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
     background:#fff; box-shadow:0 4px 24px rgba(0,0,0,.14);
-    padding:34px 54px 44px;
+    padding:14mm 14mm 16mm;
     font-family:'Times New Roman',Times,serif; color:#111; font-size:11pt; line-height:1.45;
+    break-after:page;
     page-break-after:always;
+    break-inside:avoid;
+    page-break-inside:avoid;
 }
 .boe-page:last-child { page-break-after:auto; }
 .boe-watermark {
-    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-    font-size:190px; font-weight:700; color:rgba(100,100,100,.14); pointer-events:none;
+    position:absolute;
+    left:50%;
+    top:20%;
+    transform:translate(-50%, -50%);
+    font-size:170px;
+    font-weight:700;
+    color:rgba(120,120,120,.10);
+    pointer-events:none;
+    opacity:1;
+    z-index:0;
 }
-.boe-head { text-align:center; margin-bottom:18px; }
-.boe-company { font-size:15px; font-weight:700; }
-.boe-address { font-size:10px; margin-top:2px; }
-.boe-lc-line { font-size:12px; text-align:left; margin-top:10px; }
-.boe-title { text-align:center; font-size:24px; font-weight:700; margin:28px 0 4px; }
-.boe-copyno { text-align:center; font-size:13px; font-weight:700; margin-bottom:12px; }
-.boe-inwords { font-size:11px; font-weight:700; margin:4px 0 14px; }
+.boe-content {
+    position:relative;
+    z-index:1;
+    flex:1;
+    display:flex;
+    flex-direction:column;
+}
+.boe-lc-line { font-size:12px; text-align:left; margin-top:8px; }
+.boe-title { text-align:center; font-size:24px; font-weight:700; margin:18px 0 4px; }
+.boe-docref {
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    margin:0 0 6px;
+    font-size:11px;
+    font-weight:700;
+}
+.boe-inwords { font-size:11px; font-weight:700; margin:4px 0 10px; }
 .boe-meta {
     display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
     font-size:12px; font-weight:700; margin-bottom:14px;
 }
-.boe-body { font-size:10.5px; text-align:justify; margin-bottom:28px; }
-.boe-value { font-size:12px; font-weight:700; margin:26px 0 18px; }
+.boe-body { font-size:10.5px; text-align:justify; margin-bottom:14px; }
+.boe-value { font-size:12px; font-weight:700; margin:12px 0 10px; }
 .boe-bottom {
-    margin-top:86px;
+    margin-top:auto;
     display:grid; grid-template-columns:1fr 220px; gap:32px; align-items:end;
+}
+.boe-left-bottom { display:flex; flex-direction:column; gap:24px; min-height:100px; }
+.boe-page .zzal-print-brand--footer {
+    position:static;
+    left:14mm;
+    right:14mm;
+    bottom:auto;
+    margin-top:auto;
+    padding-top:8px;
 }
 .boe-to { font-size:10.5px; white-space:pre-line; }
 .boe-sign { text-align:center; }
 .boe-sign-line { border-top:1.5px solid #000; margin-bottom:6px; }
 .boe-sign-label { font-size:10px; }
-.boe-customer { margin-top:58px; font-size:10.5px; white-space:pre-line; }
 
 @media print {
+    @page { size: A4; margin: 0; }
     .boe-ctrl, nav.page-nav, .order-id-bar, .no-print { display:none !important; }
     #boeWrap { background:none !important; padding:0 !important; }
-    .boe-page { box-shadow:none; margin:0; max-width:100%; min-height:auto; }
+    .boe-page {
+        box-shadow:none;
+        box-sizing:border-box;
+        width:210mm;
+        height:auto;          /* was 297mm — fixed A4 height overflowed to a 2nd page under browser print margins */
+        min-height:250mm;     /* fill most of the sheet so the footer drops to the bottom, but stay under a margined A4 (no overflow) */
+        max-width:210mm;
+        margin:0;
+        overflow:visible;
+        display:flex;
+        flex-direction:column;
+        break-after:page;
+        page-break-after:always;
+        break-inside:avoid;
+        page-break-inside:avoid;
+    }
+    .boe-page:last-child { break-after:auto; page-break-after:auto; }
+    .boe-page .zzal-print-brand--footer {
+        position:static;
+        left:14mm;
+        right:14mm;
+        bottom:auto;
+        margin-top:auto;
+        padding-top:8px;
+    }
     .form-stack, body, html, .app-shell { background:#fff !important; }
+    .boe-page, .boe-page * { color:#111 !important; }
+    .boe-watermark { color:rgba(120,120,120,.12) !important; }
+    .zzal-print-brand__title,
+    .zzal-print-brand__al,
+    .zzal-print-brand__z2 { color:#7b5a68 !important; }
+    .zzal-print-brand__logo { color:#2d9cdb !important; border-color:#2d9cdb !important; }
+    .zzal-print-brand__zzal { color:#fff !important; background:#2d9cdb !important; }
+    .zzal-print-brand__header-line { background:#2d9cdb !important; }
 }
 </style>
 
+<?php if (!$isPdfMode): ?>
 <div class="boe-ctrl no-print">
     <div class="boe-ctrl-group">
         <span class="boe-ctrl-label">Select Bill</span>
@@ -87,8 +266,10 @@ include __DIR__ . '/../includes/header.php';
         </select>
     </div>
     <button type="button" class="boe-excel-btn" onclick="downloadBoeExcel()">Download Excel</button>
+    <button type="button" class="boe-pdf-btn" onclick="downloadBoePdf()">Download PDF</button>
     <button type="button" class="boe-print-btn" onclick="window.print()">Print / Save PDF</button>
 </div>
+<?php endif; ?>
 
 <div id="boeWrap">
     <div id="boePages">
@@ -135,6 +316,54 @@ function boeMultiline(val) {
     return boeSplitText(val).join('\n');
 }
 
+const BOE_BANKS = {
+    ncc: {
+        name: 'National Credit & Commerce Bank Plc.',
+        address: 'Motijheel main Branch, 6 Motijheel C/A, Dhaka-1000, Bangladesh.',
+        account: '0002-0259000092',
+        swift: 'NCCLBDDHNBB',
+        routing: '160150137'
+    },
+    dbbl: {
+        name: 'Dutch-Bangla Bank Plc.',
+        address: 'Local Office, 1, Dilkusha C/A, Dhaka-1000, Bangladesh.',
+        account: 'ERQ-101.117.1382',
+        swift: 'DBBLBDDHCTS',
+        routing: '090273889'
+    }
+};
+const BOE_BRAND_FOOTER = <?php echo json_encode(zzal_print_brand_footer(), JSON_UNESCAPED_SLASHES); ?>;
+const BOE_BRAND_HEADER = <?php echo json_encode(zzal_print_brand_header(), JSON_UNESCAPED_SLASHES); ?>;
+const BOE_DEFAULT_HS_CODE = '4819.10.00';
+const BOE_BENEFICIARY_VAT_BIN = '000230256-0103';
+
+function boeResolveBank(text, fallbackKey = 'ncc') {
+    const raw = String(text || '').trim();
+    const lower = raw.toLowerCase();
+    let key = fallbackKey in BOE_BANKS ? fallbackKey : 'ncc';
+    let matched = false;
+    if (lower.includes('dutch-bangla') || lower.includes('dbbl')) {
+        key = 'dbbl';
+        matched = true;
+    } else if (lower.includes('national credit') || lower.includes('ncc')) {
+        key = 'ncc';
+        matched = true;
+    }
+    const bank = BOE_BANKS[key] || BOE_BANKS.ncc;
+    const lines = boeSplitText(raw);
+    const display = raw || [bank.name, bank.address, bank.account, bank.swift, bank.routing].filter(Boolean).join('\n');
+    return {
+        key,
+        name: matched ? bank.name : (lines[0] || bank.name),
+        address: matched ? bank.address : (lines.slice(1).join('\n') || bank.address),
+        account: matched ? bank.account : (lines[2] || ''),
+        swift: matched ? bank.swift : '',
+        routing: matched ? bank.routing : '',
+        raw,
+        display
+    };
+}
+
 function boeAmountWords(amount) {
     const n = Math.round((parseFloat(amount || 0) || 0) * 100);
     const ones = ['Zero','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
@@ -161,7 +390,7 @@ function boeDocAmount(doc, exch, lc) {
         return sum + total;
     }, 0);
     if (fromItems > 0) return fromItems;
-    return parseFloat(exch.exchangeAmount || lc.lcAmount || 0) || 0;
+    return parseFloat(exch.receivedAmount || exch.exchangeAmount || lc.lcAmount || 0) || 0;
 }
 
 function buildExchangeDocs(res) {
@@ -174,16 +403,26 @@ function buildExchangeDocs(res) {
     const standalonePis = allPis.filter(p => !p.is_master);
     const docs = [];
 
+    // One Bill of Exchange per PI (its POs are aggregated into a single bill),
+    // so a single PI prints as First + Second copy = 2 pages, not one per PO.
+    const aggregatePo = (pos) => {
+        const list = pos || [];
+        return {
+            poNum: [...new Set(list.map(p => p.poNum).filter(Boolean))].join(', '),
+            val: list.reduce((s, p) => s + (parseFloat(p.val || 0) || 0), 0),
+            items: list.flatMap(p => p.items || [])
+        };
+    };
+
     if (standalonePis.length) {
         standalonePis.forEach(pi => {
-            const poList = pi.pos?.length ? pi.pos : [{}];
-            poList.forEach((po, idx) => {
-                docs.push({
-                    key: `${pi.pi_number || 'pi'}_${idx}`,
-                    title: `${pi.pi_number || 'Bill'}${po.poNum ? ' - ' + po.poNum : ''}`,
-                    pi,
-                    po
-                });
+            const po = aggregatePo(pi.pos);
+            if (!(po.val > 0)) po.val = parseFloat(pi.grand_val || 0) || 0;
+            docs.push({
+                key: `${pi.pi_number || 'pi'}`,
+                title: `${pi.pi_number || 'Bill'}`,
+                pi,
+                po
             });
         });
         return docs;
@@ -192,13 +431,11 @@ function buildExchangeDocs(res) {
     const fallbackPos = sales.pos?.length ? sales.pos
         : (allPis.find(p => p.is_master)?.pos?.length ? allPis.find(p => p.is_master).pos : (intake.pos || []));
 
-    fallbackPos.forEach((po, idx) => {
-        docs.push({
-            key: `fallback_${idx}`,
-            title: `${po.piNum || sales.piNum || 'Bill'}${po.poNum ? ' - ' + po.poNum : ''}`,
-            pi: { pi_number: po.piNum || sales.piNum || '', customer: sales.customer || order.customer_name || '' },
-            po
-        });
+    docs.push({
+        key: 'fallback',
+        title: sales.piNum || 'Bill',
+        pi: { pi_number: sales.piNum || '', customer: sales.customer || order.customer_name || '' },
+        po: aggregatePo(fallbackPos)
     });
     return docs;
 }
@@ -223,66 +460,64 @@ function renderBoePages() {
     }
 
     const customerName = sales.customer || order.customer_name || chosenDocs[0]?.pi?.customer || '';
-    const customerAddress = sales.buyerAddress || '';
-    const topCompany = 'Zaber & Zubair Accessories Ltd.';
-    const topAddress = 'Mawna, Sreepur, Gazipur.';
-
+    const customerAddress = sales.buyerAddress || chosenDocs[0]?.po?.sharedBuyerAddress || '';
     let html = '';
     chosenDocs.forEach(doc => {
         const amount = boeDocAmount(doc, exch, lc);
-        const words = (chosenDocs.length === 1 && copies === 1 && exch.tenorWordsMaster)
-            ? exch.tenorWordsMaster
-            : boeAmountWords(amount);
-        const issuingBankInline = boePlainText(exch.applicantBank || lc.lcIssuingBank || '');
-        const toBankText = boeMultiline(exch.applicantBank || lc.lcIssuingBank || '');
-        const payToText = boePlainText(exch.beneficiaryBankAddress || exch.payToBankName || lc.negotiatingBeneficiaryBank || '');
+        const words = exch.tenorWordsMaster || boeAmountWords(amount);
+        const issuingBank = boeResolveBank(exch.applicantBank || lc.lcIssuingBank || '');
+        const payToBank = boeResolveBank(exch.payToBankName || lc.reimbursementBank || exch.beneficiaryBankAddress || '');
+        const toBankText = boeMultiline(exch.payToBankAddress || payToBank.display || exch.beneficiaryBankAddress || lc.negotiatingBeneficiaryBank || '');
+        const payToText = boePlainText(exch.beneficiaryBankAddress || exch.payToBankAddress || payToBank.display || lc.negotiatingBeneficiaryBank || '');
         const contractNo = exch.exportSalesContractNo || '-';
         const contractDate = boeFmtDate(exch.exportSalesContractDate || '-');
-        const vatBin = exch.beneficiaryVatBin || exch.applicantVatBin || '-';
+        const vatBin = exch.beneficiaryVatBin || BOE_BENEFICIARY_VAT_BIN;
         // §3.2 HS Code comes from the PI (sales), not manual entry on the exchange page.
-        const hsCode = sales.hsCode || exch.hsCodeMaster || '-';
+        const hsCode = sales.hsCode || exch.hsCodeMaster || BOE_DEFAULT_HS_CODE;
         const tenor = exch.lcTenorMaster || lc.paymentTerms || '120';
-        const displayPi = doc.pi?.pi_number || doc.po?.piNum || sales.piNum || '-';
-
         for (let copyNo = 1; copyNo <= copies; copyNo++) {
+            const displayPi = doc.pi?.pi_number || doc.po?.piNum || sales.piNum || '-';
+            const copyLabel = copyNo === 1 ? 'SECOND' : 'FIRST';
+            const copyLabelOpposite = copyNo === 1 ? 'FIRST' : 'SECOND';
             html += `
             <div class="boe-page">
-                <div class="boe-head">
-                    <div class="boe-company">${boeEsc(topCompany)}</div>
-                    <div class="boe-address">${boeEsc(topAddress)}</div>
-                    <div class="boe-lc-line">Drawn under Letter of Credit No. ${boeEsc(exch.masterLcNo || lc.lcNumber || '-')} Dated ${boeEsc(boeFmtDate(exch.masterLcDate || lc.lcDate || '-'))} of ${boeEsc(issuingBankInline || '-')}</div>
-                </div>
+                <div class="boe-watermark">${copyNo}</div>
+                <div class="boe-content">
+                ${BOE_BRAND_HEADER}
+
+                <div class="boe-lc-line">Drawn under Letter of Credit No. ${boeEsc(exch.masterLcNo || lc.lcNumber || '-')} Dated ${boeEsc(boeFmtDate(exch.masterLcDate || lc.lcDate || '-'))} of ${boeEsc(boePlainText(issuingBank.display) || '-')}</div>
 
                 <div class="boe-title">Bill of Exchange</div>
-                <div class="boe-copyno">${copyNo}</div>
+                <div class="boe-docref">
+                    <div>NO: ${boeEsc(displayPi)}</div>
+                    <div>Date: ${boeEsc(boeFmtDate(exch.exchangeDate || new Date().toISOString().slice(0,10)))}</div>
+                </div>
 
                 <div class="boe-meta">
                     <div>Exchange for USD ${boeEsc(boeFmtMoney(amount))}</div>
-                    <div>Date: ${boeEsc(boeFmtDate(exch.exchangeDate || new Date().toISOString().slice(0,10)))}</div>
                 </div>
                 <div class="boe-inwords">In Words: USD ${boeEsc(words)}</div>
 
                 <div class="boe-body">
-                    At ${boeEsc(tenor)} Days of this ${copyNo === 1 ? 'First' : copyNo === 2 ? 'Second' : copyNo + 'th'} of exchange (${copyNo === 1 ? 'first' : copyNo === 2 ? 'second' : copyNo + 'th'} of the same tenor unpaid) please pay to the order of ${boeEsc(payToText || '-')} the same of USD: ${boeEsc(words)}. Export Sales Contract No. ${boeEsc(contractNo)} Dated ${boeEsc(contractDate)}, Beneficiary's Vat/bin: ${boeEsc(vatBin)} and H.S Code No: ${boeEsc(hsCode)}.
+                    At ${boeEsc(tenor)} Days of this ${copyLabel} of exchange (${copyLabelOpposite} of the same tenor unpaid) please pay to the order of ${boeEsc(payToText || '-')} the same of USD: ${boeEsc(words)}. Export Sales Contract No. ${boeEsc(contractNo)} Dated ${boeEsc(contractDate)}, Beneficiary's Vat/bin: ${boeEsc(vatBin)} and H.S Code No: ${boeEsc(hsCode)}.
                 </div>
 
                 <div class="boe-value">Value Received</div>
 
                 <div class="boe-bottom">
-                    <div class="boe-to">
-                        <div>To</div>
-                        <div>${boeEsc(toBankText || '-').replace(/\n/g,'<br>')}</div>
+                    <div class="boe-left-bottom">
+                        <div class="boe-to">
+                            <div>To</div>
+                            <div>${boeEsc(toBankText || '-').replace(/\n/g,'<br>')}</div>
+                        </div>
                     </div>
                     <div class="boe-sign">
                         <div class="boe-sign-line"></div>
                         <div class="boe-sign-label">Authorized signature</div>
                     </div>
                 </div>
-
-                <div class="boe-customer">
-                    <strong>${boeEsc(customerName || '-')}</strong><br>
-                    ${boeEsc(customerAddress || '').replace(/\n/g,'<br>')}
                 </div>
+                ${BOE_BRAND_FOOTER}
             </div>`;
         }
     });
@@ -307,6 +542,11 @@ function downloadBoeExcel() {
         title:document.title
     });
 }
+function downloadBoePdf() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('pdf', '1');
+    window.open(url.toString(), '_blank', 'noopener');
+}
 window.onOrderLoad = function(res) {
     window._boeRes = res;
     populateBoeSelector();
@@ -315,6 +555,9 @@ window.onOrderLoad = function(res) {
         _boeExcelDone = true;
         setTimeout(downloadBoeExcel, 250);
     }
+    <?php if ($isPdfMode): ?>
+    setTimeout(() => window.print(), 350);
+    <?php endif; ?>
 };
 
 document.getElementById('boeDocSel')?.addEventListener('change', renderBoePages);
