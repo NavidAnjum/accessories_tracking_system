@@ -19,7 +19,8 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .pi-po-sel { display:none; }
 
 /* ── PI Document ─────────────────────────────────────────────────── */
-.pi-wrap { max-width:900px; margin:24px auto; font-family:'Times New Roman',Times,serif; font-size:11pt; color:#000; background:#fff; padding:28px 36px; box-shadow:0 2px 20px rgba(0,0,0,.12); }
+.pi-wrap { position:relative; box-sizing:border-box; width:210mm; height:297mm; max-width:900px; margin:24px auto; font-family:'Times New Roman',Times,serif; font-size:11pt; color:#000; background:#fff; padding:14mm 14mm 30mm; box-shadow:0 2px 20px rgba(0,0,0,.12); overflow:hidden; }
+.pi-wrap .zzal-print-brand--footer { position:absolute; left:14mm; right:14mm; bottom:8mm; margin:0!important; padding-top:6px!important; }
 
 /* Header */
 .pi-header { display:flex; align-items:center; border-bottom:3px solid #1a3a6e; padding-bottom:10px; margin-bottom:6px; }
@@ -60,9 +61,11 @@ require_once __DIR__ . '/../includes/print-brand.php';
 
 /* Print */
 @media print {
+    @page { size:A4 portrait; margin:0; }
     .pi-ctrl, nav, .order-id-bar, .form-stack > *:not(#piWrap) { display:none !important; }
-    body, html { background:#fff !important; }
-    .pi-wrap { box-shadow:none; margin:0; padding:18px 24px; }
+    body, html { width:210mm!important; min-height:297mm!important; margin:0!important; padding:0!important; background:#fff !important; overflow:visible!important; }
+    .pi-wrap { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:14mm 14mm 30mm!important; overflow:hidden; }
+    .pi-wrap .zzal-print-brand--footer { position:absolute!important; left:14mm!important; right:14mm!important; bottom:8mm!important; margin:0!important; }
     .pi-header { display:none !important; }
     .app-shell { display:block !important; }
     .form-stack { padding:0 !important; }

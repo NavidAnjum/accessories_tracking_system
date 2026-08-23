@@ -71,47 +71,37 @@ require_once __DIR__ . '/../includes/print-brand.php';
     font-family:sans-serif;
 }
 .ci-page {
+    position:relative;
+    box-sizing:border-box;
+    width:210mm;
+    height:297mm;
     max-width:820px;
-    min-height:1120px;
     margin:0 auto 18px;
     background:#fff;
     box-shadow:0 4px 24px rgba(0,0,0,.14);
-    padding:20px 30px 30px;
+    padding:14mm 14mm 30mm;
     font-family:'Times New Roman', Times, serif;
     color:#111;
     font-size:10px;
     line-height:1.25;
     display:flex;
     flex-direction:column;
+}
+.ci-page:not(:last-child) {
+    break-after:page;
     page-break-after:always;
 }
-.ci-page:last-child { page-break-after:auto; }
-.ci-header {
-    display:flex;
-    align-items:flex-start;
-    gap:10px;
-    margin-bottom:2px;
+.ci-page:last-child {
+    break-after:auto;
+    page-break-after:auto;
 }
-.ci-logo {
-    width:42px;
-    height:42px;
-    border:1px solid #444;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:12px;
-    font-weight:700;
-}
-.ci-company {
-    flex:1;
-    text-align:center;
-}
-.ci-company h1 {
-    margin:0;
-    font-size:17px;
-    font-weight:700;
-    letter-spacing:.2px;
-    text-transform:uppercase;
+.ci-page .zzal-print-brand--footer {
+    position:absolute;
+    left:14mm;
+    right:14mm;
+    bottom:8mm;
+    margin:0 !important;
+    padding-top:6px !important;
 }
 .ci-title {
     text-align:center;
@@ -176,9 +166,34 @@ require_once __DIR__ . '/../includes/print-brand.php';
     text-align:center;
 }
 @media print {
+    @page { size:A4 portrait; margin:0; }
     .ci-ctrl, nav.page-nav, .order-id-bar, .no-print { display:none !important; }
     #ciWrap { background:none !important; padding:0 !important; }
-    .ci-page { box-shadow:none; margin:0; max-width:100%; min-height:auto; }
+    html, body {
+        width:210mm !important;
+        min-height:297mm !important;
+        margin:0 !important;
+        padding:0 !important;
+        overflow:visible !important;
+    }
+    .ci-page {
+        box-shadow:none;
+        margin:0;
+        max-width:210mm;
+        width:210mm !important;
+        height:297mm !important;
+        padding:14mm 14mm 30mm !important;
+        overflow:hidden;
+    }
+    .ci-page .zzal-print-brand--footer {
+        position:absolute !important;
+        left:14mm !important;
+        right:14mm !important;
+        bottom:8mm !important;
+        margin:0 !important;
+    }
+    .ci-page:not(:last-child) { break-after:page; page-break-after:always; }
+    .ci-page:last-child { break-after:auto !important; page-break-after:auto !important; }
     .form-stack, body, html, .app-shell { background:#fff !important; }
 }
 </style>
@@ -200,6 +215,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 
 <script>
 const CI_COMPANY_NAME = 'Zaber & Zubair Accessories Ltd.';
+const CI_BRAND_HEADER = <?php echo json_encode(zzal_print_brand_header(), JSON_UNESCAPED_SLASHES); ?>;
 const CI_BRAND_FOOTER = <?php echo json_encode(zzal_print_brand_footer(), JSON_UNESCAPED_SLASHES); ?>;
 
 function ciEsc(val) {
@@ -375,13 +391,8 @@ function ciBuildPages() {
 
         html += `
         <div class="ci-page">
-            <div class="ci-header">
-                <div class="ci-logo">ZZAL</div>
-                <div class="ci-company">
-                    <h1>${ciEsc(CI_COMPANY_NAME)}</h1>
-                    <div class="ci-title">Commercial Invoice</div>
-                </div>
-            </div>
+            ${CI_BRAND_HEADER}
+            <div class="ci-title">Commercial Invoice</div>
 
             <table class="ci-topbox">
                 <tr>

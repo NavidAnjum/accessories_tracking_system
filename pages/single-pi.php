@@ -31,11 +31,14 @@ require_once __DIR__ . '/../includes/print-brand.php';
 /* ── PI Document ──────────────────────────────────────────────────── */
 #spiWrap { background:#d1d5db; padding:30px 0; min-height:500px; }
 .spi-doc {
-    max-width:900px; margin:0 auto;
+    position:relative; box-sizing:border-box;
+    width:210mm; height:297mm; max-width:900px; margin:0 auto;
     font-family:'Times New Roman',Times,serif;
     font-size:11pt; color:#000; background:#fff;
-    padding:28px 36px 36px; box-shadow:0 4px 24px rgba(0,0,0,.15);
+    padding:14mm 14mm 30mm; box-shadow:0 4px 24px rgba(0,0,0,.15);
+    overflow:hidden;
 }
+.spi-doc .zzal-print-brand--footer { position:absolute; left:14mm; right:14mm; bottom:8mm; margin:0!important; padding-top:6px!important; }
 
 /* Header */
 .spi-hd {
@@ -131,13 +134,14 @@ require_once __DIR__ . '/../includes/print-brand.php';
 /* Empty state */
 .spi-empty { text-align:center; padding:60px 20px; color:#94a3b8; font-family:sans-serif; }
 
-@page { margin: 8mm 0 0 0; }
+@page { size:A4 portrait; margin:0; }
 @media print {
     .spi-ctrl, nav.page-nav, .order-id-bar { display:none !important; }
     #spiWrap { background:none !important; padding:0 !important; }
-    .spi-doc  { box-shadow:none; padding:12mm 15mm; max-width:100%; }
+    .spi-doc  { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:14mm 14mm 30mm!important; overflow:hidden; }
+    .spi-doc .zzal-print-brand--footer { position:absolute!important; left:14mm!important; right:14mm!important; bottom:8mm!important; margin:0!important; }
     .spi-hd { display:none !important; }
-    body, html, .app-shell { background:#fff !important; }
+    body, html, .app-shell { width:210mm!important; min-height:297mm!important; margin:0!important; padding:0!important; background:#fff !important; overflow:visible!important; }
     .form-stack { padding:0 !important; }
     .no-print { display:none !important; }
 }

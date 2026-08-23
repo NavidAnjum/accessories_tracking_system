@@ -26,14 +26,15 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .doc-excel-btn{background:#2563eb;color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer}
 .doc-excel-btn:hover{background:#1d4ed8}
 #docWrap{background:#d1d5db;padding:28px 0;min-height:520px}
-.doc-page{max-width:820px;min-height:1120px;margin:0 auto 18px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.14);padding:18px 28px 28px;font-family:'Times New Roman',Times,serif;color:#111;font-size:10px;line-height:1.22;page-break-after:always}
-.doc-page:last-child{page-break-after:auto}
+.doc-page{position:relative;box-sizing:border-box;width:210mm;height:297mm;max-width:820px;margin:0 auto 18px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.14);padding:14mm 14mm 30mm;font-family:'Times New Roman',Times,serif;color:#111;font-size:10px;line-height:1.22;overflow:hidden}
+.doc-page:not(:last-child){break-after:page;page-break-after:always}
+.doc-page:last-child{break-after:auto;page-break-after:auto}
+.doc-page .zzal-print-brand--footer{position:absolute;left:14mm;right:14mm;bottom:8mm;margin:0!important;padding-top:6px!important}
 .doc-empty{text-align:center;padding:60px 20px;color:#94a3b8;font-family:sans-serif}
-.doc-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:2px}
-.doc-logo{width:34px;height:34px;border:1px solid #444;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
-.doc-title-wrap{flex:1;text-align:center;border-bottom:1px solid #555;padding-bottom:2px}
-.doc-company{margin:0;font-size:14px;font-weight:700;text-transform:uppercase}
-.doc-title{margin-top:3px;font-size:11px;font-weight:700;text-transform:uppercase;text-decoration:underline}
+.doc-head{display:block;margin:0 0 6px}
+.doc-logo,.doc-company{display:none}
+.doc-title-wrap{text-align:center;border-bottom:0;padding-bottom:0}
+.doc-title{margin:0;font-size:11px;font-weight:700;text-transform:uppercase;text-decoration:underline}
 .doc-meta-line{display:flex;justify-content:space-between;gap:20px;margin:4px 0 6px;font-size:10px}
 .doc-topbox{width:100%;border-collapse:collapse;margin-bottom:8px}
 .doc-topbox td{border:1px solid #333;vertical-align:top;width:50%;padding:4px 6px}
@@ -56,7 +57,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .doc-letter-page .doc-letter-body{flex:1;display:flex;flex-direction:column;min-height:0}
 .doc-letter-page .doc-letter-sign{margin-top:auto}
 .doc-letter-page .doc-bottom-bar{margin-top:12px}
-@media print{.doc-ctrl,nav.page-nav,.order-id-bar,.no-print{display:none!important}#docWrap{background:none!important;padding:0!important}.doc-page{box-shadow:none;margin:0;max-width:100%;min-height:auto}.form-stack,body,html,.app-shell{background:#fff!important}}
+@media print{@page{size:A4;margin:0}.doc-ctrl,nav.page-nav,.order-id-bar,.no-print{display:none!important}#docWrap{background:none!important;padding:0!important}.doc-page{box-shadow:none;margin:0;max-width:210mm;width:210mm;height:297mm}.doc-page:not(:last-child){break-after:page;page-break-after:always}.doc-page:last-child{break-after:auto!important;page-break-after:auto!important}.form-stack,body,html,.app-shell{background:#fff!important}}
 </style>
 
 <div class="doc-ctrl no-print">

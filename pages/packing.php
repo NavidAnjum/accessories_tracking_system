@@ -72,7 +72,7 @@ include __DIR__ . '/../includes/header.php';
                         </div>
 
                         <div class="packing-notes">
-                            <div class="packing-note-row"><span>Packing</span><strong id="packingDetailsText">—</strong></div>
+                            <div class="packing-note-row"><span>Packing</span><strong id="packingDetailsText">Standard Poly Packing Rolls</strong></div>
                             <div class="packing-note-row"><span>L/C No.</span><strong id="packingLcText">—</strong></div>
                             <div class="packing-note-row full"><span>Applicants</span><strong id="packingApplicantsText">—</strong></div>
                             <div class="packing-note-row"><span>Sales Contract No</span><strong id="packingContractText">—</strong></div>

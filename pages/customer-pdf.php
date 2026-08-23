@@ -55,9 +55,9 @@ $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChec
 <style>
     * { box-sizing: border-box; }
     body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e1e2e; margin: 0; background: #e5e7eb; }
-    .sheet { background: #fff; max-width: 820px; margin: 20px auto; padding: 36px 40px; box-shadow: 0 4px 24px rgba(0,0,0,.12); display:flex; flex-direction:column; }
+    .sheet { position: relative; width: 210mm; height: 297mm; max-width: 820px; margin: 20px auto; padding: 14mm 14mm 30mm; background: #fff; box-shadow: 0 4px 24px rgba(0,0,0,.12); display:flex; flex-direction:column; overflow: hidden; }
     .brand-header { margin-bottom: 10px; }
-    .brand-footer { margin-top:auto; }
+    .brand-footer { position: absolute; left: 14mm; right: 14mm; bottom: 8mm; margin: 0; }
     .doc-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #4f46e5; padding-bottom: 14px; margin-bottom: 8px; }
     .doc-head h1 { font-size: 22px; margin: 0; color: #1e1e2e; }
     .doc-head .sub { font-size: 12px; color: #6b7280; margin-top: 3px; }
@@ -81,9 +81,10 @@ $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChec
     .btn { background: #4f46e5; color: #fff; border: none; border-radius: 8px; padding: 10px 22px; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; }
     .btn.ghost { background: #fff; color: #4f46e5; border: 1.5px solid #4f46e5; }
     @media print {
+        @page { size: A4; margin: 0; }
         body { background: #fff; }
         .toolbar { display: none; }
-        .sheet { box-shadow: none; margin: 0; max-width: none; padding: 0 12px; }
+        .sheet { box-shadow: none; margin: 0; max-width: 210mm; width: 210mm; height: 297mm; }
         .sec { break-after: avoid; }
     }
 </style>

@@ -149,16 +149,15 @@ require_once __DIR__ . '/../includes/print-brand.php';
     background:#fff; box-shadow:0 4px 24px rgba(0,0,0,.14);
     padding:14mm 14mm 34mm;
     font-family:'Times New Roman',Times,serif; color:#111; font-size:11pt; line-height:1.45;
-    break-after:page;
-    page-break-after:always;
     break-inside:avoid;
     page-break-inside:avoid;
 }
-.boe-page:last-child { page-break-after:auto; }
+.boe-page:not(:last-child) { break-after:page; page-break-after:always; }
+.boe-page:last-child { break-after:auto; page-break-after:auto; }
 .boe-watermark {
     position:absolute;
     left:50%;
-    top:25%;
+    top:29%;
     transform:translate(-50%, -50%);
     font-size:170px;
     font-weight:700;
@@ -200,7 +199,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
     position:absolute;
     left:14mm;
     right:14mm;
-    bottom:14mm;
+    bottom:8mm;
     margin:0;
     padding-top:8px;
 }
@@ -224,17 +223,16 @@ require_once __DIR__ . '/../includes/print-brand.php';
         overflow:hidden;
         display:flex;
         flex-direction:column;
-        break-after:page;
-        page-break-after:always;
         break-inside:avoid;
         page-break-inside:avoid;
     }
-    .boe-page:last-child { break-after:auto; page-break-after:auto; }
+    .boe-page:not(:last-child) { break-after:page; page-break-after:always; }
+    .boe-page:last-child { break-after:auto !important; page-break-after:auto !important; }
     .boe-page .zzal-print-brand--footer {
     position:absolute;
     left:14mm;
     right:14mm;
-    bottom:14mm;
+        bottom:8mm;
     margin:0;
     padding-top:8px;
 }

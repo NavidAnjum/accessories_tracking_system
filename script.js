@@ -1487,7 +1487,7 @@ function syncPackingFromSources() {
     const payToBankName = document.getElementById("payToBankName")?.value || "";
     const advisingBankAddress = document.getElementById("advisingBankAddress")?.value || "";
     const consigneeBank = document.getElementById("consigneeBank")?.value || "";
-    const packingDetails = document.getElementById("packingDetailsMaster")?.value || "";
+    const packingDetails = document.getElementById("packingDetailsMaster")?.value || "Standard Poly Packing Rolls";
     const lcNo = document.getElementById("masterLcNo")?.value || "";
     const lcDate = formatDateDisplay(document.getElementById("masterLcDate")?.value || "");
     const contractNo = document.getElementById("exportSalesContractNo")?.value || "";
@@ -1552,7 +1552,7 @@ function syncDeliveryFromSources() {
     const payToBankName = document.getElementById("payToBankName")?.value || "";
     const advisingBankAddress = document.getElementById("advisingBankAddress")?.value || "";
     const consigneeBank = document.getElementById("consigneeBank")?.value || "";
-    const packingDetails = document.getElementById("packingDetailsMaster")?.value || "";
+    const packingDetails = document.getElementById("packingDetailsMaster")?.value || "Standard Poly Packing Rolls";
     const lcNo = document.getElementById("masterLcNo")?.value || "";
     const lcDate = formatDateDisplay(document.getElementById("masterLcDate")?.value || "");
     const contractNo = document.getElementById("exportSalesContractNo")?.value || "";
@@ -1621,7 +1621,7 @@ function syncTruckFromSources() {
     const payToBankName = document.getElementById("payToBankName")?.value || "";
     const advisingBankAddress = document.getElementById("advisingBankAddress")?.value || "";
     const consigneeBank = document.getElementById("consigneeBank")?.value || "";
-    const packingDetails = document.getElementById("packingDetailsMaster")?.value || "";
+    const packingDetails = document.getElementById("packingDetailsMaster")?.value || "Standard Poly Packing Rolls";
     const lcNo = document.getElementById("masterLcNo")?.value || "";
     const lcDate = formatDateDisplay(document.getElementById("masterLcDate")?.value || "");
     const contractNo = document.getElementById("exportSalesContractNo")?.value || "";
