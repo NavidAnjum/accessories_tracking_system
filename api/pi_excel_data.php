@@ -116,7 +116,7 @@ function piFooterRows($totalQty, $totalVal, $totalWords, $terms, $type, $cellSty
     $rows .= '<td colspan="3" style="' . $noBorder . 'vertical-align:bottom;font-weight:bold;text-align:right;">SIGNATURE OF SELLER</td>';
     $rows .= '</tr>';
     $rows .= $sp;
-    $rows .= '<tr height="18"><td colspan="6" style="' . $footStyle . 'padding:5px 8px;">Corporate Office: Adamjee Court (4th &amp; 5th Floor), 115-120, motijheel C/A, Dhaka-1000, Bangladesh.</td></tr>';
+    $rows .= '<tr height="18"><td colspan="6" style="' . $footStyle . 'padding:5px 8px;">Corporate Office: The Grand Delvistaa, Level # 7, CES (A) 1/A, Road # 113, Gulshan Avenue, Dhaka-1212.</td></tr>';
     $rows .= '<tr height="18"><td colspan="6" style="' . $footStyle . 'padding:5px 8px;">Phone: +880-2-7176207-8, 7176356, 71766348, &nbsp;Fax: +880-2-9564252, 9565282, 7167293. &nbsp;Web: www.znzfab.com</td></tr>';
     $rows .= '<tr height="18"><td colspan="6" style="' . $footStyle . 'padding:5px 8px;">Factory: Mawna, Sreepur, Gazipur. &nbsp;E-mail: znzal@znzfab.com</td></tr>';
     return $rows;

@@ -105,14 +105,14 @@ async function loadNotificationWorklist() {
                         ${Number(n.is_read) ? 'Read' : 'Unread'}
                     </span>
                 </td>
-                <td><strong>${notifEscape(n.order_id)}</strong></td>
+                <td><strong>${notifEscape(n.erp_order_no ? 'ERP ' + n.erp_order_no : n.order_id)}</strong></td>
                 <td>${notifEscape((n.step_name || '').replace(/-/g, ' '))}</td>
                 <td>${notifEscape(n.title)}</td>
                 <td>${notifEscape(n.message)}</td>
                 <td>${notifFormatDate(n.created_at)}</td>
                 <td>
-                    <button type="button" class="primary-btn" style="padding:6px 12px;font-size:12px;" onclick="openNotificationStep(${Number(n.id)}, '${encodeURIComponent(n.order_id || '')}', '${notifEscape(n.step_name || '')}')">
-                        Open
+                    <button type="button" class="primary-btn" style="padding:6px 12px;font-size:12px;" onclick="openNotificationStep('${notifEscape(n.id)}', '${encodeURIComponent(n.order_id || '')}', '${notifEscape(n.step_name || '')}', '${notifEscape(n.type || 'workflow')}', '${encodeURIComponent(n.erp_order_no || '')}')">
+                        ${n.type === 'erp_order' ? 'Create Work Order' : 'Open'}
                     </button>
                 </td>
             </tr>
@@ -122,7 +122,24 @@ async function loadNotificationWorklist() {
     }
 }
 
-async function openNotificationStep(id, encodedOrderId, step) {
+async function openNotificationStep(id, encodedOrderId, step, type, encodedErpOrder) {
+    if (type === 'erp_order') {
+        const erpOrder = decodeURIComponent(encodedErpOrder || '');
+        try {
+            const response = await fetch(APP_BASE + '/api/erp_create_work_order.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ erp_order_no: erpOrder })
+            });
+            const result = await response.json();
+            if (!response.ok || result.error) throw new Error(result.error || 'Could not create work order.');
+            sessionStorage.setItem('ats_current_order_id', result.order_id);
+            window.location.href = APP_BASE + '/pages/sales.php?erp_order=' + encodeURIComponent(erpOrder);
+        } catch (error) {
+            alert(error.message || 'Could not create work order.');
+        }
+        return;
+    }
     try {
         await fetch(APP_BASE + '/api/notifications.php', {
             method: 'POST',
@@ -132,6 +149,10 @@ async function openNotificationStep(id, encodedOrderId, step) {
     } catch (_) {}
 
     const orderId = decodeURIComponent(encodedOrderId || '');
+    if (step === 'erp-order') {
+        window.location.href = APP_BASE + '/pages/erp-live-orders-report.php?create_erp_order=' + encodeURIComponent(orderId);
+        return;
+    }
     if (orderId) sessionStorage.setItem('ats_current_order_id', orderId);
     window.location.href = APP_BASE + '/pages/' + (NOTIF_STEP_PAGE_MAP[step] || 'dashboard.php');
 }

@@ -37,8 +37,21 @@ require_once __DIR__ . '/../includes/print-brand.php';
     font-size:11pt; color:#000; background:#fff;
     padding:14mm 14mm 30mm; box-shadow:0 4px 24px rgba(0,0,0,.15);
     overflow:hidden;
+    display:flex;
+    flex-direction:column;
 }
-.spi-doc .zzal-print-brand--footer { position:absolute; left:14mm; right:14mm; bottom:8mm; margin:0!important; padding-top:6px!important; }
+.spi-doc .zzal-print-brand--footer {
+    position:static;
+    margin-top:auto!important;
+    padding-top:6px!important;
+    page-break-inside:avoid!important;
+    break-inside:avoid-page!important;
+}
+#spiContent {
+    min-height:100%;
+    display:flex;
+    flex-direction:column;
+}
 .spi-continuation { display:none; }
 
 /* Header */
@@ -86,7 +99,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 /* Table */
 .spi-tbl { width:100%; border-collapse:collapse; font-size:10pt; }
 .spi-tbl th {
-    background:#1a3a6e; color:#fff; padding:5px 8px;
+    background:#fff; color:#111; padding:5px 8px;
     border:1px solid #1a3a6e; text-align:center; font-size:9.5pt; line-height:1.3;
 }
 .spi-tbl td { border:1px solid #7a7a7a; padding:4px 8px; vertical-align:top; }
@@ -124,7 +137,6 @@ require_once __DIR__ . '/../includes/print-brand.php';
     padding-top:6px; margin-top:100px;
 }
 .spi-sig-bottom-label { font-size:10pt; font-weight:700; }
-
 /* Footer bar */
 .spi-footer-bar {
     margin-top:24px; border:1.5px solid #000;
@@ -139,8 +151,9 @@ require_once __DIR__ . '/../includes/print-brand.php';
 @media print {
     .spi-ctrl, nav.page-nav, .order-id-bar { display:none !important; }
     #spiWrap { background:none !important; padding:0 !important; }
-    .spi-doc  { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:14mm 14mm 30mm!important; overflow:hidden; }
-    .spi-doc .zzal-print-brand--footer { position:absolute!important; left:14mm!important; right:14mm!important; bottom:8mm!important; margin:0!important; }
+    .spi-doc  { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:14mm 14mm 30mm!important; overflow:hidden!important; display:flex!important; flex-direction:column!important; }
+    .spi-doc .zzal-print-brand--footer { position:static!important; margin-top:auto!important; page-break-inside:avoid!important; break-inside:avoid-page!important; }
+    #spiContent { min-height:100%!important; display:flex!important; flex-direction:column!important; }
     .spi-hd { display:none !important; }
     body, html, .app-shell { width:210mm!important; min-height:297mm!important; margin:0!important; padding:0!important; background:#fff !important; overflow:visible!important; }
     .form-stack { padding:0 !important; }
@@ -236,7 +249,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
         <div class="spi-words">TOTAL AMOUNT : US DOLLER: <span id="spiWords">-</span></div>
 
         <!-- Terms & Conditions -->
-        <div>
+        <div id="spiTermsBlock">
             <div class="spi-terms-title">Terms &amp; Conditions:</div>
             <ol class="spi-terms-list" id="spiTerms"></ol>
         </div>
@@ -262,7 +275,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
         <div><strong>PROFOMA INVOICE NO :</strong> <span id="spiContNum">-</span></div>
         <div><strong>Date :</strong> <span id="spiContDate">-</span></div>
     </div>
-    <div>
+    <div id="spiTermsContBlock">
         <div class="spi-terms-title">Terms &amp; Conditions:</div>
         <ol class="spi-terms-list" id="spiTermsCont" start="16"></ol>
     </div>
@@ -283,18 +296,42 @@ let _spiExcelDone = false;
 
 /* ── Number to words ─────────────────────────────────────────── */
 function spiNumWords(n) {
-    const a = ['','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN','ELEVEN','TWELVE','THIRTEEN','FOURTEEN','FIFTEEN','SIXTEEN','SEVENTEEN','EIGHTEEN','NINETEEN'];
-    const b = ['','','TWENTY','THIRTY','FORTY','FIFTY','SIXTY','SEVENTY','EIGHTY','NINETY'];
-    function w(x) {
+    const amount = parseFloat(n || 0) || 0;
+    const ones = ['ZERO','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN','ELEVEN','TWELVE','THIRTEEN','FOURTEEN','FIFTEEN','SIXTEEN','SEVENTEEN','EIGHTEEN','NINETEEN'];
+    const tens = ['','','TWENTY','THIRTY','FORTY','FIFTY','SIXTY','SEVENTY','EIGHTY','NINETY'];
+    const scales = ['', 'THOUSAND', 'MILLION', 'BILLION'];
+    function chunkWords(x) {
+        x = Math.floor(x);
         if (x === 0) return '';
-        if (x < 20)  return a[x] + ' ';
-        if (x < 100) return b[Math.floor(x/10)] + (x%10?' '+a[x%10]:'') + ' ';
-        return a[Math.floor(x/100)] + ' HUNDRED ' + w(x%100);
+        if (x < 20) return ones[x];
+        if (x < 100) return tens[Math.floor(x / 10)] + (x % 10 ? ' ' + ones[x % 10] : '');
+        return ones[Math.floor(x / 100)] + ' HUNDRED' + (x % 100 ? ' ' + chunkWords(x % 100) : '');
     }
-    const dollars = Math.floor(n);
-    const cents   = Math.round((n % 1) * 100);
-    let result = (w(dollars) || 'ZERO ').trim();
-    if (cents > 0) result += ' & CENTS ' + (w(cents)||'').trim();
+    function fullWords(x) {
+        x = Math.floor(x);
+        if (x === 0) return 'ZERO';
+        const parts = [];
+        let scale = 0;
+        while (x > 0) {
+            const chunk = x % 1000;
+            if (chunk) {
+                const words = chunkWords(chunk);
+                parts.unshift(words + (scales[scale] ? ' ' + scales[scale] : ''));
+            }
+            x = Math.floor(x / 1000);
+            scale++;
+        }
+        return parts.join(' ').trim();
+    }
+    let centsTotal = Math.round(amount * 100);
+    let dollars = Math.floor(centsTotal / 100);
+    let cents = centsTotal % 100;
+    if (cents === 100) {
+        dollars += 1;
+        cents = 0;
+    }
+    let result = fullWords(dollars);
+    if (cents > 0) result += ' & CENTS ' + fullWords(cents);
     return result + ' ONLY.';
 }
 
@@ -355,7 +392,7 @@ function renderSinglePi() {
 
     // Show content
     document.getElementById('spiEmpty').style.display   = 'none';
-    document.getElementById('spiContent').style.display = 'block';
+    document.getElementById('spiContent').style.display = 'flex';
 
     // PI number + date
     const piNum  = pi.pi_number || salesPg.piNum  || order.order_id + '-PI';
@@ -449,13 +486,44 @@ function renderSinglePi() {
     terms[11] = `Beneficiary Bin No : <strong>000230256-0103</strong>`;
     terms[12] = `H.S. Code : <strong>${hsCode}</strong>`;
     terms[15] = `${docMust} Mustbe`;
-    const firstPageTerms = terms.slice(0, 11);
-    const continuedTerms = terms.slice(11);
-    document.getElementById('spiTerms').innerHTML = firstPageTerms.map(t=>`<li>${t}</li>`).join('');
-    document.getElementById('spiTermsCont').innerHTML = continuedTerms.map(t=>`<li>${t}</li>`).join('');
-    document.getElementById('spiTermsCont').start = firstPageTerms.length + 1;
-    document.getElementById('spiContinuation').style.display = continuedTerms.length ? 'block' : 'none';
-    document.getElementById('spiSigArea').style.display = continuedTerms.length ? 'none' : 'block';
+    const firstTermsEl = document.getElementById('spiTerms');
+    const contTermsEl = document.getElementById('spiTermsCont');
+    const continuationEl = document.getElementById('spiContinuation');
+    const sigAreaEl = document.getElementById('spiSigArea');
+    const docEl = document.getElementById('spiDocument');
+    const footerEl = docEl.querySelector('.zzal-print-brand--footer');
+    const termsBlockEl = document.getElementById('spiTermsBlock');
+
+    function renderTermSplit(firstCount) {
+        const firstPageTerms = terms.slice(0, firstCount);
+        const continuedTerms = terms.slice(firstCount);
+        firstTermsEl.innerHTML = firstPageTerms.map(t => `<li>${t}</li>`).join('');
+        contTermsEl.innerHTML = continuedTerms.map(t => `<li>${t}</li>`).join('');
+        contTermsEl.start = firstPageTerms.length + 1;
+        continuationEl.style.display = continuedTerms.length ? 'block' : 'none';
+        sigAreaEl.style.display = continuedTerms.length ? 'none' : 'block';
+        return continuedTerms.length;
+    }
+
+    let firstCount = terms.length;
+    renderTermSplit(firstCount);
+
+    function pageBottom(el) {
+        return el.offsetTop + el.offsetHeight;
+    }
+
+    // Keep moving terms to page 2 until page 1 content clears the fixed footer area.
+    while (firstCount > 0) {
+        const footerTop = footerEl.offsetTop;
+        const activeBottom = sigAreaEl.style.display !== 'none'
+            ? pageBottom(sigAreaEl)
+            : pageBottom(termsBlockEl);
+        if (activeBottom <= (footerTop - 16)) {
+            break;
+        }
+        firstCount -= 1;
+        renderTermSplit(firstCount);
+    }
 }
 async function downloadSinglePiExcel() {
     const res = _spiOrderData;

@@ -147,7 +147,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
     display:flex;
     flex-direction:column;
     background:#fff; box-shadow:0 4px 24px rgba(0,0,0,.14);
-    padding:14mm 14mm 34mm;
+    padding:14mm 14mm 24mm;
     font-family:'Times New Roman',Times,serif; color:#111; font-size:11pt; line-height:1.45;
     break-inside:avoid;
     page-break-inside:avoid;
@@ -196,12 +196,10 @@ require_once __DIR__ . '/../includes/print-brand.php';
 }
 .boe-left-bottom { display:flex; flex-direction:column; gap:24px; min-height:100px; }
 .boe-page .zzal-print-brand--footer {
-    position:absolute;
-    left:14mm;
-    right:14mm;
-    bottom:8mm;
+    position:static;
     margin:0;
-    padding-top:8px;
+    margin-top:auto;
+    padding-top:10px;
 }
 .boe-to { font-size:10.5px; white-space:pre-line; }
 .boe-sign { text-align:center; }
@@ -216,8 +214,8 @@ require_once __DIR__ . '/../includes/print-brand.php';
         box-shadow:none;
         box-sizing:border-box;
         width:210mm;
-        height:296mm;
-        min-height:0;
+        height:auto;
+        min-height:286mm;   /* fills the sheet while keeping the footer lower on the office pad without pushing content to a blank page */
         max-width:210mm;
         margin:0;
         overflow:hidden;
@@ -226,16 +224,14 @@ require_once __DIR__ . '/../includes/print-brand.php';
         break-inside:avoid;
         page-break-inside:avoid;
     }
-    .boe-page:not(:last-child) { break-after:page; page-break-after:always; }
-    .boe-page:last-child { break-after:auto !important; page-break-after:auto !important; }
+    /* Break BEFORE each later copy (never after the last) so no trailing blank page is produced. */
+    .boe-page + .boe-page { break-before:page; page-break-before:always; }
     .boe-page .zzal-print-brand--footer {
-    position:absolute;
-    left:14mm;
-    right:14mm;
-        bottom:8mm;
-    margin:0;
-    padding-top:8px;
-}
+        position:static;
+        margin:0;
+        margin-top:auto;
+        padding-top:10px;
+    }
     .form-stack, body, html, .app-shell { background:#fff !important; }
     .boe-page, .boe-page * { color:#111 !important; }
     .boe-watermark { color:rgba(120,120,120,.12) !important; }
@@ -363,20 +359,41 @@ function boeResolveBank(text, fallbackKey = 'ncc') {
 }
 
 function boeAmountWords(amount) {
-    const n = Math.round((parseFloat(amount || 0) || 0) * 100);
+    const parsed = parseFloat(amount || 0) || 0;
     const ones = ['Zero','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
     const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+    const scales = ['', 'Thousand', 'Million', 'Billion'];
     const chunk = num => {
+        num = Math.floor(num);
+        if (num === 0) return '';
         if (num < 20) return ones[num];
         if (num < 100) return tens[Math.floor(num / 10)] + (num % 10 ? ' ' + ones[num % 10] : '');
-        if (num < 1000) return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + chunk(num % 100) : '');
-        if (num < 1000000) return chunk(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 ? ' ' + chunk(num % 1000) : '');
-        return chunk(Math.floor(num / 1000000)) + ' Million' + (num % 1000000 ? ' ' + chunk(num % 1000000) : '');
+        return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + chunk(num % 100) : '');
     };
-    const dollars = Math.floor(n / 100);
-    const cents = n % 100;
-    let out = chunk(dollars) + ' USD';
-    if (cents) out += ' and ' + chunk(cents) + ' Cents';
+    const fullWords = num => {
+        num = Math.floor(num);
+        if (num === 0) return 'Zero';
+        const parts = [];
+        let scale = 0;
+        while (num > 0) {
+            const piece = num % 1000;
+            if (piece) {
+                parts.unshift(chunk(piece) + (scales[scale] ? ' ' + scales[scale] : ''));
+            }
+            num = Math.floor(num / 1000);
+            scale++;
+        }
+        return parts.join(' ').trim();
+    };
+    let centsTotal = Math.round(parsed * 100);
+    let dollars = Math.floor(centsTotal / 100);
+    let cents = centsTotal % 100;
+    if (cents === 100) {
+        dollars += 1;
+        cents = 0;
+    }
+    let out = fullWords(dollars) + ' USD';
+    if (cents) out += ' and ' + fullWords(cents) + ' Cents';
     return out + ' Only';
 }
 
@@ -563,4 +580,3 @@ document.getElementById('boeCopies')?.addEventListener('change', renderBoePages)
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
-

@@ -58,8 +58,11 @@ require_once __DIR__ . '/../includes/print-brand.php';
     font-size:11pt; color:#000; background:#fff;
     padding:14mm 14mm 30mm; box-shadow:0 4px 24px rgba(0,0,0,.15);
     overflow:hidden;
+    display:flex;
+    flex-direction:column;
 }
-.mpi-doc .zzal-print-brand--footer { position:absolute; left:14mm; right:14mm; bottom:8mm; margin:0!important; padding-top:6px!important; }
+.mpi-doc .zzal-print-brand--footer { position:static; margin-top:auto!important; padding-top:6px!important; }
+.mpi-content { min-height:100%; display:flex; flex-direction:column; }
 .mpi-continuation { display:none; }
 
 /* Header */
@@ -96,7 +99,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 /* Table */
 .mpi-tbl { width:100%; border-collapse:collapse; font-size:10pt; }
 .mpi-tbl th {
-    background:#1a3a6e; color:#fff; padding:5px 8px;
+    background:#fff; color:#111; padding:5px 8px;
     border:1px solid #1a3a6e; text-align:center; font-size:9.5pt; line-height:1.3;
 }
 .mpi-tbl td { border:1px solid #7a7a7a; padding:4px 8px; vertical-align:top; }
@@ -142,8 +145,9 @@ require_once __DIR__ . '/../includes/print-brand.php';
 @media print {
     .mpi-ctrl, nav.page-nav, .order-id-bar { display:none !important; }
     #mpiWrap { background:none !important; padding:0 !important; }
-    .mpi-doc { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:14mm 14mm 30mm!important; overflow:hidden; }
-    .mpi-doc .zzal-print-brand--footer { position:absolute!important; left:14mm!important; right:14mm!important; bottom:8mm!important; margin:0!important; }
+    .mpi-doc { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:14mm 14mm 30mm!important; overflow:hidden; display:flex!important; flex-direction:column!important; }
+    .mpi-doc .zzal-print-brand--footer { position:static!important; margin-top:auto!important; }
+    .mpi-content { min-height:100%!important; display:flex!important; flex-direction:column!important; }
     .mpi-hd { display:none !important; }
     body, html, .app-shell { width:210mm!important; min-height:297mm!important; margin:0!important; padding:0!important; background:#fff !important; overflow:visible!important; }
     .form-stack { padding:0 !important; }
@@ -190,7 +194,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 <div id="mpiWrap">
 <div class="mpi-doc" id="mpiDocument">
     <div class="mpi-empty" id="mpiEmpty">Load an order to generate the Master PI</div>
-    <div id="mpiContent" style="display:none;">
+    <div id="mpiContent" class="mpi-content" style="display:none;">
 
         <?= zzal_print_brand_header() ?>
 
@@ -292,18 +296,42 @@ let _mpiExcelDone = false;
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 function mpiNumWords(n) {
-    const a = ['','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN','ELEVEN','TWELVE','THIRTEEN','FOURTEEN','FIFTEEN','SIXTEEN','SEVENTEEN','EIGHTEEN','NINETEEN'];
-    const b = ['','','TWENTY','THIRTY','FORTY','FIFTY','SIXTY','SEVENTY','EIGHTY','NINETY'];
-    function w(x) {
+    const amount = parseFloat(n || 0) || 0;
+    const ones = ['ZERO','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN','ELEVEN','TWELVE','THIRTEEN','FOURTEEN','FIFTEEN','SIXTEEN','SEVENTEEN','EIGHTEEN','NINETEEN'];
+    const tens = ['','','TWENTY','THIRTY','FORTY','FIFTY','SIXTY','SEVENTY','EIGHTY','NINETY'];
+    const scales = ['', 'THOUSAND', 'MILLION', 'BILLION'];
+    function chunkWords(x) {
+        x = Math.floor(x);
         if (x === 0) return '';
-        if (x < 20)  return a[x] + ' ';
-        if (x < 100) return b[Math.floor(x/10)] + (x%10?' '+a[x%10]:'') + ' ';
-        return a[Math.floor(x/100)] + ' HUNDRED ' + w(x%100);
+        if (x < 20) return ones[x];
+        if (x < 100) return tens[Math.floor(x / 10)] + (x % 10 ? ' ' + ones[x % 10] : '');
+        return ones[Math.floor(x / 100)] + ' HUNDRED' + (x % 100 ? ' ' + chunkWords(x % 100) : '');
     }
-    const dollars = Math.floor(n);
-    const cents   = Math.round((n % 1) * 100);
-    let result    = (w(dollars) || 'ZERO ').trim();
-    if (cents > 0) result += ' & CENTS ' + (w(cents)||'').trim();
+    function fullWords(x) {
+        x = Math.floor(x);
+        if (x === 0) return 'ZERO';
+        const parts = [];
+        let scale = 0;
+        while (x > 0) {
+            const chunk = x % 1000;
+            if (chunk) {
+                const words = chunkWords(chunk);
+                parts.unshift(words + (scales[scale] ? ' ' + scales[scale] : ''));
+            }
+            x = Math.floor(x / 1000);
+            scale++;
+        }
+        return parts.join(' ').trim();
+    }
+    let centsTotal = Math.round(amount * 100);
+    let dollars = Math.floor(centsTotal / 100);
+    let cents = centsTotal % 100;
+    if (cents === 100) {
+        dollars += 1;
+        cents = 0;
+    }
+    let result = fullWords(dollars);
+    if (cents > 0) result += ' & CENTS ' + fullWords(cents);
     return result + ' ONLY.';
 }
 function mpiUSD(v) {
@@ -316,8 +344,8 @@ function mpiFormatDate(d) {
     return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
 }
 function mpiRenderTerms(terms) {
-    const firstPageTerms = terms.slice(0, 11);
-    const continuedTerms = terms.slice(11);
+    const firstPageTerms = terms.slice(0, 10);
+    const continuedTerms = terms.slice(10);
     document.getElementById('mpiTerms').innerHTML = firstPageTerms.map(t => `<li>${t}</li>`).join('');
     document.getElementById('mpiTermsCont').innerHTML = continuedTerms.map(t => `<li>${t}</li>`).join('');
     document.getElementById('mpiTermsCont').start = firstPageTerms.length + 1;
@@ -490,7 +518,7 @@ function renderMasterPiFromCustom(groups, res) {
     const firstGrp = groups[0] || {};
 
     document.getElementById('mpiEmpty').style.display   = 'none';
-    document.getElementById('mpiContent').style.display = 'block';
+    document.getElementById('mpiContent').style.display = 'flex';
 
     const customPiNum = firstGrp.piNumber || firstPi.pi_number || order.order_id + '-MPI';
     const customPiDate = mpiFormatDate(firstPi.pi_date || salesPg.piDate || '');

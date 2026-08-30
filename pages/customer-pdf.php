@@ -1,5 +1,5 @@
-<?php
-// customer-pdf.php — printable Customer Profile (Save as PDF via browser print)
+﻿<?php
+// customer-pdf.php - printable Customer Profile (Save as PDF via browser print)
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/print-brand.php';
@@ -28,9 +28,8 @@ if (!empty($c['signatures'])) {
 }
 
 function h($v) { return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8'); }
-function val($v) { $v = trim((string)($v ?? '')); return $v === '' ? '—' : htmlspecialchars($v, ENT_QUOTES, 'UTF-8'); }
+function val($v) { $v = trim((string)($v ?? '')); return $v === '' ? '-' : htmlspecialchars($v, ENT_QUOTES, 'UTF-8'); }
 function ex($extra, $k) { return val($extra[$k] ?? ''); }
-
 $stageLabels = [
     'sales_person' => 'Sales Person',
     'team_leader'  => 'Team Lead',
@@ -41,23 +40,25 @@ $stageLabels = [
 $company = $c['company_name'] ?: 'Customer Profile';
 $custCode = $extra['customerCode'] ?? '';
 $productInterest = is_array($extra['productInterest'] ?? null) ? $extra['productInterest'] : [];
-$certifications  = is_array($extra['certifications'] ?? null)  ? $extra['certifications']  : [];
+$certifications  = is_array($extra['factoryCertifications'] ?? null)  ? $extra['factoryCertifications']  : [];
 $leadTimes       = is_array($extra['leadTimes'] ?? null)       ? $extra['leadTimes']       : [];
 $priceMatrix     = is_array($extra['priceMatrix'] ?? null)     ? $extra['priceMatrix']     : [];
 $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChecklist']    : [];
+$competitor      = is_array($extra['competitorAnalysis'] ?? null) ? $extra['competitorAnalysis'] : [];
+$risk            = is_array($extra['riskAssessment'] ?? null) ? $extra['riskAssessment'] : [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title><?= h($company) ?> — Customer Profile</title>
+<title><?= h($company) ?> - Customer Profile</title>
 <style>
     * { box-sizing: border-box; }
     body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e1e2e; margin: 0; background: #e5e7eb; }
-    .sheet { position: relative; width: 210mm; height: 297mm; max-width: 820px; margin: 20px auto; padding: 14mm 14mm 30mm; background: #fff; box-shadow: 0 4px 24px rgba(0,0,0,.12); display:flex; flex-direction:column; overflow: hidden; }
+    .sheet { position: relative; width: 210mm; min-height: 297mm; height: auto; max-width: 820px; margin: 20px auto; padding: 14mm 14mm 30mm; background: #fff; box-shadow: 0 4px 24px rgba(0,0,0,.12); display:flex; flex-direction:column; overflow: visible; }
     .brand-header { margin-bottom: 10px; }
-    .brand-footer { position: absolute; left: 14mm; right: 14mm; bottom: 8mm; margin: 0; }
+    .brand-footer { position: static; left: auto; right: auto; bottom: auto; margin-top: 18px; }
     .doc-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #4f46e5; padding-bottom: 14px; margin-bottom: 8px; }
     .doc-head h1 { font-size: 22px; margin: 0; color: #1e1e2e; }
     .doc-head .sub { font-size: 12px; color: #6b7280; margin-top: 3px; }
@@ -81,11 +82,12 @@ $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChec
     .btn { background: #4f46e5; color: #fff; border: none; border-radius: 8px; padding: 10px 22px; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; }
     .btn.ghost { background: #fff; color: #4f46e5; border: 1.5px solid #4f46e5; }
     @media print {
-        @page { size: A4; margin: 0; }
+        @page { size: A4; margin: 12mm 10mm 14mm; }
         body { background: #fff; }
         .toolbar { display: none; }
-        .sheet { box-shadow: none; margin: 0; max-width: 210mm; width: 210mm; height: 297mm; }
+        .sheet { box-shadow: none; margin: 0; max-width: 100%; width: 100%; min-height: 0; height: auto; overflow: visible; padding: 0; }
         .sec { break-after: avoid; }
+        .brand-footer { margin-top: 10px; }
     }
 </style>
 </head>
@@ -110,7 +112,6 @@ $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChec
         </div>
     </div>
 
-    <!-- 1. Customer Information -->
     <div class="sec">1. Customer Information</div>
     <div class="grid">
         <div class="item"><label>Customer Category</label><span><?= ex($extra,'customerCategory') ?></span></div>
@@ -119,17 +120,16 @@ $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChec
         <div class="item"><label>Website</label><span><?= ex($extra,'website') ?></span></div>
         <div class="item"><label>Head Office Address</label><span><?= val($c['address_head_office']) ?></span></div>
         <div class="item"><label>Factory Address</label><span><?= val($c['factory_address']) ?></span></div>
-        <div class="item"><label>Chairman / MD (<?= ex($extra,'chairmanRole') ?>)</label><span><?= val($c['chairman_name']) ?></span></div>
+        <div class="item"><label>Chairman / MD (<?= val($c['chairman_role'] ?? ($extra['chairmanRole'] ?? '')) ?>)</label><span><?= val($c['chairman_name']) ?></span></div>
         <div class="item"><label>Chairman Phone</label><span><?= val($c['chairman_mobile']) ?></span></div>
-        <div class="item"><label>Commercial Contact</label><span><?= ex($extra,'commercialName') ?> · <?= ex($extra,'commercialNumber') ?></span></div>
-        <div class="item"><label>Merchandiser</label><span><?= ex($extra,'merchandiserContact') ?> · <?= ex($extra,'merchandiserMobile') ?></span></div>
+        <div class="item"><label>Commercial Contact</label><span><?= ex($extra,'commercialName') ?> | <?= ex($extra,'commercialNumber') ?></span></div>
+        <div class="item"><label>Merchandiser</label><span><?= ex($extra,'merchandiserContact') ?> | <?= ex($extra,'merchandiserMobile') ?></span></div>
         <div class="item"><label>Email</label><span><?= ex($extra,'email') ?></span></div>
     </div>
 
-    <!-- 2. Business & Compliance -->
     <div class="sec">2. Business &amp; Compliance</div>
     <div class="grid three">
-        <div class="item"><label>Trade License</label><span><?= ex($extra,'tradeLicense') ?></span></div>
+        <div class="item"><label>Trade License</label><span><?= ex($extra,'tradelicense') ?></span></div>
         <div class="item"><label>BIN</label><span><?= ex($extra,'bin') ?></span></div>
         <div class="item"><label>TIN</label><span><?= ex($extra,'tin') ?></span></div>
         <div class="item"><label>Bond License</label><span><?= ex($extra,'bondLicense') ?></span></div>
@@ -143,7 +143,6 @@ $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChec
         <div class="badges"><?php if ($certifications): foreach ($certifications as $cert): ?><span class="badge"><?= h($cert) ?></span><?php endforeach; else: ?><span style="color:#9ca3af;font-size:12px;">None</span><?php endif; ?></div>
     </div>
 
-    <!-- 3. Production Capability -->
     <div class="sec">3. Production Capability</div>
     <div class="grid three">
         <div class="item"><label>Factory Type</label><span><?= ex($extra,'factoryType') ?></span></div>
@@ -154,10 +153,9 @@ $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChec
         <div class="item"><label>Peak Capacity</label><span><?= ex($extra,'peakCapacity') ?></span></div>
         <div class="item"><label>Major Buyers</label><span><?= ex($extra,'majorBuyers') ?></span></div>
         <div class="item"><label>Major Products</label><span><?= ex($extra,'majorProducts') ?></span></div>
-        <div class="item"><label>Subcontract Factory</label><span><?= ex($extra,'subcontract') ?></span></div>
+        <div class="item"><label>Subcontract Factory</label><span><?= ex($extra,'subcontractFactory') ?></span></div>
     </div>
 
-    <!-- 4. Commercial Assessment -->
     <div class="sec">4. Commercial Assessment</div>
     <div class="grid three">
         <div class="item"><label>Expected Monthly Business</label><span><?= ex($extra,'expectedMonthlyBiz') ?></span></div>
@@ -165,46 +163,41 @@ $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChec
         <div class="item"><label>Credit Facility</label><span><?= ex($extra,'creditFacility') ?></span></div>
         <div class="item"><label>Payment Currency</label><span><?= ex($extra,'paymentCurrency') ?></span></div>
         <div class="item"><label>LC Terms</label><span><?= ex($extra,'lcTerms') ?></span></div>
-        <div class="item"><label>BBLC Terms</label><span><?= ex($extra,'bblcTerms') ?></span></div>
+        <div class="item"><label>BBLC Terms</label><span><?= val($extra['bbkTerms'] ?? ($extra['bblcTerms'] ?? '')) ?></span></div>
         <div class="item"><label>Delivery Terms</label><span><?= ex($extra,'deliveryTerms') ?></span></div>
         <div class="item"><label>UD Required</label><span><?= ex($extra,'udRequired') ?></span></div>
         <div class="item"><label>Zone</label><span><?= ex($extra,'zone') ?></span></div>
     </div>
 
-    <!-- 5. Product Interest -->
     <div class="sec">5. Product Interest &amp; Lead Time</div>
     <div class="badges" style="margin-bottom:8px;">
         <?php if ($productInterest): foreach ($productInterest as $pi): ?>
-            <span class="badge"><?= h($pi) ?><?php if (!empty($leadTimes[$pi])): ?> · <?= h($leadTimes[$pi]) ?>d<?php endif; ?></span>
+            <span class="badge"><?= h($pi) ?><?php if (!empty($leadTimes[$pi])): ?> | <?= h($leadTimes[$pi]) ?>d<?php endif; ?></span>
         <?php endforeach; else: ?><span style="color:#9ca3af;font-size:12px;">None selected</span><?php endif; ?>
     </div>
 
-    <!-- 6. Competitor Analysis -->
     <div class="sec">6. Competitor Analysis</div>
     <div class="grid">
-        <div class="item"><label>Existing Supplier</label><span><?= ex($extra,'compSupplier') ?></span></div>
-        <div class="item"><label>Current Price</label><span><?= ex($extra,'compCurrentPrice') ?></span></div>
-        <div class="item"><label>Strength</label><span><?= ex($extra,'compStrength') ?></span></div>
-        <div class="item"><label>Weakness</label><span><?= ex($extra,'compWeakness') ?></span></div>
-        <div class="item" style="grid-column:1/-1;"><label>Reason for Change</label><span><?= ex($extra,'compReasonForChange') ?></span></div>
+        <div class="item"><label>Existing Supplier</label><span><?= val($competitor['supplier'] ?? ($extra['compSupplier'] ?? '')) ?></span></div>
+        <div class="item"><label>Current Price</label><span><?= val($competitor['currentPrice'] ?? ($extra['compCurrentPrice'] ?? '')) ?></span></div>
+        <div class="item"><label>Strength</label><span><?= val($competitor['strength'] ?? ($extra['compStrength'] ?? '')) ?></span></div>
+        <div class="item"><label>Weakness</label><span><?= val($competitor['weakness'] ?? ($extra['compWeakness'] ?? '')) ?></span></div>
+        <div class="item" style="grid-column:1/-1;"><label>Reason for Change</label><span><?= val($competitor['reasonForChange'] ?? ($extra['compReasonForChange'] ?? '')) ?></span></div>
     </div>
 
-    <!-- 7. Risk Assessment -->
     <div class="sec">7. Risk Assessment</div>
     <div class="grid">
-        <div class="item"><label>Financial Risk</label><span><?= ex($extra,'financialRisk') ?></span></div>
-        <div class="item"><label>Payment History</label><span><?= ex($extra,'paymentHistory') ?></span></div>
-        <div class="item"><label>Credit Limit Recommended</label><span><?= ex($extra,'creditLimitRec') ?></span></div>
-        <div class="item"><label>Remarks</label><span><?= ex($extra,'riskRemarks') ?></span></div>
+        <div class="item"><label>Financial Risk</label><span><?= val($risk['financialRisk'] ?? ($extra['financialRisk'] ?? '')) ?></span></div>
+        <div class="item"><label>Payment History</label><span><?= val($risk['paymentHistory'] ?? ($extra['paymentHistory'] ?? '')) ?></span></div>
+        <div class="item"><label>Credit Limit Recommended</label><span><?= val($risk['creditLimitRec'] ?? ($extra['creditLimitRec'] ?? '')) ?></span></div>
+        <div class="item"><label>Remarks</label><span><?= val($risk['remarks'] ?? ($extra['riskRemarks'] ?? '')) ?></span></div>
     </div>
 
-    <!-- 8. Price Approval Matrix -->
-    <?php if ($priceMatrix): ?>
     <div class="sec">8. Price Approval Matrix</div>
     <table class="matrix">
         <thead><tr><th>Product</th><th>Existing</th><th>Target</th><th>Approved</th><th>Commission</th></tr></thead>
         <tbody>
-        <?php foreach ($priceMatrix as $row): ?>
+        <?php if ($priceMatrix): foreach ($priceMatrix as $row): ?>
             <tr>
                 <td><?= val($row['product'] ?? '') ?></td>
                 <td><?= val($row['existingPrice'] ?? '') ?></td>
@@ -212,18 +205,15 @@ $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChec
                 <td><?= val($row['approvedPrice'] ?? '') ?></td>
                 <td><?= val($row['commission'] ?? '') ?></td>
             </tr>
-        <?php endforeach; ?>
+        <?php endforeach; else: ?>
+            <tr><td colspan="5" style="color:#9ca3af;text-align:center;">No price approval rows saved.</td></tr>
+        <?php endif; ?>
         </tbody>
     </table>
-    <?php endif; ?>
 
-    <!-- 9. Document Checklist -->
-    <?php if ($docChecklist): ?>
     <div class="sec">9. Document Checklist</div>
-    <div class="badges"><?php foreach ($docChecklist as $doc): ?><span class="badge">&#10003; <?= h($doc) ?></span><?php endforeach; ?></div>
-    <?php endif; ?>
+    <div class="badges"><?php if ($docChecklist): foreach ($docChecklist as $doc): ?><span class="badge">&#10003; <?= h($doc) ?></span><?php endforeach; else: ?><span style="color:#9ca3af;font-size:12px;">No documents checked.</span><?php endif; ?></div>
 
-    <!-- Signatures -->
     <div class="sec">Approvals &amp; Signatures</div>
     <div class="sigs">
         <?php foreach ($stageLabels as $role => $label): ?>
@@ -237,11 +227,11 @@ $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChec
             </div>
         <?php endforeach; ?>
     </div>
+
     <div class="brand-footer"><?= zzal_print_brand_footer() ?></div>
 </div>
 
 <script>
-// Auto-open the print dialog once the page (and signature images) are ready.
 window.addEventListener('load', function () {
     setTimeout(function () { window.print(); }, 400);
 });

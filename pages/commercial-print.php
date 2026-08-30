@@ -96,11 +96,9 @@ require_once __DIR__ . '/../includes/print-brand.php';
     page-break-after:auto;
 }
 .ci-page .zzal-print-brand--footer {
-    position:absolute;
-    left:14mm;
-    right:14mm;
-    bottom:8mm;
+    position:static;
     margin:0 !important;
+    margin-top:auto !important;
     padding-top:6px !important;
 }
 .ci-title {
@@ -168,7 +166,6 @@ require_once __DIR__ . '/../includes/print-brand.php';
 @media print {
     @page { size:A4 portrait; margin:0; }
     .ci-ctrl, nav.page-nav, .order-id-bar, .no-print { display:none !important; }
-    #ciWrap { background:none !important; padding:0 !important; }
     html, body {
         width:210mm !important;
         min-height:0 !important;
@@ -176,25 +173,51 @@ require_once __DIR__ . '/../includes/print-brand.php';
         padding:0 !important;
         overflow:visible !important;
     }
+    .app-shell, .form-stack {
+        display:block !important;
+        margin:0 !important;
+        padding:0 !important;
+        background:#fff !important;
+    }
+    .form-stack > *:not(#ciWrap) {
+        display:none !important;
+    }
+    #ciWrap {
+        display:block !important;
+        background:none !important;
+        padding:0 !important;
+        margin:0 !important;
+        width:210mm !important;
+        min-height:0 !important;
+    }
+    #ciPages {
+        display:block !important;
+        margin:0 !important;
+        padding:0 !important;
+    }
     .ci-page {
         box-shadow:none;
+        box-sizing:border-box;
         margin:0;
         max-width:210mm;
         width:210mm !important;
-        height:296mm !important;
+        height:auto !important;
+        min-height:286mm !important;
         padding:14mm 14mm 30mm !important;
         overflow:hidden;
+        display:flex;
+        flex-direction:column;
+        break-inside:avoid;
+        page-break-inside:avoid;
     }
     .ci-page .zzal-print-brand--footer {
-        position:absolute !important;
-        left:14mm !important;
-        right:14mm !important;
-        bottom:8mm !important;
+        position:static !important;
         margin:0 !important;
+        margin-top:auto !important;
     }
     .ci-page:not(:last-child) { break-after:page; page-break-after:always; }
     .ci-page:last-child { break-after:auto !important; page-break-after:auto !important; }
-    .form-stack, body, html, .app-shell { background:#fff !important; }
+    body, html { background:#fff !important; }
 }
 </style>
 
@@ -204,7 +227,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
         <select id="ciDocSel"></select>
     </div>
     <button type="button" class="ci-excel-btn" onclick="downloadCommercialExcel()">Download Excel</button>
-    <button type="button" class="ci-print-btn" onclick="window.print()">Print / Save PDF</button>
+    <button type="button" class="ci-print-btn" onclick="printCommercialInvoice()">Print / Save PDF</button>
 </div>
 
 <div id="ciWrap">
@@ -483,6 +506,9 @@ function downloadCommercialExcel() {
         filename:'commercial-invoice-'+((window.getCurrentOrderId && window.getCurrentOrderId()) || 'document'),
         title:document.title
     });
+}
+function printCommercialInvoice() {
+    window.print();
 }
 window.onOrderLoad = function(res) {
     window._ciRes = res;

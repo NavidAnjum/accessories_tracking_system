@@ -28,6 +28,7 @@ if (!$canCreate) {
         </div>
         <div class="page-actions-right" style="display:flex;gap:8px;align-items:center;">
             <a href="<?= BASE_PATH ?>/pages/customer-profile.php" class="ghost-btn" style="text-decoration:none;">&#8592; Back to List</a>
+            <a href="<?= BASE_PATH ?>/pages/create-customer-pdf.php" class="ghost-btn" style="text-decoration:none;" target="_blank" rel="noopener">Printable PDF Form</a>
             <?php if ($isCreator): ?>
             <button class="ghost-btn" style="color:#6366f1;border-color:#6366f1;" onclick="cpSaveDraft()" id="cpDraftBtn">&#10003; Save Draft</button>
             <button class="primary-btn" onclick="cpSubmit()">Submit Profile</button>

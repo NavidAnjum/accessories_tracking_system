@@ -155,8 +155,8 @@ $stageMeta = [
                     <td><?= $offset + $i + 1 ?></td>
                     <td><strong><?= htmlspecialchars($c['company_name']) ?></strong></td>
                     <td><span class="cp-type-badge"><?= htmlspecialchars($c['customer_type']) ?></span></td>
-                    <td><?= htmlspecialchars($c['chairman_name'] ?? '&mdash;') ?></td>
-                    <td><?= htmlspecialchars($c['chairman_mobile'] ?? '&mdash;') ?></td>
+                    <td><?= htmlspecialchars(trim((string)($c['chairman_name'] ?? ''))) !== '' ? htmlspecialchars(trim((string)$c['chairman_name'])) : '-' ?></td>
+                    <td><?= htmlspecialchars(trim((string)($c['chairman_mobile'] ?? ''))) !== '' ? htmlspecialchars(trim((string)$c['chairman_mobile'])) : '-' ?></td>
                     <td>
                         <span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;
                                      background:<?= $sm['bg'] ?>;color:<?= $sm['color'] ?>;">

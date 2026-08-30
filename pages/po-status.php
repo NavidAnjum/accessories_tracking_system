@@ -107,7 +107,7 @@ include __DIR__ . '/../includes/header.php';
                             </div>
                         </div>
                         <div class="challan-footer-text">
-                            Corporate Office: Adamjee Court (4th &amp; 5th Floor), 115-120, Motijheel C/A, Dhaka-1000, Bangladesh. Phone: +880-2-7176207-8, 7176356, 71766348, Fax: +880-2-9564252, 9565282, 7167293. Web: www.znzfab.com Factory: Mawna, Sreepur, Gazipur. E-mail: znzal@znzfab.com
+                            Corporate Office: The Grand Delvistaa, Level # 7, CES (A) 1/A, Road # 113, Gulshan Avenue, Dhaka-1212. Phone: +880-2-7176207-8, 7176356, 71766348, Fax: +880-2-9564252, 9565282, 7167293. Web: www.znzfab.com Factory: Mawna, Sreepur, Gazipur. E-mail: znzal@znzfab.com
                         </div>
                     </div>
                     <div class="page-actions">

@@ -243,20 +243,41 @@ function exchangeResolveBank(text, fallbackKey = 'ncc') {
 }
 
 function exchangeAmountWords(amount) {
-    const centsTotal = Math.round((parseFloat(amount || 0) || 0) * 100);
+    const parsed = parseFloat(amount || 0) || 0;
     const ones = ['Zero','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
     const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+    const scales = ['', 'Thousand', 'Million', 'Billion'];
     const chunk = num => {
+        num = Math.floor(num);
+        if (num === 0) return '';
         if (num < 20) return ones[num];
         if (num < 100) return tens[Math.floor(num / 10)] + (num % 10 ? ' ' + ones[num % 10] : '');
-        if (num < 1000) return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + chunk(num % 100) : '');
-        if (num < 1000000) return chunk(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 ? ' ' + chunk(num % 1000) : '');
-        return chunk(Math.floor(num / 1000000)) + ' Million' + (num % 1000000 ? ' ' + chunk(num % 1000000) : '');
+        return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + chunk(num % 100) : '');
     };
-    const dollars = Math.floor(centsTotal / 100);
-    const cents = centsTotal % 100;
-    let out = chunk(dollars) + ' USD';
-    if (cents) out += ' and ' + chunk(cents) + ' Cents';
+    const fullWords = num => {
+        num = Math.floor(num);
+        if (num === 0) return 'Zero';
+        const parts = [];
+        let scale = 0;
+        while (num > 0) {
+            const piece = num % 1000;
+            if (piece) {
+                parts.unshift(chunk(piece) + (scales[scale] ? ' ' + scales[scale] : ''));
+            }
+            num = Math.floor(num / 1000);
+            scale++;
+        }
+        return parts.join(' ').trim();
+    };
+    let centsTotal = Math.round(parsed * 100);
+    let dollars = Math.floor(centsTotal / 100);
+    let cents = centsTotal % 100;
+    if (cents === 100) {
+        dollars += 1;
+        cents = 0;
+    }
+    let out = fullWords(dollars) + ' USD';
+    if (cents) out += ' and ' + fullWords(cents) + ' Cents';
     return out + ' Only';
 }
 

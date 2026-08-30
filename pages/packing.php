@@ -190,7 +190,7 @@ window.onOrderLoad = function(res) {
     const lcNo   = exch.masterLcNo   || lc.lcNumber || '';
     const lcDate = exch.masterLcDate || lc.lcDate   || '';
     set('packingLcText', lcNo ? lcNo + (lcDate ? ' Dated ' + lcDate : '') : '—');
-    set('packingDetailsText',  exch.packingDetailsMaster || '—');
+    set('packingDetailsText',  exch.packingDetailsMaster || 'Standard Poly Packing Rolls');
     set('packingCarrierText',  exch.carrierNameMaster    || comm.commercialCarrier || '—');
 
     const contract = exch.exportSalesContractNo   || '';

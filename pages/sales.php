@@ -637,15 +637,15 @@ function addPoBlock() {
 
         <!-- ERP Search -->
         <div class="erp-search-row">
-            <input id="erpInput_${pid}" placeholder="Search by PO number or PI number..."
+            <input id="erpInput_${pid}" placeholder="Enter ERP sales order number..."
                    onkeydown="if(event.key==='Enter')searchErp('${pid}', window.erpChoiceAction && window.erpChoiceAction['${pid}'] === 'append')">
-            <button class="primary-btn" style="white-space:nowrap;" onclick="searchErp('${pid}', window.erpChoiceAction && window.erpChoiceAction['${pid}'] === 'append')">Search ERP</button>
-            <button class="ghost-btn" style="white-space:nowrap;" onclick="prepareAddPo('${pid}')">+ Add PO</button>
+            <button class="primary-btn" style="white-space:nowrap;" onclick="searchErp('${pid}', window.erpChoiceAction && window.erpChoiceAction['${pid}'] === 'append')">Search Order</button>
+            <button class="ghost-btn" style="white-space:nowrap;" onclick="prepareAddPo('${pid}')">+ Add Order</button>
             <button class="ghost-btn" onclick="clearPo('${pid}')">Clear</button>
         </div>
         <div class="erp-banner" id="erpBanner_${pid}">
-            <strong>ERP PO Search Result</strong>
-            <span id="erpMsg_${pid}">Enter a customer PO and click Search ERP to load order details and item rows.</span>
+            <strong>ERP Sales Order Search Result</strong>
+            <span id="erpMsg_${pid}">Enter a sales order number to load its PO and item rows directly from ERP.</span>
         </div>
 
         <!-- PO Fields -->
@@ -931,11 +931,11 @@ function prepareAddPo(pid) {
     if (input) {
         input.value = '';
         input.focus();
-        input.placeholder = 'Enter another PO to append into this same PI...';
+        input.placeholder = 'Enter another ERP sales order number...';
     }
     const msg = document.getElementById('erpMsg_' + pid);
     if (msg) {
-        msg.innerHTML = '<span style="color:#2563eb;font-weight:700;">Add PO mode</span> - enter another PO and click Search ERP to append it to this same PI.';
+        msg.innerHTML = '<span style="color:#2563eb;font-weight:700;">Add Order mode</span> - enter another sales order to append its PO and items to this same PI.';
     }
 }
 
@@ -1024,7 +1024,7 @@ function chooseErpOption(pid, optionIndex) {
         const input = document.getElementById('erpInput_' + pid);
         if (input) {
             input.value = '';
-            input.placeholder = 'Search by PO number or PI number...';
+            input.placeholder = 'Enter ERP sales order number...';
         }
         return;
     }
@@ -1209,122 +1209,73 @@ function searchErp(pid, appendMode = false) {
     window.erpChoiceAction[pid] = appendMode ? 'append' : 'replace';
 
     const msg = document.getElementById('erpMsg_' + pid);
-                if (msg) msg.innerHTML = '<span style="color:#94a3b8;">Searching...</span>';
+    if (msg) msg.innerHTML = '<span style="color:#94a3b8;">Searching live ERP by sales order...</span>';
 
-    fetch(APP_BASE + '/api/pis.php?q=' + encodeURIComponent(query))
-        .then(r => r.json())
-        .then(res => {
-
-            // â”€â”€ Found as PI number â†’ load all its POs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            if (res.match === 'pi') {
-                const pi = res.pi;
-                if (appendMode) {
-                    (pi.pos || []).forEach(po => appendPoToBlock(pid, po));
-                } else {
-                    (pi.pos || []).forEach((po, i) => {
-                        let targetPid = pid;
-                        if (i > 0) {
-                            addPoBlock();
-                            const blocks = document.querySelectorAll('.po-block');
-                            targetPid = blocks[blocks.length - 1].id.replace('block_', '');
-                        }
-                        fillPoBlock(targetPid, po);
-                    });
-                }
-
-                if (!document.getElementById('piNumber').value) {
-                    document.getElementById('piNumber').value            = pi.pi_number;
-                    document.getElementById('piNumDisplay').textContent  = pi.pi_number;
-                }
-                if (!document.getElementById('piCustomer').value)
-                    document.getElementById('piCustomer').value = pi.customer || '';
-                if (!document.getElementById('piDate').value)
-                    document.getElementById('piDate').value = pi.pi_date || '';
-
-                if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Loaded PI ${pi.pi_number}</span> - ${(pi.pos||[]).length} PO(s) ${appendMode ? 'added to this PI block' : 'loaded from database'}.`;
-                if (appendMode) {
-                    window.erpChoiceAction[pid] = 'replace';
-                    const input = document.getElementById('erpInput_' + pid);
-                    if (input) {
-                        input.value = '';
-                        input.placeholder = 'Search by PO number or PI number...';
-                    }
-                }
-                return;
+    fetch(APP_BASE + '/api/erp_order_proxy.php?order=' + encodeURIComponent(query))
+        .then(async response => {
+            const erp = await response.json();
+            if (!response.ok || erp.error) {
+                throw new Error(erp.detail || erp.error || 'Could not search ERP.');
             }
-
-            // â”€â”€ Found as PO number inside a saved PI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            if (res.match === 'po') {
-                if (appendMode) {
-                    appendPoToBlock(pid, res.po);
-                    if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Added PO ${res.poNum}</span> from saved PI <strong>${res.pi.pi_number}</strong>.`;
-                    window.erpChoiceAction[pid] = 'replace';
-                    const input = document.getElementById('erpInput_' + pid);
-                    if (input) {
-                        input.value = '';
-                        input.placeholder = 'Search by PO number or PI number...';
-                    }
-                } else {
-                    fillPoBlock(pid, res.po);
-                    if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Matched PO ${res.poNum}</span> from saved PI <strong>${res.pi.pi_number}</strong>.`;
-                }
-                return;
-            }
-
-            // â”€â”€ Not found in DB â†’ try real ERP API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            if (msg) msg.innerHTML = '<span style="color:#94a3b8;">Not in saved records - searching ERP...</span>';
-
-            fetch(APP_BASE + '/api/erp_proxy.php?po=' + encodeURIComponent(query))
-                .then(r => r.json())
-                .then(erp => {
-                    if (erp.error) {
-                        if (msg) {
-                            const detail = erp.detail ? `<br><span style="font-size:11px;color:#94a3b8;">${erp.detail}</span>` : '';
-                            msg.innerHTML = `<span style="color:#f87171;">ERP error: ${erp.error}</span>${detail}`;
-                        }
-                        return;
-                    }
-                    if (!erp.found) {
-                        if (erp.multiple && Array.isArray(erp.options) && erp.options.length) {
-                            renderErpOptions(pid, query, erp.options);
-                            return;
-                        }
-                        if (msg) msg.innerHTML = `<span style="color:#f87171;">PO <strong>${query}</strong> not found in ERP or saved records.</span>`;
-                        return;
-                    }
-
-                    if (appendMode) {
-                        const firstGrp = (erp.groups || [])[0] || {};
-                        appendPoToBlock(pid, {
-                            poNum: erp.po || query,
-                            buyer: firstGrp.buyer || '',
-                            items: buildErpLinesForGroupData(erp),
-                            salesOrder: firstGrp.salesOrderNo || '',
-                            reqDate: firstGrp.requestDate || firstGrp.shipDate || '',
-                            status: firstGrp.status || ''
-                        }, {
-                            salesOrder: firstGrp.salesOrderNo || '',
-                            reqDate: firstGrp.requestDate || firstGrp.shipDate || '',
-                            status: firstGrp.status || ''
-                        });
-                        setPiCustomerIfEmpty(firstGrp.customerName || '');
-                        if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Added PO ${erp.po || query}</span> to this PI block.`;
-                        window.erpChoiceAction[pid] = 'replace';
-                        const input = document.getElementById('erpInput_' + pid);
-                        if (input) {
-                            input.value = '';
-                            input.placeholder = 'Search by PO number or PI number...';
-                        }
-                    } else {
-                        applyErpSelection(pid, erp, erp.po || query);
-                    }
-                })
-                .catch(() => {
-                    if (msg) msg.innerHTML = '<span style="color:#f87171;">ERP server unreachable.</span>';
-                });
+            return erp;
         })
-        .catch(() => {
-            if (msg) msg.innerHTML = '<span style="color:#f87171;">Server error - could not search.</span>';
+        .then(async erp => {
+            if (!erp.found || !Array.isArray(erp.groups) || !erp.groups.length) {
+                if (msg) msg.innerHTML = `<span style="color:#f87171;">Sales order <strong>${escapeErpOptionHtml(query)}</strong> was not found in ERP.</span>`;
+                return;
+            }
+
+            const currentWorkOrderId = sessionStorage.getItem('ats_current_order_id') || '';
+            if (currentWorkOrderId) {
+                const claimResponse = await fetch(APP_BASE + '/api/erp_order_import.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sale_order_no: query, work_order_id: currentWorkOrderId })
+                });
+                const claim = await claimResponse.json();
+                if (!claimResponse.ok || claim.error) {
+                    throw new Error(claim.error || 'This ERP order is already used by another work order.');
+                }
+            }
+
+            const firstGrp = erp.groups[0] || {};
+            const poNumber = firstGrp.customerPo || erp.po || '';
+            const items = buildErpLinesForGroupData(erp);
+            const poData = {
+                poNum: poNumber,
+                buyer: firstGrp.buyer || '',
+                items,
+                salesOrder: firstGrp.salesOrderNo || query,
+                reqDate: firstGrp.requestDate || firstGrp.shipDate || '',
+                status: firstGrp.status || ''
+            };
+            const extra = {
+                salesOrder: firstGrp.salesOrderNo || query,
+                reqDate: firstGrp.requestDate || firstGrp.shipDate || '',
+                status: firstGrp.status || ''
+            };
+
+            if (appendMode) {
+                appendPoToBlock(pid, poData, extra);
+            } else {
+                fillPoBlock(pid, poData, extra);
+            }
+
+            setPiCustomerIfEmpty(firstGrp.customerName || '');
+            if (msg) {
+                const action = appendMode ? 'Added' : 'Loaded';
+                msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">${action} sales order ${escapeErpOptionHtml(firstGrp.salesOrderNo || query)}</span> - PO ${escapeErpOptionHtml(poNumber || '-')} - ${items.length} merged line(s).`;
+            }
+
+            window.erpChoiceAction[pid] = 'replace';
+            const input = document.getElementById('erpInput_' + pid);
+            if (input) {
+                input.value = '';
+                input.placeholder = 'Enter ERP sales order number...';
+            }
+        })
+        .catch(error => {
+            if (msg) msg.innerHTML = `<span style="color:#f87171;">ERP error: ${escapeErpOptionHtml(error.message || 'Server unreachable.')}</span>`;
         });
 }
 
@@ -1475,14 +1426,14 @@ function clearPo(pid) {
         if (el) el.value = '';
     });
     document.getElementById('erpInput_' + pid).value = '';
-    document.getElementById('erpInput_' + pid).placeholder = 'Search by PO number or PI number...';
+    document.getElementById('erpInput_' + pid).placeholder = 'Enter ERP sales order number...';
     document.getElementById('tbody_'    + pid).innerHTML = '';
     document.getElementById('poLabel_'  + pid).textContent = 'New Purchase Order';
     rowCounters[pid] = 0;
     addRow(pid);
     calcTotal(pid);
     const msg = document.getElementById('erpMsg_' + pid);
-    if (msg) msg.textContent = 'Enter a customer PO and click Search ERP to load order details and item rows.';
+    if (msg) msg.textContent = 'Enter a sales order number to load its PO and item rows directly from ERP.';
 }
 
 function getSelectedMasterGroups() {
@@ -2540,6 +2491,25 @@ window.onOrderLoad = async function(res) {
         return;
     }
 
+    if (salesSnapshot?.erpImported && Array.isArray(salesSnapshot.pos) && salesSnapshot.pos.length) {
+        document.getElementById('poBlocksContainer').innerHTML = '';
+        poCount = 0;
+        rowCounters = {};
+        salesSnapshot.pos.forEach(po => {
+            addPoBlock();
+            const blocks = document.querySelectorAll('.po-block');
+            const pid = blocks[blocks.length - 1].id.replace('block_', '');
+            fillPoBlock(pid, po, {
+                salesOrder: po.salesOrder || '',
+                reqDate: po.reqDate || '',
+                status: po.status || 'Booked'
+            });
+        });
+        document.getElementById('piStatus').textContent = 'ERP Imported';
+        updateSummary();
+        return;
+    }
+
     if (res.pis && res.pis.length) {
         const firstPi = res.pis[0];
         // Fill shared header fields from first PI
@@ -2576,6 +2546,17 @@ window.onOrderLoad = async function(res) {
         document.getElementById('piCustomer').value = fallbackCustomer;
         window._pendingPiCustomer = fallbackCustomer;
         onPiCustomerChange();
+    }
+
+    const erpOrderFromUrl = new URLSearchParams(window.location.search).get('erp_order') || '';
+    if (erpOrderFromUrl && !window._erpOrderAutoLoaded) {
+        window._erpOrderAutoLoaded = true;
+        const firstPid = document.querySelector('.po-block')?.id.replace('block_', '') || '';
+        const erpInput = document.getElementById('erpInput_' + firstPid);
+        if (erpInput) {
+            erpInput.value = erpOrderFromUrl;
+            searchErp(firstPid, false);
+        }
     }
 
     // New order: auto-fill is handled by addPoBlock â†’ autoFillPiNum

@@ -2,11 +2,11 @@
 header('Content-Type: application/json; charset=utf-8');
 
 const ERP_BACKFILL_ACCESS_KEY = '123';
-const ERP_BACKFILL_BATCH_PAGES = 10;
+const ERP_BACKFILL_START_DATE = '10/07/2026';
+const ERP_BACKFILL_JOB_NAME = 'sale_orders_full_backfill';
 
 $isCli = (PHP_SAPI === 'cli');
 if ($isCli) {
-    // Force local DB in CLI mode.
     $_SERVER['HTTP_HOST'] = 'localhost';
 } else {
     $providedKey = (string) ($_GET['key'] ?? '');
@@ -19,8 +19,8 @@ if ($isCli) {
 
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/erp_sale_orders_cache.php';
-
-const ERP_BACKFILL_JOB_NAME = 'sale_orders_full_backfill';
+require_once __DIR__ . '/../includes/erp_order_inbox.php';
+require_once __DIR__ . '/../includes/erp_order_inbox.php';
 
 function cronBackfillOut(array $payload): void
 {
@@ -39,6 +39,13 @@ function ensureErpBackfillStateTable(PDO $db): void
             rows_seen BIGINT NOT NULL DEFAULT 0,
             rows_saved BIGINT NOT NULL DEFAULT 0,
             last_batch_count INT NOT NULL DEFAULT 0,
+            last_live_unique_rows INT NOT NULL DEFAULT 0,
+            last_cached_before INT NOT NULL DEFAULT 0,
+            last_new_rows INT NOT NULL DEFAULT 0,
+            last_cached_after INT NOT NULL DEFAULT 0,
+            last_missing_after INT NOT NULL DEFAULT 0,
+            last_verified_from_date VARCHAR(10) NULL,
+            last_verified_to_date VARCHAR(10) NULL,
             last_source_url VARCHAR(500) NULL,
             completed TINYINT(1) NOT NULL DEFAULT 0,
             last_error TEXT NULL,
@@ -48,6 +55,35 @@ function ensureErpBackfillStateTable(PDO $db): void
             UNIQUE KEY uniq_erp_backfill_job_name (job_name)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
+
+    $wanted = [
+        'next_to_date' => "ADD COLUMN next_to_date VARCHAR(10) NULL AFTER page_limit",
+        'last_completed_to_date' => "ADD COLUMN last_completed_to_date VARCHAR(10) NULL AFTER next_to_date",
+        'last_live_unique_rows' => "ADD COLUMN last_live_unique_rows INT NOT NULL DEFAULT 0 AFTER last_batch_count",
+        'last_cached_before' => "ADD COLUMN last_cached_before INT NOT NULL DEFAULT 0 AFTER last_live_unique_rows",
+        'last_new_rows' => "ADD COLUMN last_new_rows INT NOT NULL DEFAULT 0 AFTER last_cached_before",
+        'last_cached_after' => "ADD COLUMN last_cached_after INT NOT NULL DEFAULT 0 AFTER last_new_rows",
+        'last_missing_after' => "ADD COLUMN last_missing_after INT NOT NULL DEFAULT 0 AFTER last_cached_after",
+        'last_verified_from_date' => "ADD COLUMN last_verified_from_date VARCHAR(10) NULL AFTER last_missing_after",
+        'last_verified_to_date' => "ADD COLUMN last_verified_to_date VARCHAR(10) NULL AFTER last_verified_from_date",
+    ];
+
+    $stmt = $db->prepare("
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'erp_backfill_state'
+    ");
+    $stmt->execute();
+    $existing = array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+    $alters = [];
+    foreach ($wanted as $col => $clause) {
+        if (!in_array($col, $existing, true)) {
+            $alters[] = $clause;
+        }
+    }
+    if ($alters) {
+        $db->exec('ALTER TABLE erp_backfill_state ' . implode(', ', $alters));
+    }
 }
 
 function getErpBackfillState(PDO $db): array
@@ -59,16 +95,33 @@ function getErpBackfillState(PDO $db): array
     $row = $stmt->fetch();
 
     if ($row) {
-        return $row;
+        $needsReconciliationStart = empty($row['last_verified_from_date']);
+        if (empty($row['next_to_date']) || $needsReconciliationStart) {
+            $update = $db->prepare("
+                UPDATE erp_backfill_state
+                SET next_to_date = :next_to_date,
+                    completed = 0,
+                    last_error = NULL
+                WHERE job_name = :job_name
+            ");
+            $update->execute([
+                ':job_name' => ERP_BACKFILL_JOB_NAME,
+                ':next_to_date' => ERP_BACKFILL_START_DATE,
+            ]);
+            $stmt->execute([':job_name' => ERP_BACKFILL_JOB_NAME]);
+            $row = $stmt->fetch();
+        }
+        return $row ?: [];
     }
 
     $insert = $db->prepare("
-        INSERT INTO erp_backfill_state (job_name, next_offset, page_limit, completed)
-        VALUES (:job_name, 0, :page_limit, 0)
+        INSERT INTO erp_backfill_state (job_name, next_offset, page_limit, next_to_date, completed)
+        VALUES (:job_name, 0, :page_limit, :next_to_date, 0)
     ");
     $insert->execute([
         ':job_name' => ERP_BACKFILL_JOB_NAME,
         ':page_limit' => ERP_SALE_ORDERS_LIMIT,
+        ':next_to_date' => ERP_BACKFILL_START_DATE,
     ]);
 
     $stmt->execute([':job_name' => ERP_BACKFILL_JOB_NAME]);
@@ -94,29 +147,56 @@ function updateErpBackfillState(PDO $db, array $values): void
     $stmt->execute($params);
 }
 
+function normalizeBackfillDate(string $value): ?DateTimeImmutable
+{
+    $date = DateTimeImmutable::createFromFormat('d/m/Y', trim($value));
+    return $date instanceof DateTimeImmutable ? $date : null;
+}
+
 try {
     $db = getDB();
     ensureErpSaleOrdersCacheTable($db);
     $state = getErpBackfillState($db);
 
-    // NOTE: the job never permanently stops. The ERP returns orders oldest→newest
-    // across the offset range, so brand-new orders appear at the tail (highest
-    // offset). Once the full crawl has caught up (completed=1), each run re-polls
-    // from next_offset (the tail) forward so newly-created orders keep syncing.
-    $caughtUp = !empty($state['completed']);
+    $nextDate = normalizeBackfillDate((string) ($state['next_to_date'] ?? ERP_BACKFILL_START_DATE));
+    if (!$nextDate) {
+        $nextDate = normalizeBackfillDate(ERP_BACKFILL_START_DATE);
+    }
+    if (!$nextDate) {
+        throw new RuntimeException('Invalid ERP backfill start date configuration.');
+    }
 
-    $offset = max(0, (int) ($state['next_offset'] ?? 0));
-    $limit = max(1, (int) ($state['page_limit'] ?? ERP_SALE_ORDERS_LIMIT));
-    $pagesThisRun = 0;
-    $rowsSeenThisRun = 0;
-    $rowsSavedThisRun = 0;
-    $hasMore = true;
+    $today = new DateTimeImmutable(date('Y-m-d'));
+    if ($nextDate > $today) {
+        $stats = erpSaleOrdersCacheStats($db);
+        cronBackfillOut([
+            'ok' => true,
+            'stage' => 'already_complete',
+            'job' => ERP_BACKFILL_JOB_NAME,
+            'next_to_date' => $nextDate->format('d/m/Y'),
+            'last_completed_to_date' => $state['last_completed_to_date'] ?? null,
+            'rows_seen' => (int) ($state['rows_seen'] ?? 0),
+            'rows_saved' => (int) ($state['rows_saved'] ?? 0),
+            'cache_total_rows' => (int) ($stats['total_rows'] ?? 0),
+            'cache_total_pos' => (int) ($stats['total_pos'] ?? 0),
+            'last_synced_at' => $stats['last_synced_at'] ?? null,
+        ]);
+        exit(0);
+    }
+
+    $queryDate = $nextDate->format('d/m/Y');
+    $offset = 0;
+    $limit = ERP_SALE_ORDERS_LIMIT;
+    $batchCount = 0;
+    $batchSaved = 0;
     $lastSource = null;
-    $lastBatchCount = 0;
-    $processedOffsets = [];
+    $liveKeys = [];
+    $liveOrderNumbers = [];
+    $missingBefore = 0;
+    $inboxItems = [];
 
-    while ($pagesThisRun < ERP_BACKFILL_BATCH_PAGES && $hasMore) {
-        $response = erpSaleOrdersFetchPage($offset, $limit);
+    while (true) {
+        $response = erpSaleOrdersFetchDateRange($queryDate, $queryDate, $offset, $limit);
         $decoded = erpSaleOrdersDecodeResponse($response);
 
         if (empty($decoded['ok'])) {
@@ -130,9 +210,8 @@ try {
                 'ok' => false,
                 'stage' => 'fetch_error',
                 'job' => ERP_BACKFILL_JOB_NAME,
+                'p_to_date' => $queryDate,
                 'offset' => $offset,
-                'limit' => $limit,
-                'pages_this_run' => $pagesThisRun,
                 'error' => $decoded['error'] ?? 'Unknown ERP connection error',
                 'source' => $response['url'] ?? null,
             ]);
@@ -140,65 +219,102 @@ try {
         }
 
         $items = $decoded['items'] ?? [];
-        $batchCount = count($items);
-        $lastBatchCount = $batchCount;
+        $pageCount = count($items);
+        $batchCount += $pageCount;
         $lastSource = (string) ($response['url'] ?? '');
-        $processedOffsets[] = $offset;
 
-        if ($batchCount > 0) {
-            $saved = erpSaleOrdersUpsertItems(
-                $db,
-                $items,
-                (int) ($decoded['offset'] ?? $offset),
-                (int) ($decoded['limit'] ?? $limit)
-            );
-            $rowsSavedThisRun += (int) ($saved['saved'] ?? 0);
-            $rowsSeenThisRun += $batchCount;
+        if ($pageCount > 0) {
+            foreach ($items as $item) {
+                if (is_array($item)) $inboxItems[] = $item;
+            }
+            $pageKeys = erpSaleOrdersItemKeys($items);
+            foreach (erpSaleOrdersItemOrderNumbers($items) as $number) {
+                $liveOrderNumbers[$number] = true;
+            }
+            $unseenKeys = [];
+            foreach ($pageKeys as $key) {
+                if (!isset($liveKeys[$key])) {
+                    $liveKeys[$key] = true;
+                    $unseenKeys[] = $key;
+                }
+            }
+            $missingBefore += count($unseenKeys) - erpSaleOrdersCountExistingKeys($db, $unseenKeys);
+
+            $saved = erpSaleOrdersUpsertItems($db, $items, $offset, (int) ($decoded['limit'] ?? $limit));
+            $batchSaved += (int) ($saved['saved'] ?? 0);
+            syncErpOrderInbox($db, $items);
         }
 
-        $pagesThisRun++;
-        $hasMore = !empty($decoded['hasMore']);
-        if (!$hasMore) {
+        if (empty($decoded['hasMore'])) {
             break;
         }
 
-        $offset += $limit;
+        $offset += (int) ($decoded['limit'] ?? $limit);
     }
 
-    $pagesCompleted = (int) ($state['pages_completed'] ?? 0) + $pagesThisRun;
-    $rowsSeen = (int) ($state['rows_seen'] ?? 0) + $rowsSeenThisRun;
-    $rowsSaved = (int) ($state['rows_saved'] ?? 0) + $rowsSavedThisRun;
-    $nextOffset = $hasMore ? $offset : (($processedOffsets[count($processedOffsets) - 1] ?? 0));
+    $liveUniqueRows = count($liveKeys);
+    $cachedBefore = max(0, $liveUniqueRows - $missingBefore);
+    $cachedAfter = erpSaleOrdersCountExistingKeys($db, array_keys($liveKeys));
+    $missingAfter = max(0, $liveUniqueRows - $cachedAfter);
+    $liveOrderNumbers = array_keys($liveOrderNumbers);
+    $cachedOrderNumbers = erpSaleOrdersExistingOrderNumbers($db, $liveOrderNumbers);
+    $missingOrderNumbers = array_values(array_diff($liveOrderNumbers, $cachedOrderNumbers));
+
+    $rowsSeen = (int) ($state['rows_seen'] ?? 0) + $batchCount;
+    $rowsSaved = (int) ($state['rows_saved'] ?? 0) + $batchSaved;
+    $pagesCompleted = (int) ($state['pages_completed'] ?? 0) + 1;
+    $isCurrentDateRun = $nextDate->format('Y-m-d') === $today->format('Y-m-d');
+    $inboxSync = syncErpOrderInbox($db, $inboxItems, $isCurrentDateRun);
+    $verified = $missingAfter === 0 && !$missingOrderNumbers;
+    $nextRunDate = !$verified ? $nextDate : ($isCurrentDateRun ? $today : $nextDate->modify('+1 day'));
+    $completed = $nextRunDate > $today ? 1 : 0;
+    $lastCompletedDate = $verified ? $queryDate : ($state['last_completed_to_date'] ?? null);
 
     updateErpBackfillState($db, [
-        'next_offset' => $nextOffset,
+        'next_to_date' => $nextRunDate->format('d/m/Y'),
+        'last_completed_to_date' => $lastCompletedDate,
         'pages_completed' => $pagesCompleted,
         'rows_seen' => $rowsSeen,
         'rows_saved' => $rowsSaved,
-        'last_batch_count' => $lastBatchCount,
+        'last_batch_count' => $batchCount,
+        'last_live_unique_rows' => $liveUniqueRows,
+        'last_cached_before' => $cachedBefore,
+        'last_new_rows' => $missingBefore,
+        'last_cached_after' => $cachedAfter,
+        'last_missing_after' => $missingAfter,
+        'last_verified_from_date' => $queryDate,
+        'last_verified_to_date' => $queryDate,
         'last_source_url' => $lastSource,
-        'completed' => $hasMore ? 0 : 1,
+        'completed' => $completed,
         'last_error' => null,
         'last_run_at' => date('Y-m-d H:i:s'),
     ]);
 
-    // Stage: still crawling → batch_saved; reached the end → either the first
-    // completion, or a tail re-poll that looked for newly-added orders.
-    $stage = $hasMore ? 'batch_saved' : ($caughtUp ? 'tail_repolled' : 'completed');
-
     $stats = erpSaleOrdersCacheStats($db);
     cronBackfillOut([
-        'ok' => true,
-        'stage' => $stage,
-        'caught_up' => !$hasMore,
+        'ok' => $verified,
+        'stage' => !$verified ? 'cache_verification_failed' : ($isCurrentDateRun ? 'current_date_resynced' : ($completed ? 'completed' : 'date_saved')),
         'job' => ERP_BACKFILL_JOB_NAME,
-        'pages_this_run' => $pagesThisRun,
-        'processed_offsets' => $processedOffsets,
-        'limit_per_page' => $limit,
-        'rows_seen_this_run' => $rowsSeenThisRun,
-        'rows_saved_this_run' => $rowsSavedThisRun,
-        'has_more' => $hasMore,
-        'next_offset' => $nextOffset,
+        'p_to_date' => $queryDate,
+        'batch_count' => $batchCount,
+        'batch_saved' => $batchSaved,
+        'live_unique_rows' => $liveUniqueRows,
+        'cached_before' => $cachedBefore,
+        'new_rows_added' => $missingBefore,
+        'cached_after' => $cachedAfter,
+        'missing_after' => $missingAfter,
+        'live_order_numbers' => count($liveOrderNumbers),
+        'cached_order_numbers' => count($cachedOrderNumbers),
+        'missing_order_numbers' => $missingOrderNumbers,
+        'erp_inbox_orders' => (int)($inboxSync['orders'] ?? 0),
+        'erp_inbox_new_orders' => (int)($inboxSync['new_orders'] ?? 0),
+        'commercial_notifications_created' => (int)($inboxSync['notified'] ?? 0),
+        'verified_range' => [
+            'from' => $queryDate,
+            'to' => $queryDate,
+        ],
+        'next_to_date' => $nextRunDate->format('d/m/Y'),
+        'last_completed_to_date' => $lastCompletedDate,
         'pages_completed' => $pagesCompleted,
         'rows_seen' => $rowsSeen,
         'rows_saved' => $rowsSaved,

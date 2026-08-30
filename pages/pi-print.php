@@ -19,8 +19,8 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .pi-po-sel { display:none; }
 
 /* ── PI Document ─────────────────────────────────────────────────── */
-.pi-wrap { position:relative; box-sizing:border-box; width:210mm; height:297mm; max-width:900px; margin:24px auto 10px; font-family:'Times New Roman',Times,serif; font-size:11pt; color:#000; background:#fff; padding:14mm 14mm 30mm; box-shadow:0 2px 20px rgba(0,0,0,.12); overflow:hidden; }
-.pi-wrap .zzal-print-brand--footer { position:absolute; left:14mm; right:14mm; bottom:8mm; margin:0!important; padding-top:6px!important; }
+.pi-wrap { position:relative; box-sizing:border-box; width:210mm; height:297mm; max-width:900px; margin:24px auto 10px; font-family:'Times New Roman',Times,serif; font-size:11pt; color:#000; background:#fff; padding:14mm 14mm 30mm; box-shadow:0 2px 20px rgba(0,0,0,.12); overflow:hidden; display:flex; flex-direction:column; }
+.pi-wrap .zzal-print-brand--footer { position:static; margin-top:auto!important; padding-top:6px!important; }
 .pi-continuation { display:none; }
 
 /* Header */
@@ -39,7 +39,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 
 /* Table */
 .pi-table { width:100%; border-collapse:collapse; margin-bottom:8px; font-size:10pt; }
-.pi-table th { background:#1a3a6e; color:#fff; padding:6px 8px; text-align:center; border:1px solid #1a3a6e; font-size:9.5pt; }
+.pi-table th { background:#fff; color:#111; padding:6px 8px; text-align:center; border:1px solid #1a3a6e; font-size:9.5pt; }
 .pi-table td { border:1px solid #888; padding:5px 8px; vertical-align:top; }
 .pi-table td.center { text-align:center; }
 .pi-table td.right  { text-align:right; }
@@ -49,12 +49,14 @@ require_once __DIR__ . '/../includes/print-brand.php';
 
 /* Terms */
 .pi-terms { margin-top:10px; }
+.pi-terms-grow { flex:1; display:flex; flex-direction:column; }
+.pi-terms-grow .pi-terms { flex:1; }
 .pi-terms h3 { font-size:10pt; font-weight:700; text-decoration:underline; margin-bottom:4px; }
 .pi-terms ol { margin:0; padding-left:28px; font-size:9.5pt; line-height:1.55; }
 .pi-terms ol li { margin-bottom:2px; }
 
 /* Signatures */
-.pi-sigs { display:flex; justify-content:space-between; margin-top:30px; }
+.pi-sigs { display:flex; justify-content:space-between; margin-top:16px; }
 .pi-sig-box { text-align:center; }
 .pi-sig-line { border-top:1.5px solid #000; width:200px; margin:0 auto 4px; }
 .pi-sig-label { font-size:9.5pt; font-weight:700; }
@@ -65,8 +67,8 @@ require_once __DIR__ . '/../includes/print-brand.php';
     @page { size:A4 portrait; margin:0; }
     .pi-ctrl, nav, .order-id-bar, .form-stack > *:not(#piWrap) { display:none !important; }
     body, html { width:210mm!important; min-height:297mm!important; margin:0!important; padding:0!important; background:#fff !important; overflow:visible!important; }
-    .pi-wrap { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:14mm 14mm 30mm!important; overflow:hidden; }
-    .pi-wrap .zzal-print-brand--footer { position:absolute!important; left:14mm!important; right:14mm!important; bottom:8mm!important; margin:0!important; }
+    .pi-wrap { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:14mm 14mm 30mm!important; overflow:hidden; display:flex!important; flex-direction:column!important; }
+    .pi-wrap .zzal-print-brand--footer { position:static!important; margin-top:auto!important; }
     .pi-header { display:none !important; }
     .app-shell { display:block !important; }
     .form-stack { padding:0 !important; }
@@ -161,13 +163,13 @@ require_once __DIR__ . '/../includes/print-brand.php';
 
     <div class="pi-words">TOTAL AMOUNT : US DOLLAR: <span id="piDocWords">—</span></div>
 
-    <div class="pi-terms">
-        <h3>Terms &amp; Conditions:</h3>
-        <ol id="piTermsList">
-            <!-- populated by JS -->
-        </ol>
-    </div>
-
+    <div class="pi-terms-grow">
+        <div class="pi-terms">
+            <h3>Terms &amp; Conditions:</h3>
+            <ol id="piTermsList">
+                <!-- populated by JS -->
+            </ol>
+        </div>
         <div class="pi-sigs" id="piSigs">
             <div class="pi-sig-box">
                 <div class="pi-sig-line"></div>
@@ -178,6 +180,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
                 <div class="pi-sig-label">Authorised Signature</div>
             </div>
         </div>
+    </div>
 
         <?= zzal_print_brand_footer() ?>
 
@@ -189,11 +192,12 @@ require_once __DIR__ . '/../includes/print-brand.php';
             <div><b>PROFOMA INVOICE NO :</b> <span id="piContDocNum">-</span></div>
             <div><b>Date :</b> <span id="piContDocDate">-</span></div>
         </div>
-        <div class="pi-terms">
-            <h3>Terms &amp; Conditions:</h3>
-            <ol id="piTermsCont" start="12"></ol>
-        </div>
-        <div class="pi-sigs" style="margin-top:28mm;">
+        <div class="pi-terms-grow">
+            <div class="pi-terms">
+                <h3>Terms &amp; Conditions:</h3>
+                <ol id="piTermsCont" start="12"></ol>
+            </div>
+        <div class="pi-sigs" style="margin-top:16px;">
             <div class="pi-sig-box">
                 <div class="pi-sig-line"></div>
                 <div class="pi-sig-label">SIGNATURE OF BUYER</div>
@@ -202,6 +206,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
                 <div class="pi-sig-line" style="margin-left:auto;margin-right:0;margin-top:40px;"></div>
                 <div class="pi-sig-label">Authorised Signature</div>
             </div>
+        </div>
         </div>
         <?= zzal_print_brand_footer() ?>
     </div>
@@ -221,21 +226,43 @@ function setPiType(type, btn) {
 
 // ── Number to words ───────────────────────────────────────────────
 function numToWords(n) {
-    const a = ['','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE',
-                'TEN','ELEVEN','TWELVE','THIRTEEN','FOURTEEN','FIFTEEN','SIXTEEN',
-                'SEVENTEEN','EIGHTEEN','NINETEEN'];
-    const b = ['','','TWENTY','THIRTY','FORTY','FIFTY','SIXTY','SEVENTY','EIGHTY','NINETY'];
-    const toW = x => {
+    const amount = parseFloat(n || 0) || 0;
+    const ones = ['ZERO','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN','ELEVEN','TWELVE','THIRTEEN','FOURTEEN','FIFTEEN','SIXTEEN','SEVENTEEN','EIGHTEEN','NINETEEN'];
+    const tens = ['','','TWENTY','THIRTY','FORTY','FIFTY','SIXTY','SEVENTY','EIGHTY','NINETY'];
+    const scales = ['', 'THOUSAND', 'MILLION', 'BILLION'];
+    const chunkWords = x => {
+        x = Math.floor(x);
         if (x === 0) return '';
-        if (x < 20)  return a[x] + ' ';
-        if (x < 100) return b[Math.floor(x/10)] + (x%10 ? ' ' + a[x%10] : '') + ' ';
-        return a[Math.floor(x/100)] + ' HUNDRED ' + toW(x%100);
+        if (x < 20) return ones[x];
+        if (x < 100) return tens[Math.floor(x / 10)] + (x % 10 ? ' ' + ones[x % 10] : '');
+        return ones[Math.floor(x / 100)] + ' HUNDRED' + (x % 100 ? ' ' + chunkWords(x % 100) : '');
     };
-    const cents = Math.round((n % 1) * 100);
-    const dollars = Math.floor(n);
-    let w = (toW(dollars) || 'ZERO ').trim();
-    if (cents > 0) w += ' & CENTS ' + (toW(cents) || '').trim();
-    return w + ' ONLY.';
+    const integerWords = x => {
+        x = Math.floor(x);
+        if (x === 0) return 'ZERO';
+        let parts = [];
+        let scale = 0;
+        while (x > 0) {
+            const chunk = x % 1000;
+            if (chunk) {
+                const words = chunkWords(chunk);
+                parts.unshift(words + (scales[scale] ? ' ' + scales[scale] : ''));
+            }
+            x = Math.floor(x / 1000);
+            scale++;
+        }
+        return parts.join(' ').trim();
+    };
+    let centsTotal = Math.round(amount * 100);
+    let dollars = Math.floor(centsTotal / 100);
+    let cents = centsTotal % 100;
+    if (cents === 100) {
+        dollars += 1;
+        cents = 0;
+    }
+    let words = integerWords(dollars);
+    if (cents > 0) words += ' & CENTS ' + integerWords(cents);
+    return words + ' ONLY.';
 }
 
 function formatUSD(v) { return '$ ' + parseFloat(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -390,8 +417,8 @@ function renderPi() {
     terms[12] = `H.S.Code : <b>${hsCode}</b>`;
     terms[13] = `${docMust} Mustbe`;
 
-    const firstPageTerms = terms.slice(0, 11);
-    const continuedTerms = terms.slice(11);
+    const firstPageTerms = terms.slice(0, 10);
+    const continuedTerms = terms.slice(10);
     const ol = document.getElementById('piTermsList');
     ol.innerHTML = firstPageTerms.map(t => `<li>${t}</li>`).join('');
     document.getElementById('piTermsCont').innerHTML = continuedTerms.map(t => `<li>${t}</li>`).join('');

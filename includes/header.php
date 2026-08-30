@@ -102,6 +102,11 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
             <span class="nav-flow-arrow">&#8594;</span>
             <a class="nav-home-btn<?= $activePage === 'dashboard' ? ' active' : '' ?>"
                href="<?= BASE_PATH ?>/pages/dashboard.php">&#9783; Dashboard</a>
+            <?php if (canAccessTab('erp-orders-report')): ?>
+            <span class="nav-flow-arrow">&#8594;</span>
+            <a class="nav-home-btn<?= $activePage === 'erp-orders-report' ? ' active' : '' ?>"
+               href="<?= BASE_PATH ?>/pages/erp-live-orders-report.php">&#128230; ERP Orders</a>
+            <?php endif; ?>
 
             <div class="nav-user-bar">
                 <div class="nav-notify-wrap">
@@ -136,7 +141,6 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
             ['id' => 'costing-review',   'href' => 'costing-review.php',        'label' => 'Costing Review'],
             ['id' => 'production',       'href' => 'production.php',            'label' => 'Production'],
             ['id' => 'sales',            'href' => 'sales.php',                 'label' => 'PI'],
-            ['id' => 'erp-orders-report','href' => 'erp-orders-report.php',     'label' => 'ERP Orders'],
             ['id' => 'marketing',        'href' => 'marketing.php',            'label' => 'Marketing'],
             ['id' => 'lc',               'href' => 'lc.php',                    'label' => 'LC'],
             ['id' => 'exchange',         'href' => 'exchange.php',              'label' => 'Bill of Exchange'],
@@ -369,11 +373,11 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
             }
 
             listEl.innerHTML = items.map(n => `
-                <div class="nav-notify-item ${Number(n.is_read) ? '' : 'unread'}" data-id="${n.id}" data-order-id="${encodeURIComponent(n.order_id)}" data-step="${n.step_name}">
+                <div class="nav-notify-item ${Number(n.is_read) ? '' : 'unread'}" data-id="${n.id}" data-type="${escapeHtml(n.type || 'workflow')}" data-erp-order="${escapeHtml(n.erp_order_no || '')}" data-order-id="${encodeURIComponent(n.order_id)}" data-step="${n.step_name}">
                     <div class="nav-notify-title">${escapeHtml(n.title || '')}</div>
                     <div class="nav-notify-msg">${escapeHtml(n.message || '')}</div>
                     <div class="nav-notify-meta">
-                        <span>${escapeHtml(n.order_id || '')}</span>
+                        <span>${escapeHtml(n.erp_order_no ? 'ERP ' + n.erp_order_no : (n.order_id || ''))}</span>
                         <span>${escapeHtml((n.step_name || '').replace(/-/g, ' '))}</span>
                         <span>${escapeHtml(timeAgo(n.created_at))}</span>
                     </div>
@@ -383,8 +387,30 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
             listEl.querySelectorAll('.nav-notify-item').forEach(item => {
                 item.addEventListener('click', async function () {
                     const id = this.dataset.id;
+                    const type = this.dataset.type || 'workflow';
+                    const erpOrder = this.dataset.erpOrder || '';
                     const orderId = decodeURIComponent(this.dataset.orderId || '');
                     const step = this.dataset.step || '';
+                    if (type === 'erp_order' && erpOrder) {
+                        this.style.pointerEvents = 'none';
+                        this.style.opacity = '0.65';
+                        try {
+                            const response = await fetch(APP_BASE + '/api/erp_create_work_order.php', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ erp_order_no: erpOrder })
+                            });
+                            const result = await response.json();
+                            if (!response.ok || result.error) throw new Error(result.error || 'Could not create work order.');
+                            sessionStorage.setItem('ats_current_order_id', result.order_id);
+                            window.location.href = APP_BASE + '/pages/sales.php?erp_order=' + encodeURIComponent(erpOrder);
+                        } catch (error) {
+                            alert(error.message || 'Could not create work order.');
+                            this.style.pointerEvents = '';
+                            this.style.opacity = '';
+                        }
+                        return;
+                    }
                     try {
                         await fetch(APP_BASE + '/api/notifications.php', {
                             method: 'POST',
@@ -393,6 +419,10 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
                         });
                     } catch (_) {}
 
+                    if (step === 'erp-order') {
+                        window.location.href = APP_BASE + '/pages/erp-live-orders-report.php?create_erp_order=' + encodeURIComponent(orderId);
+                        return;
+                    }
                     if (orderId) sessionStorage.setItem('ats_current_order_id', orderId);
                     const target = stepPageMap[step] || 'dashboard.php';
                     window.location.href = APP_BASE + '/pages/' + target;

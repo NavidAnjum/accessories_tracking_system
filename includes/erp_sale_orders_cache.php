@@ -121,6 +121,53 @@ function erpSaleOrdersFetchPage(int $offset = 0, int $limit = ERP_SALE_ORDERS_LI
     return ['ok' => true, 'body' => $body, 'url' => $url];
 }
 
+function erpSaleOrdersFetchDateRange(string $fromDate, string $toDate, int $offset = 0, int $limit = ERP_SALE_ORDERS_LIMIT): array
+{
+    $url = ERP_SALE_ORDERS_BASE
+        . '?p_from_date=' . rawurlencode($fromDate)
+        . '&p_to_date=' . rawurlencode($toDate)
+        . '&offset=' . max(0, $offset)
+        . '&limit=' . max(1, $limit);
+
+    if (function_exists('curl_init')) {
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 60,
+            CURLOPT_HTTPHEADER => ['Accept: application/json'],
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+        ]);
+        $body = curl_exec($ch);
+        $error = curl_error($ch);
+        curl_close($ch);
+        if ($body === false) {
+            return ['ok' => false, 'error' => $error ?: 'Unknown cURL error', 'url' => $url];
+        }
+        return ['ok' => true, 'body' => $body, 'url' => $url];
+    }
+
+    $ctx = stream_context_create([
+        'http' => ['method' => 'GET', 'timeout' => 60, 'header' => "Accept: application/json\r\n"],
+        'ssl'  => ['verify_peer' => false, 'verify_peer_name' => false],
+    ]);
+    $body = @file_get_contents($url, false, $ctx);
+    if ($body === false) {
+        $lastError = error_get_last();
+        return ['ok' => false, 'error' => $lastError['message'] ?? 'file_get_contents failed', 'url' => $url];
+    }
+
+    return ['ok' => true, 'body' => $body, 'url' => $url];
+}
+
+function erpSaleOrdersFetchToDate(string $toDate, int $offset = 0, int $limit = ERP_SALE_ORDERS_LIMIT): array
+{
+    return erpSaleOrdersFetchDateRange($toDate, $toDate, $offset, $limit);
+}
+
 function erpSaleOrdersFetchExactPo(string $po): array
 {
     $url = ERP_SALE_ORDERS_BASE . '?po=' . rawurlencode($po);
@@ -198,6 +245,69 @@ function erpSaleOrdersCacheKey(array $row): string
         (string) ($row['ordered_item'] ?? ''),
     ];
     return sha1(implode('|', $parts));
+}
+
+function erpSaleOrdersItemKeys(array $items): array
+{
+    $keys = [];
+    foreach ($items as $row) {
+        if (is_array($row)) {
+            $key = erpSaleOrdersCacheKey($row);
+            $keys[$key] = true;
+        }
+    }
+    return array_keys($keys);
+}
+
+function erpSaleOrdersCountExistingKeys(PDO $db, array $keys): int
+{
+    $keys = array_values(array_unique(array_filter(array_map('strval', $keys))));
+    if (!$keys) {
+        return 0;
+    }
+
+    $found = 0;
+    foreach (array_chunk($keys, 500) as $chunk) {
+        $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+        $stmt = $db->prepare("SELECT COUNT(*) FROM erp_sale_orders_cache WHERE cache_key IN ($placeholders)");
+        $stmt->execute($chunk);
+        $found += (int) $stmt->fetchColumn();
+    }
+    return $found;
+}
+
+function erpSaleOrdersItemOrderNumbers(array $items): array
+{
+    $numbers = [];
+    foreach ($items as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $number = trim((string) ($row['sale_order_no'] ?? ''));
+        if ($number !== '') {
+            $numbers[$number] = true;
+        }
+    }
+    return array_keys($numbers);
+}
+
+function erpSaleOrdersExistingOrderNumbers(PDO $db, array $numbers): array
+{
+    $numbers = array_values(array_unique(array_filter(array_map('strval', $numbers))));
+    if (!$numbers) {
+        return [];
+    }
+
+    $found = [];
+    foreach (array_chunk($numbers, 500) as $chunk) {
+        $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+        $stmt = $db->prepare("SELECT DISTINCT sale_order_no FROM erp_sale_orders_cache WHERE sale_order_no IN ($placeholders)");
+        $stmt->execute($chunk);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $number) {
+            $found[(string) $number] = true;
+        }
+    }
+    return array_keys($found);
 }
 
 function erpSaleOrdersNormalize(string $value): string
