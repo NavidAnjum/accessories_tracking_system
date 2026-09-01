@@ -40,10 +40,23 @@ setup/      one-off migrations / seeds / ERP backfill + cron scripts
 - `notifications` — per-user worklist; written on step change.
 - Master data: `customers`, `buyers`, `items`.
 - ERP cache: `erp_sale_orders_cache` (+ `erp_backfill_state`).
+- `erp_order_inbox` — one row per ERP **sales order** (`sale_order_no` unique).
+  Tracks conversion (`work_order_id` is indexed and may repeat because one
+  multi-PO work order can include multiple ERP sales orders),
+  read state (`read_at` / `read_by_id`), and a `snapshot_json` of the ERP lines.
+  Managed via [includes/erp_order_inbox.php](includes/erp_order_inbox.php); its
+  tables/columns self-migrate through `ensureErpOrderInboxTable()`.
 
 Important: **order detail for PI-created orders lives in `pis`, not `orders`.**
 When surfacing order info (e.g. dashboards), enrich from `pis` — don't assume
 the `orders` row is populated.
+
+**Work-order id generation** (`ORD-YYYY-MM-NNNNN`): the next sequence number must
+be the **max across BOTH `orders.order_id` and `erp_order_inbox.work_order_id`**.
+Using only `orders` max reused an id already claimed in
+the inbox → 1062 duplicate. See `nextErpWorkOrderId()`
+([api/erp_create_work_order.php](api/erp_create_work_order.php)) and the same
+logic in [api/erp_order_import.php](api/erp_order_import.php).
 
 ## Roles & the redirect guard
 - Roles and their allowed pages are defined in `allowedTabs()`
@@ -65,12 +78,61 @@ the `orders` row is populated.
 
 ## ERP integration (see [api/erp_proxy.php](api/erp_proxy.php) + [includes/erp_sale_orders_cache.php](includes/erp_sale_orders_cache.php))
 - Live ERP: `https://ebs.talhagroup.com:8080/ords/xxapi/ebs/sale-orders` (`?po=` or `?offset=&limit=`).
+- Exact sales-order lookup from the PI page uses [api/erp_order_proxy.php](api/erp_order_proxy.php):
+  check `erp_sale_orders_cache.sale_order_no` first and call the live ERP only
+  when the order is absent locally; successful live results are cached.
 - Proxy merges **live + local cache**, dedupes, groups by customer PO / sales
   order, prefers exact live PO, and returns `multiple:true` + `options[]` when
   ambiguous. ERP `customerName` is the real customer → map it to **Customer (TO)**,
   not to the Buyer field.
 - Cache search is scored and deliberately does **not** split structured codes
   (letters+digits+separators like `601BLAUI27-210`) into loose tokens.
+
+### ERP Live Orders report ([pages/erp-live-orders-report.php](pages/erp-live-orders-report.php) + [api/erp_live_orders_report.php](api/erp_live_orders_report.php))
+- Full-width page, linked at the top nav beside Dashboard (gated by
+  `canAccessTab('erp-orders-report')`). Commercial-facing.
+- **Cache-first then reconcile**: the page first loads saved rows fast
+  (`?cached=1`, read from `erp_sale_orders_cache` by `header_creation_date`),
+  then fetches live and merges. **Every live load also upserts** what it fetched
+  (`erpSaleOrdersUpsertItems`) and `syncErpOrderInbox()` so nothing is missed —
+  the backfill cron is a backup, not the only writer.
+- Auto-loads the last ~10 days on open and auto-reloads when the date range
+  changes. Client-side filters: Work Order (All / Not Created / Already Created),
+  Read (All / Unread / Read), and free-text **Customer / Buyer / Sales Person /
+  PO** search boxes (all in `erpLiveApplyFilter()`).
+- Rows carry `workOrderId` + `conversionStatus` (from `erpOrderInboxMappings`)
+  and `readStatus` (from `erpOrderInboxReadMap`). "Already created" counts as read.
+- Do **not** re-add a "saved N new rows to DB" indicator — it was removed, and
+  the count computation (`erpSaleOrdersItemKeys`/`CountExistingKeys`) was dropped
+  because it threw "undefined function" in some runtime paths.
+
+### ERP → notifications
+- `canManageErpOrderInbox()` roles see unconverted ERP orders as notifications.
+- The list is floored at a **fixed start date** `ERP_ORDER_NOTIFY_FLOOR_DATE`
+  ([includes/config.php](includes/config.php), currently `2026-08-30`): show every
+  unconverted order with `header_creation_date >= floor`, staying until a work
+  order is created. Do **not** pin the list to `MAX(header_creation_date)` or to
+  "today" — that hid all but the newest day's orders.
+
+## Print / PDF pages (export & bank documents)
+- Print pages: [pages/pi-print.php](pages/pi-print.php),
+  [pages/single-pi.php](pages/single-pi.php),
+  [pages/commercial-print.php](pages/commercial-print.php),
+  [pages/exchange-print.php](pages/exchange-print.php),
+  [pages/document-print.php](pages/document-print.php).
+- Each doc is a fixed A4 box: `.spi-doc`/equivalent at `width:210mm;height:297mm`,
+  `@page{margin:0}`, `overflow:hidden`. The container is a **flex column** and the
+  brand footer uses `margin-top:auto` so it pins to the page bottom; the content
+  block uses `flex:1 1 auto` (not just `min-height:100%`, which is flaky) so it
+  fills the page and the footer actually reaches the bottom.
+- **Term/page-2 pagination** ([single-pi.php](pages/single-pi.php)): split to the
+  continuation page only on **real overflow** (`docEl.scrollHeight >
+  docEl.clientHeight`). An earlier "require N px of slack below the footer" check
+  bumped a term to a near-empty page 2 even when everything fit.
+- **Font sizing is per-document**: the **PI** (single-pi + pi-print) is scaled to
+  75% of the original sizes; the other print docs are at their original sizes.
+  Don't blanket-scale all print pages when a request says "PI only".
+- **PLY** is removed from the printed PDFs only, **not** the data-entry UI.
 
 ## How to run / verify
 - Just open pages in the browser under `http://localhost/ed_module` (XAMPP Apache
@@ -95,4 +157,10 @@ the `orders` row is populated.
    marketing role back to intake; keep post-submit nav role-legal.
 4. A PI could be submitted with no customer selected → blank order; validate/
    fill customer on submit and copy it onto the `orders` row.
-```
+5. Work-order id was generated from `orders` max only → collided with an id
+   already in `erp_order_inbox.work_order_id` (1062 duplicate). Take the max
+   across both tables. (See work-order id note above.)
+6. PI print rendered a near-empty second page — the paginator split on
+   insufficient slack instead of real overflow. Split on `scrollHeight`.
+7. ERP notifications showed only the newest date because the query pinned to
+   `MAX(header_creation_date)`; use the fixed `ERP_ORDER_NOTIFY_FLOOR_DATE`.

@@ -133,7 +133,7 @@ $stageMeta = [
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>Company Name</th>
+                    <th>Group Name</th>
                     <th>Type</th>
                     <th>Chairman / MD</th>
                     <th>Mobile</th>
@@ -257,7 +257,7 @@ $stageMeta = [
             <div id="reviewDocChecklist" style="display:none;padding:0 28px 20px;">
                 <div style="border-top:2px dashed #bae6fd;padding-top:18px;">
                     <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#0284c7;margin-bottom:12px;">
-                        9. Document Checklist
+                        10. Document Checklist
                     </div>
                     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;">
                         <?php foreach(['Trade License','BIN','TIN','Bond License','Bank Solvency','Company Profile','Compliance Certificates','Factory Photos','Sample Approval'] as $doc): ?>
@@ -323,20 +323,18 @@ $stageMeta = [
                 <input type="text" id="cp_customerCode" class="field-input" placeholder="e.g. CUST-001">
             </div>
             <div class="span-6">
-                <label class="field-label">Company Name <span style="color:#dc2626;">*</span></label>
-                <input type="text" id="cp_companyName" class="field-input" placeholder="Full legal company name">
+                <label class="field-label">Group Name <span style="color:#dc2626;">*</span></label>
+                <input type="text" id="cp_companyName" class="field-input" placeholder="Full legal group name">
             </div>
             <div class="span-3">
                 <label class="field-label">Customer Type</label>
                 <select id="cp_customerType" class="field-input">
-                    <option value="Regular">Regular</option>
-                    <option value="Premium">Premium</option>
                     <option value="New">New</option>
-                    <option value="Strategic">Strategic</option>
+                    <option value="Regular">Regular</option>
                 </select>
             </div>
             <div class="span-4">
-                <label class="field-label">Industry</label>
+                <label class="field-label">Business Type</label>
                 <input type="text" id="cp_industry" class="field-input" placeholder="e.g. Garments, Textile">
             </div>
             <div class="span-4">
@@ -357,7 +355,7 @@ $stageMeta = [
             </div>
             <div class="span-12" style="background:#f8f9ff;border:1.5px solid #e0e3ff;border-radius:10px;padding:14px 16px;">
                 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6366f1;margin-bottom:12px;">Chairman / MD / Director</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
                     <div>
                         <label class="field-label">Name</label>
                         <input type="text" id="cp_chairmanName" class="field-input" placeholder="Full name">
@@ -366,11 +364,15 @@ $stageMeta = [
                         <label class="field-label">Phone</label>
                         <input type="text" id="cp_chairmanMobile" class="field-input" placeholder="+880...">
                     </div>
+                    <div>
+                        <label class="field-label">Email</label>
+                        <input type="email" id="cp_chairmanEmail" class="field-input" placeholder="chairman@company.com">
+                    </div>
                 </div>
             </div>
             <div class="span-12" style="background:#f8f9ff;border:1.5px solid #e0e3ff;border-radius:10px;padding:14px 16px;">
                 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6366f1;margin-bottom:12px;">Commercial Contact</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
                     <div>
                         <label class="field-label">Name</label>
                         <input type="text" id="cp_commercialName" class="field-input" placeholder="Contact name">
@@ -378,6 +380,10 @@ $stageMeta = [
                     <div>
                         <label class="field-label">Number</label>
                         <input type="text" id="cp_commercialNumber" class="field-input" placeholder="+880...">
+                    </div>
+                    <div>
+                        <label class="field-label">Email</label>
+                        <input type="email" id="cp_commercialEmail" class="field-input" placeholder="commercial@company.com">
                     </div>
                 </div>
             </div>
@@ -400,8 +406,8 @@ $stageMeta = [
             </div>
         </div>
 
-        <!-- ── Section 2: Business & Compliance ── -->
-        <div class="cp-section-head">2. Business &amp; Compliance</div>
+        <!-- ── Section 2: KYC ── -->
+        <div class="cp-section-head">2. KYC</div>
         <div class="form-grid">
             <div class="span-4">
                 <label class="field-label">Trade License No.</label>
@@ -416,11 +422,15 @@ $stageMeta = [
                 <input type="text" id="cp_tin" class="field-input" placeholder="TIN number">
             </div>
             <div class="span-4">
+                <label class="field-label">ERC</label>
+                <input type="text" id="cp_erc" class="field-input" placeholder="ERC number">
+            </div>
+            <div class="span-4">
                 <label class="field-label">Bond License No.</label>
                 <input type="text" id="cp_bondLicense" class="field-input" placeholder="Bond license number">
             </div>
             <div class="span-4">
-                <label class="field-label">Bond License Expiry</label>
+                <label class="field-label">Bond License Expiry Date</label>
                 <input type="date" id="cp_bondLicenseExpiry" class="field-input">
             </div>
             <div class="span-4">
@@ -690,6 +700,9 @@ $stageMeta = [
                     <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 12px;border:1.5px solid #d1d5db;border-radius:8px;" id="dclbl_tin">
                         <input type="checkbox" id="cp_dc_tin" value="TIN" onchange="pillHighlight('dclbl_tin',this)"> TIN
                     </label>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 12px;border:1.5px solid #d1d5db;border-radius:8px;" id="dclbl_erc">
+                        <input type="checkbox" id="cp_dc_erc" value="ERC" onchange="pillHighlight('dclbl_erc',this)"> ERC
+                    </label>
                     <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 12px;border:1.5px solid #d1d5db;border-radius:8px;" id="dclbl_bondlic">
                         <input type="checkbox" id="cp_dc_bondlic" value="Bond License" onchange="pillHighlight('dclbl_bondlic',this)"> Bond License
                     </label>
@@ -906,6 +919,16 @@ function renderSectionTitle(t) {
     return `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#6366f1;border-bottom:1.5px solid #e0e3ff;padding-bottom:4px;margin:18px 0 10px;">${t}</div>`;
 }
 
+function escHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    }[ch]));
+}
+
 function renderGrid(rows, cols) {
     cols = cols || 2;
     return `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:10px 24px;font-size:13px;">` +
@@ -943,6 +966,59 @@ function renderMatrixTable(matrix) {
     return t;
 }
 
+function renderScorecardReview(scorecard) {
+    if (!scorecard || !Object.keys(scorecard).length) {
+        return '<span style="color:#94a3b8;font-size:13px;">No scorecard saved</span>';
+    }
+
+    const total = Number(scorecard.total || 0);
+    const grade = escHtml(scorecard.grade || '-');
+    const action = escHtml(scorecard.action || '-');
+    const sections = Array.isArray(scorecard.sections) ? scorecard.sections : [];
+
+    let html = `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;">
+            <div style="background:#eef2ff;border:1px solid #dbe4ff;border-radius:10px;padding:12px;">
+                <div style="font-size:10px;text-transform:uppercase;color:#64748b;font-weight:800;">Total Score</div>
+                <div style="font-size:24px;font-weight:900;color:#4f46e5;">${total}/100</div>
+            </div>
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;">
+                <div style="font-size:10px;text-transform:uppercase;color:#64748b;font-weight:800;">Grade</div>
+                <div style="font-size:24px;font-weight:900;color:#15803d;">${grade}</div>
+            </div>
+            <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px;">
+                <div style="font-size:10px;text-transform:uppercase;color:#64748b;font-weight:800;">Action</div>
+                <div style="font-size:13px;font-weight:700;color:#9a3412;">${action}</div>
+            </div>
+        </div>`;
+
+    sections.forEach(section => {
+        const answers = Array.isArray(section.answers) ? section.answers : [];
+        html += `
+            <div style="border:1px solid #e0e7ff;border-radius:10px;margin-top:10px;overflow:hidden;">
+                <div style="display:flex;justify-content:space-between;gap:10px;background:#f8f9ff;padding:8px 10px;font-weight:800;color:#1e1e2e;">
+                    <span>${escHtml(section.title || '-')}</span>
+                    <span style="color:#4f46e5;">${Number(section.subtotal || 0)}/${Number(section.max || 0)}</span>
+                </div>
+                <table style="border-collapse:collapse;width:100%;font-size:12px;">
+                    <tbody>
+                        ${answers.map(a => {
+                            const score = Number(a.score || 0);
+                            return `
+                                <tr>
+                                    <td style="width:52%;padding:7px 9px;border-top:1px solid #eef2ff;color:#334155;">${escHtml(a.question || '-')}</td>
+                                    <td style="padding:7px 9px;border-top:1px solid #eef2ff;font-weight:700;color:#111827;">${escHtml(a.answer || '-')}</td>
+                                    <td style="width:70px;padding:7px 9px;border-top:1px solid #eef2ff;text-align:right;color:#4f46e5;font-weight:800;">${score >= 0 ? '+' : ''}${score}</td>
+                                </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+    });
+
+    return html;
+}
+
 function renderCustomerDetail(data) {
     const extra = data.extra_data
         ? (typeof data.extra_data === 'string' ? JSON.parse(data.extra_data) : data.extra_data)
@@ -953,18 +1029,19 @@ function renderCustomerDetail(data) {
     // 1. Customer Information
     html += renderSectionTitle('1. Customer Information');
     html += renderGrid([
-        ['Customer Category',   extra.customerCategory || '&mdash;'],
         ['Customer Code',       extra.customerCode || '&mdash;'],
-        ['Company Name',        data.company_name],
+        ['Group Name',          data.company_name],
         ['Customer Type',       data.customer_type],
-        ['Industry',            extra.industry || '&mdash;'],
+        ['Business Type',       extra.industry || '&mdash;'],
         ['Head Office',         data.address_head_office],
         ['Factory Address',     data.factory_address],
         ['Website',             extra.website || '&mdash;'],
         ['Chairman / MD',       data.chairman_name],
         ['Chairman Phone',      data.chairman_mobile],
+        ['Chairman Email',      extra.chairmanEmail || '&mdash;'],
         ['Commercial Name',     extra.commercialName || '&mdash;'],
         ['Commercial Number',   extra.commercialNumber || '&mdash;'],
+        ['Commercial Email',    extra.commercialEmail || '&mdash;'],
         ['Merchandiser Contact',extra.merchandiserContact || '&mdash;'],
         ['Merchandiser Mobile', extra.merchandiserMobile || '&mdash;'],
         ['Email',               extra.email || '&mdash;'],
@@ -973,13 +1050,14 @@ function renderCustomerDetail(data) {
         ['Submitted',           data.created_at ? new Date(data.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '&mdash;'],
     ]);
 
-    // 2. Business & Compliance
-    html += renderSectionTitle('2. Business &amp; Compliance');
+    // 2. KYC
+    html += renderSectionTitle('2. KYC');
     html += renderGrid([
         ['Trade License No.',   extra.tradelicense || '&mdash;'],
         ['BIN',                 extra.bin || '&mdash;'],
         ['TIN',                 extra.tin || '&mdash;'],
-        ['Bond License Expiry', extra.bondLicenseExpiry || '&mdash;'],
+        ['ERC',                 extra.erc || '&mdash;'],
+        ['Bond License Expiry Date', extra.bondLicenseExpiry || '&mdash;'],
         ['Compliance Status',   extra.complianceStatus || '&mdash;'],
         ['Factory Building',    extra.factoryBuilding || '&mdash;'],
         ['Bank Name & Branch',  extra.bankName || '&mdash;'],
@@ -989,8 +1067,17 @@ function renderCustomerDetail(data) {
         html += renderBadges(Array.isArray(extra.factoryCertifications) ? extra.factoryCertifications : [extra.factoryCertifications]);
     }
 
-    // 3. Production Capability
-    html += renderSectionTitle('3. Production Capability');
+    let scorecard = extra.scorecard || null;
+    if (!scorecard && data.scorecard_json) {
+        try { scorecard = typeof data.scorecard_json === 'string' ? JSON.parse(data.scorecard_json) : data.scorecard_json; } catch (_) {}
+    }
+
+    // 3. Scorecard Questionnaire
+    html += renderSectionTitle('3. Scorecard Questionnaire');
+    html += renderScorecardReview(scorecard);
+
+    // 4. Production Capability
+    html += renderSectionTitle('4. Production Capability');
     html += renderGrid([
         ['Factory Type',        extra.factoryType || '&mdash;'],
         ['Monthly Capacity',    extra.monthlyCapacity || '&mdash;'],
@@ -1003,8 +1090,8 @@ function renderCustomerDetail(data) {
         ['Subcontract Factory', extra.subcontractFactory || '&mdash;'],
     ]);
 
-    // 4. Commercial Assessment
-    html += renderSectionTitle('4. Commercial Assessment');
+    // 5. Commercial Assessment
+    html += renderSectionTitle('5. Commercial Assessment');
     html += renderGrid([
         ['Expected Monthly Biz',extra.expectedMonthlyBiz || '&mdash;'],
         ['Avg Monthly Order',   extra.avgMonthlyOrder || '&mdash;'],
@@ -1018,13 +1105,13 @@ function renderCustomerDetail(data) {
         ['Zone',                extra.zone || '&mdash;'],
     ]);
 
-    // 5. Product Interest
-    html += renderSectionTitle('5. Product Interest');
+    // 6. Product Interest
+    html += renderSectionTitle('6. Product Interest');
     html += renderBadges(Array.isArray(extra.productInterest) ? extra.productInterest : []);
 
-    // 6. Competitor Analysis
+    // 7. Competitor Analysis
     const comp = extra.competitorAnalysis || {};
-    html += renderSectionTitle('6. Competitor Analysis');
+    html += renderSectionTitle('7. Competitor Analysis');
     html += renderGrid([
         ['Existing Supplier',   comp.supplier || '&mdash;'],
         ['Current Price',       comp.currentPrice || '&mdash;'],
@@ -1033,9 +1120,9 @@ function renderCustomerDetail(data) {
         ['Reason for Change',   comp.reasonForChange || '&mdash;'],
     ]);
 
-    // 7. Risk Assessment
+    // 8. Risk Assessment
     const risk = extra.riskAssessment || {};
-    html += renderSectionTitle('7. Risk Assessment');
+    html += renderSectionTitle('8. Risk Assessment');
     html += renderGrid([
         ['Financial Risk',      risk.financialRisk || '&mdash;'],
         ['Payment History',     risk.paymentHistory || '&mdash;'],
@@ -1043,12 +1130,12 @@ function renderCustomerDetail(data) {
         ['Remarks',             risk.remarks || '&mdash;'],
     ]);
 
-    // 8. Price Approval Matrix
-    html += renderSectionTitle('8. Price Approval Matrix');
+    // 9. Price Approval Matrix
+    html += renderSectionTitle('9. Price Approval Matrix');
     html += renderMatrixTable(extra.priceMatrix);
 
-    // 9. Document Checklist
-    html += renderSectionTitle('9. Document Checklist');
+    // 10. Document Checklist
+    html += renderSectionTitle('10. Document Checklist');
     html += renderBadges(Array.isArray(extra.docChecklist) ? extra.docChecklist : []);
 
     return html;
@@ -1326,7 +1413,7 @@ function cpSetFeedback(msg, isError) {
 async function cpSubmit() {
     const companyName = (document.getElementById('cp_companyName')?.value || '').trim();
     if (!companyName) {
-        cpSetFeedback('Company Name is required before submitting.', true);
+        cpSetFeedback('Group Name is required before submitting.', true);
         document.getElementById('cp_companyName')?.focus();
         return;
     }
@@ -1346,7 +1433,7 @@ async function cpSubmit() {
         .map(el => el.value);
 
     // Collect doc checklist
-    const dcIds = ['cp_dc_tradelic','cp_dc_bin','cp_dc_tin','cp_dc_bondlic','cp_dc_banksol','cp_dc_compprofile','cp_dc_compliancecert','cp_dc_facphotos','cp_dc_sampleapproval'];
+    const dcIds = ['cp_dc_tradelic','cp_dc_bin','cp_dc_tin','cp_dc_erc','cp_dc_bondlic','cp_dc_banksol','cp_dc_compprofile','cp_dc_compliancecert','cp_dc_facphotos','cp_dc_sampleapproval'];
     const docChecklist = dcIds
         .map(id => document.getElementById(id))
         .filter(el => el && el.checked)
@@ -1387,6 +1474,7 @@ async function cpSubmit() {
         tradelicense:         (document.getElementById('cp_tradeLicense')?.value || '').trim(),
         bin:                  (document.getElementById('cp_bin')?.value || '').trim(),
         tin:                  (document.getElementById('cp_tin')?.value || '').trim(),
+        erc:                  (document.getElementById('cp_erc')?.value || '').trim(),
         bondLicenseExpiry:    (document.getElementById('cp_bondLicenseExpiry')?.value || '').trim(),
         complianceStatus:     (document.getElementById('cp_complianceStatus')?.value || '').trim(),
         factoryBuilding:      factoryBuilding,
@@ -1401,8 +1489,10 @@ async function cpSubmit() {
         majorProducts:        (document.getElementById('cp_majorProducts')?.value || '').trim(),
         peakCapacity:         (document.getElementById('cp_peakCapacity')?.value || '').trim(),
         subcontractFactory:   subcontract,
+        chairmanEmail:        (document.getElementById('cp_chairmanEmail')?.value || '').trim(),
         commercialName:       (document.getElementById('cp_commercialName')?.value || '').trim(),
         commercialNumber:     (document.getElementById('cp_commercialNumber')?.value || '').trim(),
+        commercialEmail:      (document.getElementById('cp_commercialEmail')?.value || '').trim(),
         merchandiserContact:  (document.getElementById('cp_merchandiserContact')?.value || '').trim(),
         merchandiserMobile:   (document.getElementById('cp_merchandiserMobile')?.value || '').trim(),
         email:                (document.getElementById('cp_email')?.value || '').trim(),
@@ -1443,7 +1533,7 @@ async function cpSubmit() {
         factoryAddress:    (document.getElementById('cp_factoryAddress')?.value || '').trim(),
         chairmanName:      (document.getElementById('cp_chairmanName')?.value || '').trim(),
         chairmanMobile:    (document.getElementById('cp_chairmanMobile')?.value || '').trim(),
-        customerType:      document.getElementById('cp_customerType')?.value || 'Regular',
+        customerType:      document.getElementById('cp_customerType')?.value || 'New',
         dateForm:          document.getElementById('cp_dateForm')?.value || '',
         politicsYes,
         politicsParty:     '',
@@ -1483,7 +1573,7 @@ function cpCollectDraftData() {
         'cp_customerCode','cp_companyName','cp_industry','cp_website','cp_dateForm',
         'cp_addressHeadOffice','cp_factoryAddress','cp_chairmanName','cp_chairmanMobile',
         'cp_commercialName','cp_commercialNumber','cp_merchandiserContact','cp_merchandiserMobile','cp_email',
-        'cp_tradeLicense','cp_bin','cp_tin','cp_bondLicense','cp_bondLicenseExpiry',
+        'cp_tradeLicense','cp_bin','cp_tin','cp_erc','cp_bondLicense','cp_bondLicenseExpiry',
         'cp_complianceStatus','cp_bankName',
         'cp_monthlyCapacity','cp_dailyProduction','cp_noOfMachines','cp_noOfLines',
         'cp_peakCapacity','cp_majorBuyers','cp_majorProducts',
@@ -1498,7 +1588,7 @@ function cpCollectDraftData() {
         'cp_cert_bsci','cp_cert_wrap','cp_cert_sedex','cp_cert_iso','cp_cert_others',
         'cp_pi_carton','cp_pi_poly','cp_pi_hangtag','cp_pi_label','cp_pi_offset',
         'cp_pi_thread','cp_pi_elastic','cp_pi_narrowfabric','cp_pi_others',
-        'cp_dc_tradelic','cp_dc_bin','cp_dc_tin','cp_dc_bondlic','cp_dc_banksol',
+        'cp_dc_tradelic','cp_dc_bin','cp_dc_tin','cp_dc_erc','cp_dc_bondlic','cp_dc_banksol',
         'cp_dc_compprofile','cp_dc_compliancecert','cp_dc_facphotos','cp_dc_sampleapproval',
     ];
 

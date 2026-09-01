@@ -247,35 +247,24 @@ requireLogin();
     <div class="section">
         <div class="section-title">1. Customer Information</div>
         <div class="grid">
-            <div class="field span-4">
-                <label>Customer Category</label>
-                <select>
-                    <option></option>
-                    <option>Sample Production</option>
-                    <option>Bulk Production</option>
-                    <option>Negotiation Stage</option>
-                </select>
-            </div>
             <div class="field span-3">
                 <label>Customer Code</label>
                 <input type="text">
             </div>
-            <div class="field span-5">
-                <label>Company Name</label>
+            <div class="field span-6">
+                <label>Group Name</label>
                 <input type="text">
             </div>
             <div class="field span-3">
                 <label>Customer Type</label>
                 <select>
                     <option></option>
-                    <option>Regular</option>
-                    <option>Premium</option>
                     <option>New</option>
-                    <option>Strategic</option>
+                    <option>Regular</option>
                 </select>
             </div>
             <div class="field span-4">
-                <label>Industry</label>
+                <label>Business Type</label>
                 <input type="text">
             </div>
             <div class="field span-3">
@@ -308,12 +297,16 @@ requireLogin();
                     </div>
                 </div>
                 <div class="grid" style="margin-top:10px;">
-                    <div class="field span-6">
+                    <div class="field span-4">
                         <label>Name</label>
                         <input type="text">
                     </div>
-                    <div class="field span-6">
+                    <div class="field span-4">
                         <label>Phone</label>
+                        <input type="text">
+                    </div>
+                    <div class="field span-4">
+                        <label>Email</label>
                         <input type="text">
                     </div>
                 </div>
@@ -321,12 +314,16 @@ requireLogin();
 
             <div class="span-12 line-box">
                 <div class="grid">
-                    <div class="field span-6">
+                    <div class="field span-4">
                         <label>Commercial Contact Name</label>
                         <input type="text">
                     </div>
-                    <div class="field span-6">
+                    <div class="field span-4">
                         <label>Commercial Contact Number</label>
+                        <input type="text">
+                    </div>
+                    <div class="field span-4">
+                        <label>Commercial Contact Email</label>
                         <input type="text">
                     </div>
                 </div>
@@ -352,13 +349,14 @@ requireLogin();
     </div>
 
     <div class="section">
-        <div class="section-title">2. Business &amp; Compliance</div>
+        <div class="section-title">2. KYC</div>
         <div class="grid">
             <div class="field span-4"><label>Trade License No.</label><input type="text"></div>
             <div class="field span-4"><label>BIN</label><input type="text"></div>
             <div class="field span-4"><label>TIN</label><input type="text"></div>
+            <div class="field span-4"><label>ERC</label><input type="text"></div>
             <div class="field span-4"><label>Bond License No.</label><input type="text"></div>
-            <div class="field span-4"><label>Bond License Expiry</label><input type="text"></div>
+            <div class="field span-4"><label>Bond License Expiry Date</label><input type="text"></div>
             <div class="field span-4"><label>Compliance Status</label><input type="text"></div>
             <div class="field span-4">
                 <label>Factory Building</label>
@@ -522,6 +520,7 @@ requireLogin();
                 <label><input type="checkbox"> Trade License</label>
                 <label><input type="checkbox"> BIN</label>
                 <label><input type="checkbox"> TIN</label>
+                <label><input type="checkbox"> ERC</label>
                 <label><input type="checkbox"> Bond License</label>
                 <label><input type="checkbox"> Bank Solvency</label>
                 <label><input type="checkbox"> Company Profile</label>

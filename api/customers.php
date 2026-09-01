@@ -39,6 +39,19 @@ function firstApprovalStageForCreator(string $creatorRole): string {
     return $creatorRole === 'team_leader' ? 'commercial' : 'team_leader';
 }
 
+function scorecardFields(array $extraDataArray): array {
+    $scorecard = isset($extraDataArray['scorecard']) && is_array($extraDataArray['scorecard'])
+        ? $extraDataArray['scorecard']
+        : [];
+
+    return [
+        'total'  => isset($scorecard['total']) ? (int) $scorecard['total'] : null,
+        'grade'  => trim((string) ($scorecard['grade'] ?? '')),
+        'action' => trim((string) ($scorecard['action'] ?? '')),
+        'json'   => $scorecard ? json_encode($scorecard) : null,
+    ];
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 
 try {
@@ -60,7 +73,7 @@ try {
             }
             echo json_encode($row ?: null);
         } else {
-            $cols = "id, company_name, customer_type, chairman_name, chairman_mobile, address_head_office, factory_address, extra_data, team, COALESCE(stage, 'completed') as stage, created_at";
+            $cols = "id, company_name, customer_type, chairman_name, chairman_mobile, address_head_office, factory_address, extra_data, scorecard_total, scorecard_grade, scorecard_action, team, COALESCE(stage, 'completed') as stage, created_at";
             $stmt = $db->query("SELECT $cols FROM customers ORDER BY company_name");
             echo json_encode($stmt->fetchAll());
         }
@@ -86,6 +99,7 @@ try {
         $politicsParty     = trim($body['politicsParty'] ?? '');
         $extraDataArray    = isset($body['extraData']) && is_array($body['extraData']) ? $body['extraData'] : [];
         $extraData         = json_encode($extraDataArray);
+        $scorecard         = scorecardFields($extraDataArray);
         $creatorRole       = normalizeCreatorRole((string) ($body['creatorRole'] ?? 'sales_person'));
         $creatorSig        = $body['creatorSig'] ?? ($body['salesPersonSig'] ?? null);
 
@@ -109,11 +123,13 @@ try {
             INSERT INTO customers
                 (company_name, address_head_office, factory_address, chairman_name,
                  chairman_mobile, customer_type, date_form, politics_yes, politics_party,
-                 extra_data, stage, signatures, team)
+                 extra_data, scorecard_total, scorecard_grade, scorecard_action, scorecard_json,
+                 stage, signatures, team)
             VALUES
                 (:company_name, :address_head_office, :factory_address, :chairman_name,
                  :chairman_mobile, :customer_type, :date_form, :politics_yes, :politics_party,
-                 :extra_data, :stage, :signatures, :team)
+                 :extra_data, :scorecard_total, :scorecard_grade, :scorecard_action, :scorecard_json,
+                 :stage, :signatures, :team)
             ON DUPLICATE KEY UPDATE
                 address_head_office = VALUES(address_head_office),
                 factory_address     = VALUES(factory_address),
@@ -124,6 +140,10 @@ try {
                 politics_yes        = VALUES(politics_yes),
                 politics_party      = VALUES(politics_party),
                 extra_data          = VALUES(extra_data),
+                scorecard_total     = VALUES(scorecard_total),
+                scorecard_grade     = VALUES(scorecard_grade),
+                scorecard_action    = VALUES(scorecard_action),
+                scorecard_json      = VALUES(scorecard_json),
                 updated_at          = CURRENT_TIMESTAMP
         ';
 
@@ -139,6 +159,10 @@ try {
             ':politics_yes'        => $politicsYes,
             ':politics_party'      => $politicsParty,
             ':extra_data'          => $extraData,
+            ':scorecard_total'     => $scorecard['total'],
+            ':scorecard_grade'     => $scorecard['grade'] !== '' ? $scorecard['grade'] : null,
+            ':scorecard_action'    => $scorecard['action'] !== '' ? $scorecard['action'] : null,
+            ':scorecard_json'      => $scorecard['json'],
             ':stage'               => $stage,
             ':signatures'          => $sigJson,
             ':team'                => $customerTeam,
@@ -201,9 +225,29 @@ try {
         }
 
         $newStage = nextStage($currentStage);
+        $scorecard = scorecardFields($extraData);
 
-        $db->prepare('UPDATE customers SET stage = ?, signatures = ?, extra_data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-            ->execute([$newStage, json_encode($signatures), json_encode($extraData), $id]);
+        $db->prepare('
+            UPDATE customers
+            SET stage = ?,
+                signatures = ?,
+                extra_data = ?,
+                scorecard_total = ?,
+                scorecard_grade = ?,
+                scorecard_action = ?,
+                scorecard_json = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ')->execute([
+            $newStage,
+            json_encode($signatures),
+            json_encode($extraData),
+            $scorecard['total'],
+            $scorecard['grade'] !== '' ? $scorecard['grade'] : null,
+            $scorecard['action'] !== '' ? $scorecard['action'] : null,
+            $scorecard['json'],
+            $id,
+        ]);
 
         echo json_encode(['ok' => true, 'stage' => $newStage]);
         exit;

@@ -12,19 +12,19 @@ require_once __DIR__ . '/../includes/print-brand.php';
     display:flex; gap:20px; align-items:center; flex-wrap:wrap;
 }
 .spi-ctrl-group { display:flex; flex-direction:column; gap:4px; }
-.spi-ctrl-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#a5b4fc; }
+.spi-ctrl-label { font-size:7.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#a5b4fc; }
 .spi-ctrl select {
     background:#2d2d50; color:#fff; border:1.5px solid #4f46e5;
-    border-radius:6px; padding:6px 12px; font-size:12px; outline:none; min-width:160px;
+    border-radius:6px; padding:6px 12px; font-size:9px; outline:none; min-width:160px;
 }
 .spi-print-btn {
     margin-left:auto; background:#22c55e; color:#fff; border:none;
-    border-radius:8px; padding:10px 28px; font-size:13px; font-weight:700; cursor:pointer;
+    border-radius:8px; padding:10px 28px; font-size:9.75px; font-weight:700; cursor:pointer;
 }
 .spi-print-btn:hover { background:#16a34a; }
 .spi-excel-btn {
     background:#2563eb; color:#fff; border:none;
-    border-radius:8px; padding:10px 22px; font-size:13px; font-weight:700; cursor:pointer;
+    border-radius:8px; padding:10px 22px; font-size:9.75px; font-weight:700; cursor:pointer;
 }
 .spi-excel-btn:hover { background:#1d4ed8; }
 
@@ -34,8 +34,8 @@ require_once __DIR__ . '/../includes/print-brand.php';
     position:relative; box-sizing:border-box;
     width:210mm; height:297mm; max-width:900px; margin:0 auto 10px;
     font-family:'Times New Roman',Times,serif;
-    font-size:11pt; color:#000; background:#fff;
-    padding:14mm 14mm 30mm; box-shadow:0 4px 24px rgba(0,0,0,.15);
+    font-size:8.25pt; color:#000; background:#fff;
+    padding:4mm 14mm 12mm; box-shadow:0 4px 24px rgba(0,0,0,.15);
     overflow:hidden;
     display:flex;
     flex-direction:column;
@@ -48,11 +48,13 @@ require_once __DIR__ . '/../includes/print-brand.php';
     break-inside:avoid-page!important;
 }
 #spiContent {
-    min-height:100%;
+    min-height:0;
+    flex:1 1 auto;      /* fill the page so the footer's margin-top:auto reaches the bottom */
     display:flex;
     flex-direction:column;
 }
 .spi-continuation { display:none; }
+.spi-continuation.is-active { display:flex; }
 
 /* Header */
 .spi-hd {
@@ -67,40 +69,40 @@ require_once __DIR__ . '/../includes/print-brand.php';
     width:62px; min-height:62px; justify-content:center;
 }
 .spi-logo-z {
-    font-size:28px; font-weight:900; color:#1a3a6e;
+    font-size:21px; font-weight:900; color:#1a3a6e;
     font-family:Georgia,serif; line-height:1;
 }
 .spi-logo-zzal {
-    font-size:9px; font-weight:900; letter-spacing:3px;
+    font-size:6.75px; font-weight:900; letter-spacing:3px;
     color:#1a3a6e; margin-top:2px;
 }
 .spi-company-name {
-    font-size:22pt; font-weight:900; color:#1a3a6e;
+    font-size:16.5pt; font-weight:900; color:#1a3a6e;
     font-family:Georgia,serif; letter-spacing:.5px;
     font-variant:small-caps; line-height:1.1;
 }
 
 .spi-title {
-    text-align:center; font-size:13pt; font-weight:700;
+    text-align:center; font-size:9.75pt; font-weight:700;
     letter-spacing:8px; color:#000;
     border-top:2px solid #1a3a6e; border-bottom:2px solid #1a3a6e;
-    padding:5px 0; margin:4px 0 8px;
+    padding:4px 0; margin:2px 0 3px;
 }
 
 /* Meta row */
-.spi-meta { display:flex; justify-content:space-between; font-size:10.5pt; margin-bottom:6px; }
+.spi-meta { display:flex; justify-content:space-between; font-size:7.875pt; margin-bottom:2px; }
 
 /* Address section */
-.spi-buyer { font-size:10.5pt; margin:4px 0 2px; }
-.spi-to-label { font-size:10.5pt; font-weight:700; margin:4px 0 2px; }
-.spi-to    { font-size:10.5pt; margin:0 0 2px; line-height:1.6; }
-.spi-conf  { font-size:10pt; margin:6px 0 10px; }
+.spi-buyer { font-size:7.875pt; margin:2px 0 1px; }
+.spi-to-label { font-size:7.875pt; font-weight:700; margin:1px 0; }
+.spi-to    { font-size:7.875pt; margin:0 0 1px; line-height:1.35; }
+.spi-conf  { font-size:7.5pt; margin:4px 0; }
 
 /* Table */
-.spi-tbl { width:100%; border-collapse:collapse; font-size:10pt; }
+.spi-tbl { width:100%; border-collapse:collapse; font-size:7.5pt; }
 .spi-tbl th {
     background:#fff; color:#111; padding:5px 8px;
-    border:1px solid #1a3a6e; text-align:center; font-size:9.5pt; line-height:1.3;
+    border:1px solid #1a3a6e; text-align:center; font-size:7.125pt; line-height:1.3;
 }
 .spi-tbl td { border:1px solid #7a7a7a; padding:4px 8px; vertical-align:top; }
 .spi-tbl tr { page-break-inside: avoid; }
@@ -108,39 +110,42 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .spi-tbl td.tr { text-align:right; }
 .spi-tbl tr.ref-row td { border:none; padding:3px 8px 1px; }
 .spi-tbl tr.total-row td { font-weight:700; border-top:2px solid #1a3a6e; }
-.spi-ref-bold { font-weight:700; font-size:10pt; }
+.spi-ref-bold { font-weight:700; font-size:7.5pt; }
+.spi-addr-row { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
+.spi-addr-left { flex:1 1 auto; }
+.spi-orderref { font-size:7.5pt; font-weight:700; margin:0; line-height:1.5; text-align:right; white-space:nowrap; flex:0 0 auto; }
 
 /* Total words */
 .spi-words {
-    font-size:10pt; font-weight:700; text-transform:uppercase;
+    font-size:7.5pt; font-weight:700; text-transform:uppercase;
     margin:8px 0 12px; color:#000;
     border-top:1px dashed #333; border-bottom:1px dashed #333;
     padding:4px 0;
 }
 
 /* Terms */
-.spi-terms-title { font-size:10pt; font-weight:700; text-decoration:underline; margin:0 0 4px; }
-.spi-terms-list  { margin:0; padding-left:32px; font-size:9.5pt; line-height:1.65; }
-.spi-terms-list li { margin-bottom:1px; }
+.spi-terms-title { font-size:6.375pt; font-weight:700; text-decoration:underline; margin:0 0 4px; }
+.spi-terms-list  { margin:0; padding-left:32px; font-size:6.05625pt; line-height:1.3; }
+.spi-terms-list li { margin-bottom:0; }
 
 /* Signatures */
 .spi-sig-area { margin-top:36px; }
 .spi-sig-right-block {
     text-align:right; margin-bottom:8px;
 }
-.spi-sig-co   { font-size:10pt; font-weight:700; margin-bottom:36px; }
+.spi-sig-co   { font-size:7.5pt; font-weight:700; margin-bottom:36px; }
 .spi-sig-line { border-top:1.5px solid #000; width:220px; margin:0 0 3px auto; }
-.spi-sig-auth { font-size:9.5pt; }
+.spi-sig-auth { font-size:7.125pt; }
 
 .spi-sig-bottom {
     display:flex; justify-content:space-between;
-    padding-top:6px; margin-top:100px;
+    padding-top:6px; margin-top:40px;
 }
-.spi-sig-bottom-label { font-size:10pt; font-weight:700; }
+.spi-sig-bottom-label { font-size:7.5pt; font-weight:700; }
 /* Footer bar */
 .spi-footer-bar {
     margin-top:24px; border:1.5px solid #000;
-    padding:6px 12px; font-size:8.5pt; line-height:1.7;
+    padding:6px 12px; font-size:6.375pt; line-height:1.7;
     text-align:center;
 }
 
@@ -151,13 +156,31 @@ require_once __DIR__ . '/../includes/print-brand.php';
 @media print {
     .spi-ctrl, nav.page-nav, .order-id-bar { display:none !important; }
     #spiWrap { background:none !important; padding:0 !important; }
-    .spi-doc  { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:14mm 14mm 30mm!important; overflow:hidden!important; display:flex!important; flex-direction:column!important; }
+    .spi-doc  { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:4mm 14mm 12mm!important; overflow:hidden!important; display:flex!important; flex-direction:column!important; }
+    .spi-continuation:not(.is-active) { display:none!important; }
     .spi-doc .zzal-print-brand--footer { position:static!important; margin-top:auto!important; page-break-inside:avoid!important; break-inside:avoid-page!important; }
-    #spiContent { min-height:100%!important; display:flex!important; flex-direction:column!important; }
+    #spiContent { min-height:0!important; flex:1 1 auto!important; display:flex!important; flex-direction:column!important; }
     .spi-hd { display:none !important; }
     body, html, .app-shell { width:210mm!important; min-height:297mm!important; margin:0!important; padding:0!important; background:#fff !important; overflow:visible!important; }
     .form-stack { padding:0 !important; }
     .no-print { display:none !important; }
+}
+html.spi-embed .page-nav,
+html.spi-embed .order-id-bar,
+html.spi-embed .spi-ctrl {
+    display:none!important;
+}
+html.spi-embed .app-shell {
+    max-width:none!important;
+    padding:0!important;
+    margin:0!important;
+}
+html.spi-embed #spiWrap {
+    padding:10px 0!important;
+    min-height:auto!important;
+}
+html.pi-preview .spi-ctrl {
+    display:none!important;
 }
 </style>
 
@@ -179,6 +202,12 @@ require_once __DIR__ . '/../includes/print-brand.php';
 <script>
 (function(){
     const p = new URLSearchParams(window.location.search);
+    const orderId = p.get('order_id');
+    if (orderId) {
+        try { sessionStorage.setItem('ats_current_order_id', orderId); } catch (e) {}
+    }
+    if (p.get('embed') === '1') document.documentElement.classList.add('spi-embed');
+    if (p.get('preview') === '1') document.documentElement.classList.add('pi-preview');
     const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
     set('spiDays',      p.get('days'));
     set('spiLcType',    p.get('lctype'));
@@ -207,7 +236,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
         </div>
 
         <!-- PROFORMA INVOICE title -->
-        <div class="spi-title">PROFORMA &nbsp;&nbsp;&nbsp; INVOICE</div>
+        <div class="spi-title">PROFORMA &nbsp; INVOICE</div>
 
         <!-- PI Number + Date -->
         <div class="spi-meta">
@@ -215,10 +244,16 @@ require_once __DIR__ . '/../includes/print-brand.php';
             <div><strong>Date :</strong> <span id="spiDate">-</span></div>
         </div>
 
-        <!-- Buyer / TO -->
-        <div class="spi-buyer"><strong>BUYER:</strong> <span id="spiBuyer">-</span></div>
-        <div class="spi-to-label">TO</div>
-        <div class="spi-to" id="spiTo">-</div>
+        <!-- Buyer / TO (left)  +  Order reference / PO (right) -->
+        <div class="spi-addr-row">
+            <div class="spi-addr-left">
+                <div class="spi-buyer"><strong>BUYER:</strong> <span id="spiBuyer">-</span></div>
+                <div class="spi-to-label">TO</div>
+                <div class="spi-to" id="spiTo">-</div>
+            </div>
+            <div class="spi-orderref" id="spiOrderRef" style="display:none;"></div>
+        </div>
+
         <div class="spi-conf">WE CONFIRM HAVING SOLD TO YOU THE FOLLOWING MERCHANDISE AS PER TERMS AND CONDITION STATED BELOW.</div>
 
         <!-- Item Table -->
@@ -255,7 +290,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
         </div>
 
         <!-- Signature area -->
-        <div class="spi-sig-area" id="spiSigArea" style="margin-top:80px;">
+        <div class="spi-sig-area" id="spiSigArea" style="margin-top:28px;">
             <div class="spi-sig-right-block" style="margin-bottom:8px;"></div>
             <div class="spi-sig-bottom">
                 <div class="spi-sig-bottom-label">SIGNATURE OF BUYER</div>
@@ -270,7 +305,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 </div><!-- .spi-doc -->
 <div class="spi-doc spi-continuation" id="spiContinuation">
     <?= zzal_print_brand_header() ?>
-    <div class="spi-title">PROFORMA &nbsp;&nbsp;&nbsp; INVOICE</div>
+    <div class="spi-title">PROFORMA &nbsp; INVOICE</div>
     <div class="spi-meta">
         <div><strong>PROFOMA INVOICE NO :</strong> <span id="spiContNum">-</span></div>
         <div><strong>Date :</strong> <span id="spiContDate">-</span></div>
@@ -415,18 +450,19 @@ function renderSinglePi() {
     tbody.innerHTML = '';
     let totalQty = 0, totalVal = 0, sl = 0;
 
-    // Reference row (ORDER REF + PO #)
+    // Order reference + PO — shown above the table (near the top of the PI).
     const orderRef = po.orderRef || po.salesOrder || po.salesOrderNo || '';
     const poNum    = po.poNum    || po.customerPo  || '';
     const style    = po.style    || '';
+    const refEl = document.getElementById('spiOrderRef');
     if (orderRef || poNum) {
-        const rtr = document.createElement('tr');
-        rtr.className = 'ref-row';
-        rtr.innerHTML = `<td></td><td colspan="5"><span class="spi-ref-bold">
-            ${orderRef ? 'ORDER REF: ' + orderRef + '<br>' : ''}
-            ${poNum    ? 'PO # ' + poNum + (style ? ' &nbsp; Style# ' + style + '/' : '') : ''}
-        </span></td>`;
-        tbody.appendChild(rtr);
+        refEl.style.display = 'block';
+        refEl.innerHTML =
+            (orderRef ? 'ORDER REF: ' + orderRef + '<br>' : '') +
+            (poNum    ? 'PO # ' + poNum + (style ? ' &nbsp; Style# ' + style + '/' : '') : '');
+    } else {
+        refEl.style.display = 'none';
+        refEl.innerHTML = '';
     }
 
     const items = po.items || [];
@@ -449,7 +485,7 @@ function renderSinglePi() {
             tbody.appendChild(tr);
         });
     } else {
-        tbody.innerHTML = '<tr class="no-print"><td colspan="6" style="text-align:center;color:#999;padding:16px;font-family:sans-serif;font-size:9pt;">No items saved yet — add items in the PI page and save.</td></tr>';
+        tbody.innerHTML = '<tr class="no-print"><td colspan="6" style="text-align:center;color:#999;padding:16px;font-family:sans-serif;font-size:6.75pt;">No items saved yet — add items in the PI page and save.</td></tr>';
     }
 
     document.getElementById('spiTotalQty').innerHTML = `<strong>${totalQty.toLocaleString()}</strong>`;
@@ -500,7 +536,7 @@ function renderSinglePi() {
         firstTermsEl.innerHTML = firstPageTerms.map(t => `<li>${t}</li>`).join('');
         contTermsEl.innerHTML = continuedTerms.map(t => `<li>${t}</li>`).join('');
         contTermsEl.start = firstPageTerms.length + 1;
-        continuationEl.style.display = continuedTerms.length ? 'block' : 'none';
+        continuationEl.classList.toggle('is-active', continuedTerms.length > 0);
         sigAreaEl.style.display = continuedTerms.length ? 'none' : 'block';
         return continuedTerms.length;
     }
@@ -512,17 +548,24 @@ function renderSinglePi() {
         return el.offsetTop + el.offsetHeight;
     }
 
-    // Keep moving terms to page 2 until page 1 content clears the fixed footer area.
-    while (firstCount > 0) {
-        const footerTop = footerEl.offsetTop;
-        const activeBottom = sigAreaEl.style.display !== 'none'
-            ? pageBottom(sigAreaEl)
-            : pageBottom(termsBlockEl);
-        if (activeBottom <= (footerTop - 16)) {
-            break;
-        }
+    // Only move terms to page 2 when page 1 genuinely overflows. The doc is a
+    // fixed-height A4 with overflow:hidden, so scrollHeight > clientHeight means
+    // the content (terms + signature + footer) no longer fits on one page.
+    while (firstCount > 1 && docEl.scrollHeight > docEl.clientHeight + 2) {
         firstCount -= 1;
         renderTermSplit(firstCount);
+    }
+
+    // Moving the first term also hides the signature block, which may make the
+    // complete PI fit again. Re-test the full one-page layout before keeping a
+    // continuation page.
+    if (firstCount < terms.length) {
+        renderTermSplit(terms.length);
+        if (docEl.scrollHeight <= docEl.clientHeight + 2) {
+            firstCount = terms.length;
+        } else {
+            renderTermSplit(firstCount);
+        }
     }
 }
 async function downloadSinglePiExcel() {

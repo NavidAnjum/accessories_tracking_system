@@ -47,6 +47,8 @@ function notificationStepRoles(string $step): array {
         'forwarding'       => ['commercial', 'commercial_dept'],
         'bank-forwarding'  => ['commercial', 'commercial_dept'],
         'po-status'        => ['commercial', 'commercial_dept'],
+        'erp-order'        => ['commercial', 'commercial_dept'],
+        'commercial-pi'    => ['commercial', 'commercial_dept'],
     ];
 
     return $map[$step] ?? [];
@@ -83,9 +85,54 @@ function notificationStepLabel(string $step): string {
         'forwarding'       => 'Forwarding',
         'bank-forwarding'  => 'Bank Forwarding',
         'po-status'        => 'Challan Sheet',
+        'erp-order'        => 'ERP Order',
+        'commercial-pi'    => 'PI',
     ];
 
     return $map[$step] ?? ucwords(str_replace('-', ' ', $step));
+}
+
+function createCommercialPiNotifications(PDO $db, string $orderId, ?int $sourceUserId = null): void {
+    ensureNotificationsTable($db);
+
+    // This is the submitter's personal PI worklist, not a broadcast to every
+    // Commercial user. Marketing receives the separate approval notification.
+    // Without a submitter this cannot be a personal Commercial worklist item.
+    // Do not fall back to broadcasting it to every Commercial account.
+    if (!$sourceUserId) return;
+
+    $userStmt = $db->prepare("\n        SELECT id, role\n        FROM users\n        WHERE id = ?\n          AND role IN ('commercial', 'commercial_dept', 'admin')\n          AND COALESCE(is_active, 1) = 1\n    ");
+    $userStmt->execute([$sourceUserId]);
+    $users = $userStmt->fetchAll();
+    if (empty($users)) return;
+
+    $stmt = $db->prepare('SELECT customer_name, to_buyer, po_number FROM orders WHERE order_id = ?');
+    $stmt->execute([$orderId]);
+    $order = $stmt->fetch();
+    if (!$order) return;
+
+    $customer = trim((string)($order['customer_name'] ?? ''));
+    $buyer = trim((string)($order['to_buyer'] ?? ''));
+    $po = trim((string)($order['po_number'] ?? ''));
+    $details = array_filter([$customer, $buyer !== '' ? 'Buyer: ' . $buyer : '', $po !== '' ? 'PO: ' . $po : '']);
+
+    $existsStmt = $db->prepare("SELECT id FROM notifications WHERE user_id = ? AND order_id = ? AND step_name = 'commercial-pi' LIMIT 1");
+    $insertStmt = $db->prepare("\n        INSERT INTO notifications\n            (user_id, order_id, step_name, target_role, title, message, source_user_id, is_read)\n        VALUES\n            (?, ?, 'commercial-pi', ?, ?, ?, ?, 0)\n    ");
+
+    foreach ($users as $user) {
+        $uid = (int)$user['id'];
+        $existsStmt->execute([$uid, $orderId]);
+        if ($existsStmt->fetch()) continue;
+
+        $insertStmt->execute([
+            $uid,
+            $orderId,
+            (string)$user['role'],
+            $orderId . ' PI submitted',
+            trim('Create another PI while Marketing reviews this order. ' . implode(' - ', $details)),
+            $sourceUserId,
+        ]);
+    }
 }
 
 function createStepNotifications(PDO $db, string $orderId, string $step, ?int $sourceUserId = null, ?int $assignedUserId = null): void {

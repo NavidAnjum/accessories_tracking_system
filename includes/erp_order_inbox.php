@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/notifications.php';
 
 function ensureErpOrderInboxTable(PDO $db): void
 {
@@ -14,6 +15,7 @@ function ensureErpOrderInboxTable(PDO $db): void
             customer_po_no VARCHAR(255) NULL,
             customer_name VARCHAR(255) NULL,
             buyer VARCHAR(255) NULL,
+            sales_person VARCHAR(255) NULL,
             header_status VARCHAR(80) NULL,
             header_creation_date DATETIME NULL,
             line_count INT UNSIGNED NOT NULL DEFAULT 0,
@@ -24,7 +26,7 @@ function ensureErpOrderInboxTable(PDO $db): void
             first_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE KEY uq_erp_order_inbox_sale_order (sale_order_no),
-            UNIQUE KEY uq_erp_order_inbox_work_order (work_order_id),
+            KEY idx_erp_order_inbox_work_order (work_order_id),
             KEY idx_erp_order_inbox_pending (work_order_id, header_creation_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
@@ -43,6 +45,7 @@ function ensureErpOrderInboxTable(PDO $db): void
         'customer_po_no' => 'VARCHAR(255) NULL',
         'customer_name' => 'VARCHAR(255) NULL',
         'buyer' => 'VARCHAR(255) NULL',
+        'sales_person' => 'VARCHAR(255) NULL',
         'header_status' => 'VARCHAR(80) NULL',
         'header_creation_date' => 'DATETIME NULL',
         'line_count' => 'INT UNSIGNED NOT NULL DEFAULT 0',
@@ -81,8 +84,14 @@ function ensureErpOrderInboxTable(PDO $db): void
     if (!isset($indexes['uq_erp_order_inbox_sale_order'])) {
         $db->exec('ALTER TABLE erp_order_inbox ADD UNIQUE KEY uq_erp_order_inbox_sale_order (sale_order_no)');
     }
-    if (!isset($indexes['uq_erp_order_inbox_work_order'])) {
-        $db->exec('ALTER TABLE erp_order_inbox ADD UNIQUE KEY uq_erp_order_inbox_work_order (work_order_id)');
+    // A Single PI/work order may contain multiple ERP sales orders. The ERP
+    // sales-order number remains unique, but work_order_id is many-to-one.
+    if (isset($indexes['uq_erp_order_inbox_work_order'])) {
+        $db->exec('ALTER TABLE erp_order_inbox DROP INDEX uq_erp_order_inbox_work_order');
+        unset($indexes['uq_erp_order_inbox_work_order']);
+    }
+    if (!isset($indexes['idx_erp_order_inbox_work_order'])) {
+        $db->exec('ALTER TABLE erp_order_inbox ADD KEY idx_erp_order_inbox_work_order (work_order_id)');
     }
 
     $done = true;
@@ -104,6 +113,7 @@ function erpInboxSqlDate(string $value): ?string
 function syncErpOrderInbox(PDO $db, array $items, bool $notifyCommercial = false): array
 {
     ensureErpOrderInboxTable($db);
+    ensureNotificationsTable($db);
     if (!$items) return ['orders' => 0, 'new_orders' => 0, 'notified' => 0];
 
     $groups = [];
@@ -117,12 +127,13 @@ function syncErpOrderInbox(PDO $db, array $items, bool $notifyCommercial = false
     $exists = $db->prepare('SELECT 1 FROM erp_order_inbox WHERE sale_order_no = ? LIMIT 1');
     $upsert = $db->prepare("
         INSERT INTO erp_order_inbox
-            (sale_order_no, customer_po_no, customer_name, buyer, header_status, header_creation_date, line_count, snapshot_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (sale_order_no, customer_po_no, customer_name, buyer, sales_person, header_status, header_creation_date, line_count, snapshot_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
             customer_po_no = VALUES(customer_po_no),
             customer_name = VALUES(customer_name),
             buyer = VALUES(buyer),
+            sales_person = VALUES(sales_person),
             header_status = VALUES(header_status),
             header_creation_date = COALESCE(VALUES(header_creation_date), header_creation_date),
             line_count = VALUES(line_count),
@@ -130,7 +141,22 @@ function syncErpOrderInbox(PDO $db, array $items, bool $notifyCommercial = false
             last_seen_at = CURRENT_TIMESTAMP
     ");
 
+    $notificationUsers = $notifyCommercial ? notificationTargetUsers($db, 'erp-order') : [];
+    $notificationExists = $db->prepare("
+        SELECT id FROM notifications
+        WHERE user_id = ? AND order_id = ? AND step_name = 'erp-order'
+        LIMIT 1
+    ");
+    $notificationInsert = $db->prepare("
+        INSERT INTO notifications
+            (user_id, order_id, step_name, target_role, title, message, source_user_id, is_read)
+        VALUES
+            (?, ?, 'erp-order', ?, ?, ?, NULL, 0)
+    ");
+    $convertedCheck = $db->prepare('SELECT work_order_id FROM erp_order_inbox WHERE sale_order_no = ? LIMIT 1');
+
     $newOrders = 0;
+    $notified = 0;
     foreach ($groups as $orderNo => $rows) {
         $exists->execute([$orderNo]);
         $wasPresent = (bool)$exists->fetchColumn();
@@ -140,16 +166,42 @@ function syncErpOrderInbox(PDO $db, array $items, bool $notifyCommercial = false
             trim((string)($first['customer_po_no'] ?? '')),
             trim((string)($first['customer_name'] ?? '')),
             trim((string)($first['buyer'] ?? '')),
+            trim((string)($first['sales_person'] ?? $first['salesperson'] ?? $first['salesperson_name'] ?? $first['sales_person_name'] ?? '')),
             trim((string)($first['header_status'] ?? '')),
             erpInboxSqlDate((string)($first['header_creation_date'] ?? $first['ordered_date'] ?? '')),
             count($rows),
             json_encode($rows, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         ]);
         if (!$wasPresent) $newOrders++;
+
+        if ($notifyCommercial && $notificationUsers) {
+            $convertedCheck->execute([$orderNo]);
+            $workOrderId = trim((string)$convertedCheck->fetchColumn());
+            if ($workOrderId !== '') continue;
+
+            $po = trim((string)($first['customer_po_no'] ?? ''));
+            $customer = trim((string)($first['customer_name'] ?? ''));
+            $title = 'New ERP sales order ' . $orderNo;
+            $message = trim(($po !== '' ? 'PO ' . $po : 'No PO') . ($customer !== '' ? ' - ' . $customer : ''));
+
+            foreach ($notificationUsers as $user) {
+                $uid = (int)$user['id'];
+                $notificationExists->execute([$uid, $orderNo]);
+                if ($notificationExists->fetch()) continue;
+
+                $notificationInsert->execute([
+                    $uid,
+                    $orderNo,
+                    (string)$user['role'],
+                    $title,
+                    $message,
+                ]);
+                $notified++;
+            }
+        }
     }
 
-    // Notifications are generated from today's unresolved inbox rows by notifications.php.
-    return ['orders' => count($groups), 'new_orders' => $newOrders, 'notified' => 0];
+    return ['orders' => count($groups), 'new_orders' => $newOrders, 'notified' => $notified];
 }
 
 function erpOrderInboxMappings(PDO $db, array $orderNumbers): array

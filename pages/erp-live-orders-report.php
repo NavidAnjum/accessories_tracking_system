@@ -70,6 +70,9 @@ include __DIR__ . '/../includes/header.php';
                 <label style="font-size:12px;color:#64748b;font-weight:700;">Sales Person
                     <input type="text" id="erpLiveSalesSearch" placeholder="Search sales person" oninput="erpLiveApplyFilter()" style="width:130px;">
                 </label>
+                <label style="font-size:12px;color:#64748b;font-weight:700;">PO
+                    <input type="text" id="erpLivePoSearch" placeholder="Search PO" oninput="erpLiveApplyFilter()" style="width:120px;">
+                </label>
                 <button type="button" class="primary-btn" id="erpLiveBtn" onclick="loadErpLiveOrdersReport()">Load Report</button>
             </div>
         </div>
@@ -246,12 +249,14 @@ function erpLiveApplyFilter() {
     var custQ  = (document.getElementById('erpLiveCustSearch')?.value  || '').trim().toLowerCase();
     var buyerQ = (document.getElementById('erpLiveBuyerSearch')?.value || '').trim().toLowerCase();
     var salesQ = (document.getElementById('erpLiveSalesSearch')?.value || '').trim().toLowerCase();
+    var poQ    = (document.getElementById('erpLivePoSearch')?.value    || '').trim().toLowerCase();
     var orders = erpLiveOrders.filter(function (order) {
         if (filter !== 'all' && (order.conversionStatus || 'new') !== filter) return false;
         if (readF !== 'all' && (order.readStatus || 'unread') !== readF) return false;
         if (custQ  && (order.customerName || '').toLowerCase().indexOf(custQ)  === -1) return false;
         if (buyerQ && (order.buyer || '').toLowerCase().indexOf(buyerQ) === -1) return false;
         if (salesQ && (order.salesPerson || '').toLowerCase().indexOf(salesQ) === -1) return false;
+        if (poQ    && (order.customerPo || '').toLowerCase().indexOf(poQ) === -1) return false;
         return true;
     });
     erpLiveRows = erpLiveFlattenOrders(orders);
@@ -347,7 +352,7 @@ async function loadErpLiveOrdersReport() {
     var meta = document.getElementById('erpLiveMeta');
     var body = document.getElementById('erpLiveBody');
     var btn = document.getElementById('erpLiveBtn');
-    var fromDate = fromInput.value || erpLiveDaysAgo(9);
+    var fromDate = fromInput.value || erpLiveToday();
     var toDate = toInput.value || erpLiveToday();
 
     btn.disabled = true;
@@ -408,12 +413,8 @@ async function loadErpLiveOrdersReport() {
 
         combined.orders = erpLiveSortOrders(combined.orders);
         var rows = erpLiveFlattenOrders(combined.orders);
-        var savedNote = savedNewTotal > 0
-            ? ' | ✅  ' + erpLiveNum(savedNewTotal) + ' new row(s) to DB'
-            : ' | ✓ All rows already in DB';
         meta.textContent = erpLiveNum(combined.lineCount) + ' line(s) | Total Qty ' + erpLiveNum(combined.totalQty)
             + ' | Total Value ' + erpLiveMoney(combined.totalValue)
-            + savedNote
             + ' | Created ' + fromDate + ' to ' + toDate + '.';
 
         // If live truly returned nothing but we already showed saved rows, keep them.
@@ -447,7 +448,7 @@ async function loadErpLiveOrdersReport() {
 document.addEventListener('DOMContentLoaded', function () {
     var fromEl = document.getElementById('erpLiveFrom');
     var toEl = document.getElementById('erpLiveTo');
-    fromEl.value = erpLiveDaysAgo(9);
+    fromEl.value = erpLiveToday();
     toEl.value = erpLiveToday();
 
     // Reload automatically when the user changes either date.
@@ -461,7 +462,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
-    // Auto-load the last 10 days on open (cache-first shows instantly) — no click needed.
+    // Auto-load today's orders on open (cache-first shows instantly) - no click needed.
     loadErpLiveOrdersReport();
 });
 </script>

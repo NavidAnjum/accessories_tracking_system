@@ -17,11 +17,20 @@ if (!canManageErpOrderInbox((string)(currentUser()['role'] ?? ''))) {
 function nextErpWorkOrderId(PDO $db): string
 {
     $prefix = 'ORD-' . date('Y-m') . '-';
+    // Take the max across both the orders table and the inbox mapping
+    // (erp_order_inbox.work_order_id is unique) so we never reuse an id already
+    // claimed by a prior conversion, which would raise a 1062 duplicate.
     $stmt = $db->prepare("SELECT order_id FROM orders WHERE order_id LIKE ? ORDER BY order_id DESC LIMIT 1 FOR UPDATE");
     $stmt->execute([$prefix . '%']);
-    $last = (string)($stmt->fetchColumn() ?: '');
-    $sequence = 1;
-    if (preg_match('/(\d+)$/', $last, $match)) $sequence = (int)$match[1] + 1;
+    $lastOrderNum = 0;
+    if (preg_match('/(\d+)$/', (string)($stmt->fetchColumn() ?: ''), $m)) $lastOrderNum = (int)$m[1];
+
+    $inboxStmt = $db->prepare("SELECT work_order_id FROM erp_order_inbox WHERE work_order_id LIKE ? ORDER BY work_order_id DESC LIMIT 1");
+    $inboxStmt->execute([$prefix . '%']);
+    $lastInboxNum = 0;
+    if (preg_match('/(\d+)$/', (string)($inboxStmt->fetchColumn() ?: ''), $m)) $lastInboxNum = (int)$m[1];
+
+    $sequence = max($lastOrderNum, $lastInboxNum) + 1;
     return $prefix . str_pad((string)$sequence, 5, '0', STR_PAD_LEFT);
 }
 
@@ -48,8 +57,8 @@ function fetchExactErpOrderRows(string $erpOrderNo): array
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_TIMEOUT => 60,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 15,
             CURLOPT_HTTPHEADER => ['Accept: application/json'],
         ]);
         $response = curl_exec($ch);
@@ -108,8 +117,17 @@ try {
         exit;
     }
 
-    $freshRows = fetchExactErpOrderRows($erpOrderNo);
-    if ($freshRows) syncErpOrderInbox($db, $freshRows, false);
+    // Only hit the (slow) live ERP when we don't already have this order cached.
+    // The notification/report already stored the ERP lines in snapshot_json, and
+    // some hosts block the outbound :8080 call — letting it hang would exceed
+    // max_execution_time and return an HTML 500 (breaks the JSON response).
+    $snapStmt = $db->prepare('SELECT snapshot_json FROM erp_order_inbox WHERE sale_order_no = ? LIMIT 1');
+    $snapStmt->execute([$erpOrderNo]);
+    $hasSnapshot = trim((string)($snapStmt->fetchColumn() ?: '')) !== '';
+    if (!$hasSnapshot) {
+        $freshRows = fetchExactErpOrderRows($erpOrderNo);
+        if ($freshRows) syncErpOrderInbox($db, $freshRows, false);
+    }
     $db->prepare('INSERT IGNORE INTO erp_order_inbox (sale_order_no) VALUES (?)')->execute([$erpOrderNo]);
 
     $db->beginTransaction();

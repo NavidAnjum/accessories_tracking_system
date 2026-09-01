@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/erp_order_inbox.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -42,12 +43,22 @@ try {
             $startStep = 'marketing-intake';
         }
 
-        // Generate next order_id in monthly format: ORD-YYYY-MM-NNNNN
+        // Generate the next monthly ID across both real orders and IDs already
+        // claimed in the ERP inbox. COUNT(*) can reuse a number after gaps and
+        // does not see inbox claims, causing uq_erp_order_inbox_work_order 1062.
         $yearMonth = date('Y-m');
-        $stmt  = $db->prepare("SELECT COUNT(*) FROM orders WHERE order_id LIKE ?");
-        $stmt->execute(["ORD-{$yearMonth}-%"]);
-        $count = (int)$stmt->fetchColumn();
-        $orderId = sprintf('ORD-%s-%05d', $yearMonth, $count + 1);
+        $prefix = "ORD-{$yearMonth}-";
+        ensureErpOrderInboxTable($db);
+
+        $stmt = $db->prepare('SELECT order_id FROM orders WHERE order_id LIKE ? ORDER BY order_id DESC LIMIT 1');
+        $stmt->execute([$prefix . '%']);
+        $lastOrderNum = (int)substr((string)($stmt->fetchColumn() ?: ''), strlen($prefix));
+
+        $stmt = $db->prepare('SELECT work_order_id FROM erp_order_inbox WHERE work_order_id LIKE ? ORDER BY work_order_id DESC LIMIT 1');
+        $stmt->execute([$prefix . '%']);
+        $lastInboxNum = (int)substr((string)($stmt->fetchColumn() ?: ''), strlen($prefix));
+
+        $orderId = sprintf('%s%05d', $prefix, max($lastOrderNum, $lastInboxNum) + 1);
 
         // Stamp who created the order
         $me     = currentUser();

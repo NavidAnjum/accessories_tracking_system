@@ -216,7 +216,6 @@ if ($rangeDays > 31) {
 try {
     $db = getDB();
     ensureErpSaleOrdersCacheTable($db);
-    $savedNew = 0; // rows this load persisted that were NOT already in the local cache
 
     if ($cached) {
         // Fast path: read previously-saved rows from the local cache (no ERP call).
@@ -239,13 +238,9 @@ try {
             throw new RuntimeException($result['error'] ?? 'Could not load ERP data');
         }
         $rawItems = erpLiveReportFilterRowsByDate($result['items'] ?? [], $from, $to);
-        // Save everything we fetched so the next load can serve it fast from the DB,
-        // and count how many rows were genuinely NEW (not already cached).
+        // Save everything we fetched so the next load can serve it fast from the DB.
         if ($rawItems) {
-            $keys = array_values(array_unique(erpSaleOrdersItemKeys($rawItems)));
-            $existingBefore = $keys ? erpSaleOrdersCountExistingKeys($db, $keys) : 0;
             erpSaleOrdersUpsertItems($db, $rawItems, 0, count($rawItems) ?: ERP_LIVE_ORDERS_LIMIT);
-            $savedNew = max(0, count($keys) - $existingBefore);
         }
         syncErpOrderInbox($db, $rawItems, false);
     }
@@ -362,7 +357,6 @@ try {
         'totalQty' => $totalQty,
         'totalValue' => $totalValue,
         'orders' => $orderRows,
-        'savedNew' => $savedNew,
         'source' => $cached ? 'cache' : 'live_api',
     ]);
 } catch (Throwable $e) {

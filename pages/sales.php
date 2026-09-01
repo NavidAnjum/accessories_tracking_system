@@ -308,11 +308,32 @@ include __DIR__ . '/../includes/header.php';
 .pi-type-lbl.active-lbl { background:#6366f1; color:#fff; }
 </style>
 <script>
+let _currentPiStep = 'sales';
+let _marketingApproved = false;
+
+function isWaitingForMarketingApproval() {
+    return _currentPiStep === 'marketing';
+}
+
+function hasMarketingApproval() {
+    return _marketingApproved === true;
+}
+
 function resetSubmitBtn() {
     const btn = document.getElementById('universalSaveBtn');
-    if (btn) {
-        btn.textContent = 'Submit';
-        btn.style.background = '';
+    if (!btn) return;
+    btn.style.background = '';
+    if (isWaitingForMarketingApproval()) {
+        btn.textContent = 'Waiting for Marketing Approval';
+        btn.style.background = '#94a3b8';
+        btn.disabled = true;
+        btn.onclick = null;
+    } else if (hasMarketingApproval()) {
+        btn.textContent = 'Submit to LC';
+        btn.disabled = false;
+        btn.onclick = submitApprovedPiToLc;
+    } else {
+        btn.textContent = 'Submit to Marketing';
         btn.disabled = false;
         btn.onclick = submitToMarketing;
     }
@@ -324,23 +345,17 @@ function onPiTypeChange() {
     document.querySelectorAll('.pi-type-lbl').forEach(l => l.classList.remove('active-lbl'));
     const lbl = document.getElementById('piTypeLbl_' + val);
     if (lbl) lbl.classList.add('active-lbl');
-    const labels = { single:'Print Single PI', summary:'Print Summary PI', master:'Print Master PI' };
+    const approved = hasMarketingApproval();
+    document.querySelectorAll('input[name="piTypeChoice"]').forEach(r => {
+        r.disabled = !approved && r.value !== 'single';
+    });
+    const labels = !approved
+        ? { single:'Preview Single PI', summary:'Preview Summary PI', master:'Preview Master PI' }
+        : { single:'Print Single PI', summary:'Print Summary PI', master:'Print Master PI' };
     const btn = document.getElementById('printPiBtn');
     if (btn) btn.textContent = labels[val] || 'Print PI';
     const submitBtn = document.getElementById('universalSaveBtn');
-    if (submitBtn) {
-        if (val === 'master') {
-            submitBtn.textContent = 'Create Master PI';
-            submitBtn.style.background = 'linear-gradient(135deg,#7c3aed,#6366f1)';
-            submitBtn.disabled = false;
-            submitBtn.onclick = generateMasterPi;
-        } else {
-            submitBtn.textContent = 'Submit';
-            submitBtn.style.background = '';
-            submitBtn.disabled = false;
-            submitBtn.onclick = submitToMarketing;
-        }
-    }
+    resetSubmitBtn();
     const addBtn = document.getElementById('addAnotherPoBtn');
     if (addBtn) addBtn.style.display = val === 'summary' ? '' : 'none';
     const termsBox = document.getElementById('salesTermsBox');
@@ -354,7 +369,20 @@ function onPiTypeChange() {
 }
 document.addEventListener('DOMContentLoaded', onPiTypeChange);
 function goToPiPrint(excelMode = false) {
+    const approved = hasMarketingApproval();
+    if (!approved && !isWaitingForMarketingApproval()) {
+        alert('Submit the PI to Marketing before previewing it.');
+        return;
+    }
+    if (!approved && excelMode) {
+        alert('Waiting for Marketing approval before exporting PI.');
+        return;
+    }
     const val  = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
+    if (!approved && val !== 'single') {
+        alert('Summary PI and Master PI are available after Marketing approval.');
+        return;
+    }
     const pages = { single:'single-pi.php', summary:'summary-pi.php', master:'master-pi.php' };
     let url = APP_BASE + '/pages/' + (pages[val] || 'single-pi.php');
     if (val === 'master') {
@@ -378,6 +406,9 @@ function goToPiPrint(excelMode = false) {
     }
     if (excelMode) {
         url += (url.includes('?') ? '&' : '?') + 'excel=1';
+    }
+    if (!approved) {
+        url += (url.includes('?') ? '&' : '?') + 'preview=1&embed=1';
     }
     window.location.href = url;
 }
@@ -546,7 +577,7 @@ function goToPiPrint(excelMode = false) {
         <button type="button" class="primary-btn" id="universalSaveBtn" onclick="submitToMarketing()">Submit</button>
     </div>
     <div class="page-actions-right">
-        <button type="button" class="primary-btn js-next-page" data-next-page="lc">Next: LC</button>
+        <button type="button" class="primary-btn" id="nextLcBtn" disabled style="display:none;">LC after final submit</button>
     </div>
 </div>
 
@@ -1796,6 +1827,14 @@ savePi = async function() {
 };
 
 async function submitToMarketing() {
+    if (hasMarketingApproval()) {
+        alert('This PI is already approved. Use Submit to LC to continue.');
+        return;
+    }
+    if (isWaitingForMarketingApproval()) {
+        alert('This PI is already waiting for Marketing approval.');
+        return;
+    }
     let data;
     try { data = collectPiData(); } catch(e) { console.error('collectPiData error:', e); alert('Form read error: ' + e.message); return; }
     const piType = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
@@ -1845,38 +1884,52 @@ async function submitToMarketing() {
             totalVal = parseFloat(data.grandVal || 0);
         }
 
-        // Update UI immediately â€” don't block on snapshot / step update
-        document.getElementById('piStatus').textContent = 'Submitted';
-        updatePrintLock('sales', true);
-        refreshSavedPiBadge();
-        renderOrderPiOverview(orderId);
-        if (btn) {
-            btn.textContent = 'Submitted';
-            btn.style.background = '#16a34a';
-            btn.disabled = false;
-            setTimeout(() => {
-                onPiTypeChange();
-            }, 3000);
-        }
-
-        // Fire-and-forget background tasks
+        // The Marketing handoff must finish before we show "Submitted".
         if (orderId) {
-            fetch(APP_BASE + '/api/save_page.php', {
+            const pageRes = await fetch(APP_BASE + '/api/save_page.php', {
                 method: 'POST', headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({ order_id: orderId, page_name: 'sales', ...data })
-            }).catch(() => {});
+            });
+            const pageText = await pageRes.text();
+            let pageJson = {};
+            try { pageJson = pageText ? JSON.parse(pageText) : {}; }
+            catch (err) { throw new Error('Sales page snapshot returned invalid response.'); }
+            if (!pageRes.ok || pageJson.error) {
+                throw new Error(pageJson.error || 'Sales page snapshot could not be saved.');
+            }
+
             const firstPo = (data.pos && data.pos[0]) || {};
-            // PI submit hands the order to Marketing for approval (not straight to LC).
-            // Marketing approval then advances it to LC and notifies Commercial + Production.
+            // PI submit hands the order to Marketing for approval.
+            // Marketing approval returns it to PI so Commercial can print/create Summary/Master PI.
             const orderParams = new URLSearchParams({ id: orderId, step: 'marketing' });
             if (data.customer) orderParams.set('customer', data.customer);
             if (data.buyer)    orderParams.set('buyer', data.buyer);
             if (firstPo.poNum) orderParams.set('po', firstPo.poNum);
             // Route the approval notification to the selected marketing person.
             if (data.marketingUserId) orderParams.set('marketing_user', data.marketingUserId);
-            fetch(APP_BASE + '/api/orders.php?' + orderParams.toString(), { method: 'PUT' })
-                .catch(() => {});
+            const orderRes = await fetch(APP_BASE + '/api/orders.php?' + orderParams.toString(), { method: 'PUT' });
+            const orderText = await orderRes.text();
+            let orderJson = {};
+            try { orderJson = orderText ? JSON.parse(orderText) : {}; }
+            catch (err) { throw new Error('Marketing handoff returned invalid response.'); }
+            if (!orderRes.ok || orderJson.error) {
+                throw new Error(orderJson.error || 'Could not send PI to Marketing.');
+            }
         }
+
+        _currentPiStep = 'marketing';
+        document.getElementById('piStatus').textContent = 'Submitted';
+        const stepEl = document.getElementById('oidStep');
+        if (stepEl) stepEl.textContent = 'Step: Marketing';
+        updatePrintLock('marketing', true);
+        refreshSavedPiBadge();
+        renderOrderPiOverview(orderId);
+        if (btn) {
+            btn.textContent = 'Waiting for Marketing Approval';
+            btn.style.background = '#94a3b8';
+            btn.disabled = true;
+        }
+        window.location.href = APP_BASE + '/pages/notifications.php';
     } catch (e) {
         console.error('submitToMarketing error:', e);
         if (btn) {
@@ -1884,6 +1937,67 @@ async function submitToMarketing() {
             btn.disabled = false;
         }
         alert('Submit failed: ' + (e.message || 'Could not reach server. Check your connection.'));
+    }
+}
+
+async function submitApprovedPiToLc() {
+    if (!hasMarketingApproval() || _currentPiStep !== 'sales') {
+        alert('Marketing approval is required before sending this order to LC.');
+        return;
+    }
+
+    const orderId = sessionStorage.getItem('ats_current_order_id') || '';
+    if (!orderId) {
+        alert('No order loaded.');
+        return;
+    }
+    if (!_savedPisCache.length) {
+        alert('Please save at least one PI before sending the order to LC.');
+        return;
+    }
+
+    const btn = document.getElementById('universalSaveBtn');
+    if (btn) {
+        btn.textContent = 'Sending to LC...';
+        btn.disabled = true;
+    }
+
+    try {
+        const data = collectPiData();
+        const pageResponse = await fetch(APP_BASE + '/api/save_page.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_id: orderId, page_name: 'sales', ...data })
+        });
+        const pageText = await pageResponse.text();
+        let pageJson = {};
+        try { pageJson = pageText ? JSON.parse(pageText) : {}; }
+        catch (_) { throw new Error('Final PI save returned an invalid response.'); }
+        if (!pageResponse.ok || pageJson.error) {
+            throw new Error(pageJson.error || 'The approved PI could not be saved before LC handoff.');
+        }
+
+        const response = await fetch(
+            APP_BASE + '/api/orders.php?id=' + encodeURIComponent(orderId) + '&step=lc',
+            { method: 'PUT' }
+        );
+        const text = await response.text();
+        let json = {};
+        try { json = text ? JSON.parse(text) : {}; }
+        catch (_) { throw new Error('LC handoff returned an invalid response.'); }
+        if (!response.ok || json.error) {
+            throw new Error(json.error || 'Could not send the approved PI to LC.');
+        }
+
+        _currentPiStep = 'lc';
+        document.getElementById('piStatus').textContent = 'Sent to LC';
+        const stepEl = document.getElementById('oidStep');
+        if (stepEl) stepEl.textContent = 'Step: LC';
+        window.location.href = APP_BASE + '/pages/lc.php';
+    } catch (e) {
+        console.error('submitApprovedPiToLc error:', e);
+        alert('Submit to LC failed: ' + (e.message || 'Could not reach server.'));
+        resetSubmitBtn();
     }
 }
 
@@ -1928,7 +2042,7 @@ function refreshSavedPiBadge() {
             if (_savedPisCache.length > 0) {
                 badge.style.display = 'inline-block';
                 cnt.textContent = _savedPisCache.length;
-                updatePrintLock('sales', true);
+                updatePrintLock(_currentPiStep, true);
             } else {
                 badge.style.display = 'none';
             }
@@ -1945,7 +2059,7 @@ function renderOrderPiOverview(orderId) {
         .then(r => r.json())
         .then(pis => {
             if (!pis || !pis.length) { overview.style.display = 'none'; return; }
-            updatePrintLock('sales', true);
+            updatePrintLock(_currentPiStep, true);
 
             const masters     = pis.filter(p => p.is_master);
             const individuals = pis.filter(p => !p.is_master);
@@ -2440,15 +2554,21 @@ function updatePrintLock(step, forceUnlock = false) {
     const btn = document.getElementById('printPiBtn');
     const excelBtn = document.getElementById('excelPiBtn');
     if (!btn) return;
-    const submitted = forceUnlock || _stepIdx(step) > _stepIdx('sales');
-    btn.disabled = !submitted;
-    btn.title    = submitted ? '' : 'Submit PI first to unlock printing';
-    btn.style.opacity = submitted ? '' : '0.5';
+    _currentPiStep = step || 'sales';
+    const waitingForMarketing = step === 'marketing';
+    const approvedAtPi = step === 'sales' && hasMarketingApproval();
+    const canPrint = hasMarketingApproval() && (approvedAtPi || _stepIdx(step) > _stepIdx('sales'));
+    const canPreview = !canPrint && waitingForMarketing && forceUnlock;
+    btn.disabled = !(canPrint || canPreview);
+    btn.textContent = canPreview ? 'Preview Single PI' : 'Print Single PI';
+    btn.title    = canPrint ? '' : (canPreview ? 'Preview only until Marketing approval' : 'Submit PI and get Marketing approval before printing');
+    btn.style.opacity = (canPrint || canPreview) ? '' : '0.5';
     if (excelBtn) {
-        excelBtn.disabled = !submitted;
-        excelBtn.title = submitted ? '' : 'Submit PI first to unlock Excel download';
-        excelBtn.style.opacity = submitted ? '' : '0.5';
+        excelBtn.disabled = !canPrint;
+        excelBtn.title = canPrint ? '' : (waitingForMarketing ? 'Waiting for Marketing approval before Excel download' : 'Submit PI and get Marketing approval before Excel download');
+        excelBtn.style.opacity = canPrint ? '' : '0.5';
     }
+    onPiTypeChange();
 }
 
 window.onOrderLoad = async function(res) {
@@ -2456,6 +2576,11 @@ window.onOrderLoad = async function(res) {
     resetSubmitBtn();
     const orderId = res.order?.order_id;
     const salesSnapshot = res.pages?.sales || null;
+    const marketingSnapshot = res.pages?.marketing || null;
+    const currentStep = res.order?.current_step || 'sales';
+    _marketingApproved = marketingSnapshot?.marketingApproved === true
+        || marketingSnapshot?.marketingApproved === 'true'
+        || marketingSnapshot?.piApprovalStatus === 'approved';
     const hasSavedPiData = !!(
         salesSnapshot &&
         (
@@ -2463,7 +2588,7 @@ window.onOrderLoad = async function(res) {
             (Array.isArray(salesSnapshot.pis) && salesSnapshot.pis.length)
         )
     );
-    updatePrintLock(res.order?.current_step || 'sales', hasSavedPiData);
+    updatePrintLock(currentStep, hasSavedPiData);
     const marketingIntake = res.pages?.['marketing-intake'] || null;
     const fallbackCustomer = salesSnapshot?.customer || marketingIntake?.customer || res.order?.customer_name || '';
     if (salesSnapshot?.piType) {
@@ -2565,7 +2690,10 @@ window.onOrderLoad = async function(res) {
 
 window.onNewOrder = function(orderId) {
     setPiContentVisible(true);
+    _currentPiStep = 'sales';
+    _marketingApproved = false;
     resetPiFormFields();
+    updatePrintLock('sales', false);
     if (orderId) {
         renderOrderPiOverview(orderId);
         document.getElementById('piNumber').value           = orderId + '-PI';

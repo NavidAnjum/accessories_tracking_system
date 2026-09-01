@@ -27,6 +27,21 @@ $method = $_SERVER['REQUEST_METHOD'];
 try {
     $db = getDB();
 
+    $hasMarketingApproval = static function (PDO $db, string $orderId): bool {
+        $stmt = $db->prepare("SELECT data FROM page_data WHERE order_id = ? AND page_name = 'marketing' LIMIT 1");
+        $stmt->execute([$orderId]);
+        $data = json_decode((string)($stmt->fetchColumn() ?: ''), true);
+
+        if (!is_array($data)) {
+            return false;
+        }
+
+        $approved = $data['marketingApproved'] ?? false;
+        return $approved === true
+            || $approved === 'true'
+            || ($data['piApprovalStatus'] ?? '') === 'approved';
+    };
+
     // ── GET ───────────────────────────────────────────────────────────────────
     if ($method === 'GET') {
         $id = $_GET['id'] ?? null;
@@ -124,6 +139,21 @@ try {
         $curStmt = $db->prepare('SELECT current_step FROM orders WHERE order_id = ?');
         $curStmt->execute([$id]);
         $current = $curStmt->fetchColumn();
+        if ($current === false) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Order not found']);
+            exit;
+        }
+
+        if ($step === 'lc' && ($current !== 'sales' || !$hasMarketingApproval($db, $id))) {
+            http_response_code(409);
+            echo json_encode([
+                'error' => 'Marketing approval is required before this order can move to LC.',
+                'order_id' => $id,
+                'current_step' => $current,
+            ]);
+            exit;
+        }
 
         // Optional order fields — only overwrite when a non-empty value is supplied,
         // so a plain step change never blanks out existing details.
@@ -145,6 +175,9 @@ try {
             $assignedUserId = isset($_GET['marketing_user']) && $_GET['marketing_user'] !== ''
                 ? (int)$_GET['marketing_user'] : null;
             createStepNotifications($db, $id, $step, (int)(currentUser()['id'] ?? 0) ?: null, $assignedUserId);
+            if ($step === 'marketing') {
+                createCommercialPiNotifications($db, $id, (int)(currentUser()['id'] ?? 0) ?: null);
+            }
         }
         echo json_encode(['ok' => true, 'order_id' => $id, 'current_step' => $step]);
         exit;
@@ -227,6 +260,15 @@ try {
         $existingStmt = $db->prepare('SELECT current_step FROM orders WHERE order_id = ?');
         $existingStmt->execute([$orderId]);
         $existingStep = $existingStmt->fetchColumn();
+
+        if ($step === 'lc' && ($existingStep !== 'sales' || !$hasMarketingApproval($db, $orderId))) {
+            http_response_code(409);
+            echo json_encode([
+                'error' => 'Marketing approval is required before this order can move from PI to LC.',
+                'order_id' => $orderId,
+            ]);
+            exit;
+        }
 
         // Upsert orders
         $sql = '

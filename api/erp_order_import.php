@@ -75,6 +75,7 @@ try {
         if (!(int)$exists->fetchColumn()) {
             throw new RuntimeException('The selected internal work order does not exist.');
         }
+
         $update = $db->prepare('UPDATE erp_order_inbox SET work_order_id = ?, converted_by_id = ?, converted_at = NOW() WHERE sale_order_no = ? AND work_order_id IS NULL');
         $update->execute([$requestedWorkOrderId, $me['id'] ?? null, $erpOrderNo]);
         if ($update->rowCount() !== 1) {
@@ -98,10 +99,18 @@ try {
 
     $yearMonth = date('Y-m');
     $prefix = 'ORD-' . $yearMonth . '-';
+    // The generated id must be free in BOTH the orders table and the inbox
+    // (work_order_id is unique there). Taking the max across both avoids reusing
+    // an id already claimed by a prior conversion, which caused a 1062 duplicate.
     $lastStmt = $db->prepare('SELECT order_id FROM orders WHERE order_id LIKE ? ORDER BY order_id DESC LIMIT 1 FOR UPDATE');
     $lastStmt->execute([$prefix . '%']);
-    $lastId = (string)($lastStmt->fetchColumn() ?: '');
-    $nextNumber = $lastId !== '' ? ((int)substr($lastId, strlen($prefix)) + 1) : 1;
+    $lastOrderNum = (int)substr((string)($lastStmt->fetchColumn() ?: ''), strlen($prefix));
+
+    $lastInboxStmt = $db->prepare('SELECT work_order_id FROM erp_order_inbox WHERE work_order_id LIKE ? ORDER BY work_order_id DESC LIMIT 1');
+    $lastInboxStmt->execute([$prefix . '%']);
+    $lastInboxNum = (int)substr((string)($lastInboxStmt->fetchColumn() ?: ''), strlen($prefix));
+
+    $nextNumber = max($lastOrderNum, $lastInboxNum) + 1;
     $orderId = sprintf('%s%05d', $prefix, $nextNumber);
 
     $values = [

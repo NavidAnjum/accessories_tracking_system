@@ -26,7 +26,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .doc-excel-btn{background:#2563eb;color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer}
 .doc-excel-btn:hover{background:#1d4ed8}
 #docWrap{background:#d1d5db;padding:28px 0;min-height:520px}
-.doc-page{position:relative;box-sizing:border-box;width:210mm;min-height:286mm;max-width:820px;margin:0 auto 18px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.14);padding:14mm 14mm 30mm;font-family:'Times New Roman',Times,serif;color:#111;font-size:10px;line-height:1.22;overflow:hidden}
+.doc-page{position:relative;box-sizing:border-box;width:210mm;min-height:297mm;max-width:820px;margin:0 auto 18px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.14);padding:14mm 14mm 12mm;font-family:'Times New Roman',Times,serif;color:#111;font-size:10px;line-height:1.22;overflow:hidden}
 .doc-page:not(:last-child){break-after:page;page-break-after:always}
 .doc-page:last-child{break-after:auto;page-break-after:auto}
 .doc-page .zzal-print-brand--footer{position:static;margin:0!important;margin-top:auto!important;padding-top:6px!important}
@@ -46,7 +46,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .center{text-align:center}.right{text-align:right}
 .doc-note-list{margin-top:8px}
 .doc-note-row{display:grid;grid-template-columns:140px 1fr;gap:8px;margin-bottom:2px}
-.doc-sign-row{margin-top:26px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
+.doc-sign-row{margin-top:50px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
 .doc-sign-line{width:120px;border-top:1px solid #000;margin-top:28px;margin-bottom:4px}
 .doc-sign-right{text-align:right}.doc-sign-right .doc-sign-line{margin-left:auto}
 .doc-bottom-bar{margin-top:56px;padding-top:4px;border-top:1px solid #000;font-size:9px;text-align:center}
@@ -56,8 +56,11 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .doc-page.doc-letter-page{display:flex;flex-direction:column}
 .doc-letter-page .doc-letter-body{flex:1;display:flex;flex-direction:column;min-height:0}
 .doc-letter-page .doc-letter-sign{margin-top:auto}
+<?php if (in_array($doc, ['origin', 'beneficiary'], true)): ?>
+.doc-letter-page .doc-letter-sign{margin-top:55mm}
+<?php endif; ?>
 .doc-letter-page .doc-bottom-bar{margin-top:12px}
-@media print{@page{size:A4;margin:0}.doc-ctrl,nav.page-nav,.order-id-bar,.no-print{display:none!important}html,body{width:210mm!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;background:#fff!important}.app-shell,.form-stack{display:block!important;margin:0!important;padding:0!important;background:#fff!important}.form-stack>*:not(#docWrap){display:none!important}#docWrap{display:block!important;background:none!important;padding:0!important;margin:0!important;width:210mm!important;min-height:0!important}#docPages{display:block!important;margin:0!important;padding:0!important}.doc-page{box-shadow:none;box-sizing:border-box;margin:0;max-width:210mm;width:210mm!important;height:auto!important;min-height:286mm!important;padding:14mm 14mm 30mm!important;overflow:hidden;display:flex;flex-direction:column;break-inside:avoid;page-break-inside:avoid}.doc-page:not(:last-child){break-after:page;page-break-after:always}.doc-page:last-child{break-after:auto!important;page-break-after:auto!important}}
+@media print{@page{size:A4;margin:0}.doc-ctrl,nav.page-nav,.order-id-bar,.no-print{display:none!important}html,body{width:210mm!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;background:#fff!important}.app-shell,.form-stack{display:block!important;margin:0!important;padding:0!important;background:#fff!important}.form-stack>*:not(#docWrap){display:none!important}#docWrap{display:block!important;background:none!important;padding:0!important;margin:0!important;width:210mm!important;min-height:0!important}#docPages{display:block!important;margin:0!important;padding:0!important}.doc-page{box-shadow:none;box-sizing:border-box;margin:0;max-width:210mm;width:210mm!important;height:297mm!important;min-height:297mm!important;padding:14mm 14mm 12mm!important;overflow:hidden;display:flex;flex-direction:column;break-inside:avoid;page-break-inside:avoid}.doc-page:not(:last-child){break-after:page;page-break-after:always}.doc-page:last-child{break-after:auto!important;page-break-after:auto!important}}
 </style>
 
 <div class="doc-ctrl no-print">

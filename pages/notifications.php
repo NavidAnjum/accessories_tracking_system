@@ -27,21 +27,49 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 
+    <div style="margin-bottom:16px;padding:14px 16px;border:1.5px solid #e0e7ff;border-radius:14px;background:#fff;display:grid;grid-template-columns:repeat(5,minmax(160px,1fr));gap:12px;">
+        <label style="display:block;">
+            <span style="display:block;margin-bottom:6px;font-size:11px;font-weight:800;text-transform:uppercase;color:#64748b;">Order</span>
+            <input type="search" id="notifSearchOrder" class="form-control" placeholder="Search order no">
+        </label>
+        <label style="display:block;">
+            <span style="display:block;margin-bottom:6px;font-size:11px;font-weight:800;text-transform:uppercase;color:#64748b;">PO</span>
+            <input type="search" id="notifSearchPo" class="form-control" placeholder="Search PO">
+        </label>
+        <label style="display:block;">
+            <span style="display:block;margin-bottom:6px;font-size:11px;font-weight:800;text-transform:uppercase;color:#64748b;">Customer</span>
+            <input type="search" id="notifSearchCustomer" class="form-control" placeholder="Search customer">
+        </label>
+        <label style="display:block;">
+            <span style="display:block;margin-bottom:6px;font-size:11px;font-weight:800;text-transform:uppercase;color:#64748b;">Buyer</span>
+            <input type="search" id="notifSearchBuyer" class="form-control" placeholder="Search buyer">
+        </label>
+        <label style="display:block;">
+            <span style="display:block;margin-bottom:6px;font-size:11px;font-weight:800;text-transform:uppercase;color:#64748b;">Sales Person</span>
+            <input type="search" id="notifSearchSalesPerson" class="form-control" placeholder="Search sales person">
+        </label>
+    </div>
+
     <div class="packing-items-wrap">
         <table class="packing-items-table">
             <thead>
                 <tr>
                     <th>Status</th>
-                    <th>Order ID</th>
-                    <th>Step</th>
-                    <th>Subject</th>
-                    <th>Message</th>
+                    <th>Order No</th>
+                    <th>Customer</th>
+                    <th>Buyer</th>
+                    <th>Sales Person</th>
+                    <th>PO</th>
+                    <th>Item Name</th>
+                    <th>Total Qty</th>
+                    <th>Price</th>
+                    <th>Value</th>
                     <th>Sent</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody id="notifTableBody">
-                <tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:28px;">Loading notifications...</td></tr>
+                <tr><td colspan="12" style="text-align:center;color:#94a3b8;padding:28px;">Loading notifications...</td></tr>
             </tbody>
         </table>
     </div>
@@ -53,6 +81,7 @@ const NOTIF_STEP_PAGE_MAP = {
     'costing-review': 'costing-review.php',
     'production': 'production.php',
     'sales': 'sales.php',
+    'commercial-pi': 'sales.php',
     'marketing': 'marketing.php',
     'lc': 'lc.php',
     'exchange': 'exchange.php',
@@ -66,6 +95,8 @@ const NOTIF_STEP_PAGE_MAP = {
     'bank-forwarding': 'bank-forwarding.php',
     'po-status': 'po-status.php'
 };
+
+let notifItems = [];
 
 function notifEscape(s) {
     return String(s || '')
@@ -84,41 +115,86 @@ function notifFormatDate(ts) {
     });
 }
 
+function notifMoney(value) {
+    const n = Number(value || 0);
+    return Number.isFinite(n) ? '$' + n.toFixed(2) : notifEscape(value);
+}
+
+function notifNumber(value) {
+    const n = Number(value || 0);
+    return Number.isFinite(n) ? n.toLocaleString() : notifEscape(value);
+}
+
+function notifFilterValue(id) {
+    return String(document.getElementById(id)?.value || '').trim().toLowerCase();
+}
+
+function notifMatches(value, needle) {
+    if (!needle) return true;
+    return String(value || '').toLowerCase().includes(needle);
+}
+
+function renderNotificationWorklist() {
+    const body = document.getElementById('notifTableBody');
+    const unreadEl = document.getElementById('notifUnreadCount');
+    const orderQ = notifFilterValue('notifSearchOrder');
+    const poQ = notifFilterValue('notifSearchPo');
+    const customerQ = notifFilterValue('notifSearchCustomer');
+    const buyerQ = notifFilterValue('notifSearchBuyer');
+    const salesQ = notifFilterValue('notifSearchSalesPerson');
+    const rows = notifItems.filter(n => {
+        const orderText = [n.erp_order_no, n.order_id, n.title, n.message].join(' ');
+        const poText = [n.customer_po_no, n.message].join(' ');
+        return notifMatches(orderText, orderQ)
+            && notifMatches(poText, poQ)
+            && notifMatches([n.customer_name, n.message].join(' '), customerQ)
+            && notifMatches([n.buyer, n.message].join(' '), buyerQ)
+            && notifMatches(n.sales_person, salesQ);
+    });
+    if (unreadEl) unreadEl.textContent = String(rows.length);
+
+    if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#94a3b8;padding:28px;">No notifications found.</td></tr>';
+        return;
+    }
+
+    body.innerHTML = rows.map(n => `
+        <tr>
+            <td>
+                <span style="display:inline-block;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;${Number(n.is_read) ? 'background:#e2e8f0;color:#475569;' : 'background:#dbeafe;color:#1d4ed8;'}">
+                    ${Number(n.is_read) ? 'Read' : 'Unread'}
+                </span>
+            </td>
+            <td><strong>${notifEscape(n.erp_order_no ? 'ERP ' + n.erp_order_no : n.order_id)}</strong></td>
+            <td>${notifEscape(n.customer_name || '-')}</td>
+            <td>${notifEscape(n.buyer || '-')}</td>
+            <td>${notifEscape(n.sales_person || '-')}</td>
+            <td>${notifEscape(n.customer_po_no || '-')}</td>
+            <td>${notifEscape(n.item_name || n.title || '-')}</td>
+            <td style="text-align:right;">${n.total_qty ? notifNumber(n.total_qty) : '-'}</td>
+            <td style="text-align:right;">${notifEscape(n.price || '-')}</td>
+            <td style="text-align:right;">${n.total_value ? notifMoney(n.total_value) : '-'}</td>
+            <td>${notifFormatDate(n.created_at)}</td>
+            <td>
+                <button type="button" class="primary-btn" style="padding:6px 12px;font-size:12px;" onclick="openNotificationStep('${notifEscape(n.id)}', '${encodeURIComponent(n.order_id || '')}', '${notifEscape(n.step_name || '')}', '${notifEscape(n.type || 'workflow')}', '${encodeURIComponent(n.erp_order_no || '')}')">
+                    ${n.type === 'erp_order' ? 'Create Work Order' : (n.type === 'commercial_pi' ? 'Create Another PI' : 'Open')}
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
 async function loadNotificationWorklist() {
     const body = document.getElementById('notifTableBody');
     const unreadEl = document.getElementById('notifUnreadCount');
     try {
         const res = await fetch(APP_BASE + '/api/notifications.php?full=1');
         const json = await res.json();
-        const items = json.items || [];
-        unreadEl.textContent = String(json.unreadCount || 0);
-
-        if (!items.length) {
-            body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:28px;">No notifications found.</td></tr>';
-            return;
-        }
-
-        body.innerHTML = items.map(n => `
-            <tr>
-                <td>
-                    <span style="display:inline-block;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;${Number(n.is_read) ? 'background:#e2e8f0;color:#475569;' : 'background:#dbeafe;color:#1d4ed8;'}">
-                        ${Number(n.is_read) ? 'Read' : 'Unread'}
-                    </span>
-                </td>
-                <td><strong>${notifEscape(n.erp_order_no ? 'ERP ' + n.erp_order_no : n.order_id)}</strong></td>
-                <td>${notifEscape((n.step_name || '').replace(/-/g, ' '))}</td>
-                <td>${notifEscape(n.title)}</td>
-                <td>${notifEscape(n.message)}</td>
-                <td>${notifFormatDate(n.created_at)}</td>
-                <td>
-                    <button type="button" class="primary-btn" style="padding:6px 12px;font-size:12px;" onclick="openNotificationStep('${notifEscape(n.id)}', '${encodeURIComponent(n.order_id || '')}', '${notifEscape(n.step_name || '')}', '${notifEscape(n.type || 'workflow')}', '${encodeURIComponent(n.erp_order_no || '')}')">
-                        ${n.type === 'erp_order' ? 'Create Work Order' : 'Open'}
-                    </button>
-                </td>
-            </tr>
-        `).join('');
+        notifItems = json.items || [];
+        unreadEl.textContent = String(notifItems.length);
+        renderNotificationWorklist();
     } catch (e) {
-        body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#dc2626;padding:28px;">Could not load notifications.</td></tr>';
+        body.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#dc2626;padding:28px;">Could not load notifications.</td></tr>';
     }
 }
 
@@ -160,6 +236,9 @@ async function openNotificationStep(id, encodedOrderId, step, type, encodedErpOr
 document.addEventListener('DOMContentLoaded', function () {
     loadNotificationWorklist();
     document.getElementById('notifRefreshBtn')?.addEventListener('click', loadNotificationWorklist);
+    ['notifSearchOrder', 'notifSearchPo', 'notifSearchCustomer', 'notifSearchBuyer', 'notifSearchSalesPerson'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', renderNotificationWorklist);
+    });
     document.getElementById('notifMarkAllBtn')?.addEventListener('click', async function () {
         try {
             await fetch(APP_BASE + '/api/notifications.php', {

@@ -2,6 +2,8 @@
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/erp_sale_orders_cache.php';
 requireLogin();
 
 const ERP_ORDER_BASE = 'https://ebs.talhagroup.com:8080/ords/xxapi/ebs/sale-orders';
@@ -56,32 +58,52 @@ function fetchErpOrderPage(string $order, int $offset): array
 
 try {
     $items = [];
+    $source = 'local_cache';
     $offset = 0;
     $pageCount = 0;
 
-    do {
-        $pageCount++;
-        $response = fetchErpOrderPage($order, $offset);
-        $decoded = json_decode((string) $response['body'], true);
-        if (!is_array($decoded)) {
-            throw new RuntimeException('ERP returned invalid JSON.');
-        }
+    // Exact local lookup first. raw_json preserves fields (addresses, UOM,
+    // currency, etc.) that are not promoted to dedicated cache columns.
+    $db = getDB();
+    ensureErpSaleOrdersCacheTable($db);
+    $localStmt = $db->prepare('SELECT * FROM erp_sale_orders_cache WHERE sale_order_no = ? ORDER BY line_id ASC, id ASC');
+    $localStmt->execute([$order]);
+    foreach ($localStmt->fetchAll() as $cachedRow) {
+        $raw = json_decode((string)($cachedRow['raw_json'] ?? ''), true);
+        $items[] = is_array($raw) ? array_merge($raw, $cachedRow) : $cachedRow;
+    }
 
-        foreach (($decoded['items'] ?? []) as $row) {
-            if (is_array($row) && (string) ($row['sale_order_no'] ?? '') === $order) {
-                $items[] = $row;
+    // Only wait for the remote ERP when the exact sales order is absent locally.
+    if (!$items) {
+        $source = 'live_order_api';
+        do {
+            $pageCount++;
+            $response = fetchErpOrderPage($order, $offset);
+            $decoded = json_decode((string) $response['body'], true);
+            if (!is_array($decoded)) {
+                throw new RuntimeException('ERP returned invalid JSON.');
             }
-        }
 
-        $hasMore = !empty($decoded['hasMore']);
-        $offset += max(1, (int) ($decoded['limit'] ?? ERP_ORDER_LIMIT));
-    } while ($hasMore && $pageCount < 200);
+            foreach (($decoded['items'] ?? []) as $row) {
+                if (is_array($row) && (string) ($row['sale_order_no'] ?? '') === $order) {
+                    $items[] = $row;
+                }
+            }
+
+            $hasMore = !empty($decoded['hasMore']);
+            $offset += max(1, (int) ($decoded['limit'] ?? ERP_ORDER_LIMIT));
+        } while ($hasMore && $pageCount < 200);
+
+        if ($items) {
+            erpSaleOrdersUpsertItems($db, $items, 0, ERP_ORDER_LIMIT);
+        }
+    }
 
     if (!$items) {
         echo json_encode([
             'found' => false,
             'order' => $order,
-            'source' => 'live_order_api',
+            'source' => $source,
         ]);
         exit;
     }
@@ -126,7 +148,7 @@ try {
         'found' => true,
         'order' => $order,
         'po' => $customerPo,
-        'source' => 'live_order_api',
+        'source' => $source,
         'total' => count($items),
         'groups' => [[
             'salesOrderNo' => (string) ($first['sale_order_no'] ?? $order),

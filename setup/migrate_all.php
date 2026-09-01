@@ -41,6 +41,10 @@ run($db, 'customers table', "
         `politics_yes`        TINYINT(1) DEFAULT 0,
         `politics_party`      VARCHAR(100),
         `extra_data`          JSON,
+        `scorecard_total`     SMALLINT NULL,
+        `scorecard_grade`     VARCHAR(5) NULL,
+        `scorecard_action`    TEXT NULL,
+        `scorecard_json`      JSON NULL,
         `stage`               VARCHAR(30) NOT NULL DEFAULT 'completed',
         `signatures`          JSON,
         `created_at`          DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -52,6 +56,10 @@ run($db, 'customers table', "
 
 run($db, 'customers.stage column', "ALTER TABLE `customers` ADD COLUMN `stage` VARCHAR(30) NOT NULL DEFAULT 'completed' AFTER `extra_data`", $ok, $err);
 run($db, 'customers.signatures column', "ALTER TABLE `customers` ADD COLUMN `signatures` JSON NULL AFTER `stage`", $ok, $err);
+run($db, 'customers.scorecard_total column', "ALTER TABLE `customers` ADD COLUMN `scorecard_total` SMALLINT NULL AFTER `extra_data`", $ok, $err);
+run($db, 'customers.scorecard_grade column', "ALTER TABLE `customers` ADD COLUMN `scorecard_grade` VARCHAR(5) NULL AFTER `scorecard_total`", $ok, $err);
+run($db, 'customers.scorecard_action column', "ALTER TABLE `customers` ADD COLUMN `scorecard_action` TEXT NULL AFTER `scorecard_grade`", $ok, $err);
+run($db, 'customers.scorecard_json column', "ALTER TABLE `customers` ADD COLUMN `scorecard_json` JSON NULL AFTER `scorecard_action`", $ok, $err);
 
 // ── 2. buyers ────────────────────────────────────────────────────────────────
 run($db, 'buyers table', "

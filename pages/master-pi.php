@@ -11,19 +11,19 @@ require_once __DIR__ . '/../includes/print-brand.php';
     background:#1e1e3a; padding:14px 24px;
     display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;
 }
-.mpi-ctrl-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#a5b4fc; margin-bottom:4px; }
+.mpi-ctrl-label { font-size:7.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#a5b4fc; margin-bottom:4px; }
 .mpi-ctrl select {
     background:#2d2d50; color:#fff; border:1.5px solid #4f46e5;
-    border-radius:6px; padding:6px 12px; font-size:12px; outline:none; min-width:160px;
+    border-radius:6px; padding:6px 12px; font-size:9px; outline:none; min-width:160px;
 }
 .mpi-print-btn {
     margin-left:auto; align-self:center; background:#22c55e; color:#fff; border:none;
-    border-radius:8px; padding:10px 28px; font-size:13px; font-weight:700; cursor:pointer;
+    border-radius:8px; padding:10px 28px; font-size:9.75px; font-weight:700; cursor:pointer;
 }
 .mpi-print-btn:hover { background:#16a34a; }
 .mpi-excel-btn {
     background:#2563eb; color:#fff; border:none;
-    border-radius:8px; padding:10px 22px; font-size:13px; font-weight:700; cursor:pointer;
+    border-radius:8px; padding:10px 22px; font-size:9.75px; font-weight:700; cursor:pointer;
 }
 .mpi-excel-btn:hover { background:#1d4ed8; }
 
@@ -35,19 +35,19 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .mpi-pi-panel-hd {
     display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;
 }
-.mpi-pi-panel-hd span { font-size:10px; font-weight:700; text-transform:uppercase; color:#a5b4fc; }
+.mpi-pi-panel-hd span { font-size:7.5px; font-weight:700; text-transform:uppercase; color:#a5b4fc; }
 .mpi-pi-panel-hd button {
     background:none; border:1px solid #4f46e5; color:#a5b4fc;
-    font-size:10px; border-radius:4px; padding:2px 8px; cursor:pointer;
+    font-size:7.5px; border-radius:4px; padding:2px 8px; cursor:pointer;
 }
 .mpi-pi-check-row {
     display:flex; align-items:center; gap:8px;
-    padding:4px 0; border-bottom:1px solid #3d3d60; font-size:11px; color:#e2e8f0;
+    padding:4px 0; border-bottom:1px solid #3d3d60; font-size:9px; color:#e2e8f0;
 }
 .mpi-pi-check-row:last-child { border-bottom:none; }
 .mpi-pi-check-row input[type=checkbox] { accent-color:#6366f1; width:14px; height:14px; cursor:pointer; }
 .mpi-pi-check-row label { cursor:pointer; flex:1; }
-.mpi-pi-count { font-size:10px; color:#94a3b8; white-space:nowrap; }
+.mpi-pi-count { font-size:7.5px; color:#94a3b8; white-space:nowrap; }
 
 /* ── PI Document ──────────────────────────────────────────────────── */
 #mpiWrap { background:#d1d5db; padding:30px 0; min-height:500px; }
@@ -55,15 +55,16 @@ require_once __DIR__ . '/../includes/print-brand.php';
     position:relative; box-sizing:border-box;
     width:210mm; height:297mm; max-width:900px; margin:0 auto 10px;
     font-family:'Times New Roman',Times,serif;
-    font-size:11pt; color:#000; background:#fff;
-    padding:14mm 14mm 30mm; box-shadow:0 4px 24px rgba(0,0,0,.15);
+    font-size:8.25pt; color:#000; background:#fff;
+    padding:4mm 14mm 12mm; box-shadow:0 4px 24px rgba(0,0,0,.15);
     overflow:hidden;
     display:flex;
     flex-direction:column;
 }
 .mpi-doc .zzal-print-brand--footer { position:static; margin-top:auto!important; padding-top:6px!important; }
-.mpi-content { min-height:100%; display:flex; flex-direction:column; }
+.mpi-content { min-height:0; flex:1 1 auto; display:flex; flex-direction:column; }
 .mpi-continuation { display:none; }
+.mpi-continuation.is-active { display:flex; }
 
 /* Header */
 .mpi-hd {
@@ -77,30 +78,30 @@ require_once __DIR__ . '/../includes/print-brand.php';
     display:flex; flex-direction:column; align-items:center;
     width:62px; min-height:62px; justify-content:center;
 }
-.mpi-logo-z    { font-size:28px; font-weight:900; color:#1a3a6e; font-family:Georgia,serif; line-height:1; }
-.mpi-logo-zzal { font-size:9px; font-weight:900; letter-spacing:3px; color:#1a3a6e; margin-top:2px; }
+.mpi-logo-z    { font-size:21px; font-weight:900; color:#1a3a6e; font-family:Georgia,serif; line-height:1; }
+.mpi-logo-zzal { font-size:6.75px; font-weight:900; letter-spacing:3px; color:#1a3a6e; margin-top:2px; }
 .mpi-company-name {
-    font-size:22pt; font-weight:900; color:#1a3a6e;
+    font-size:16.5pt; font-weight:900; color:#1a3a6e;
     font-family:Georgia,serif; letter-spacing:.5px;
     font-variant:small-caps; line-height:1.1;
 }
 .mpi-title {
-    text-align:center; font-size:13pt; font-weight:700;
+    text-align:center; font-size:9.75pt; font-weight:700;
     letter-spacing:8px; color:#000;
     border-top:2px solid #1a3a6e; border-bottom:2px solid #1a3a6e;
-    padding:5px 0; margin:4px 0 8px;
+    padding:4px 0; margin:2px 0 3px;
 }
-.mpi-meta   { display:flex; justify-content:space-between; font-size:10.5pt; margin-bottom:6px; }
-.mpi-buyer  { font-size:10.5pt; margin:4px 0 2px; }
-.mpi-to-label { font-size:10.5pt; font-weight:700; margin:4px 0 2px; }
-.mpi-to     { font-size:10.5pt; margin:0 0 2px; line-height:1.6; }
-.mpi-conf   { font-size:10pt; margin:6px 0 10px; }
+.mpi-meta   { display:flex; justify-content:space-between; font-size:7.875pt; margin-bottom:2px; }
+.mpi-buyer  { font-size:7.875pt; margin:2px 0 1px; }
+.mpi-to-label { font-size:7.875pt; font-weight:700; margin:1px 0; }
+.mpi-to     { font-size:7.875pt; margin:0 0 1px; line-height:1.35; }
+.mpi-conf   { font-size:7.5pt; margin:4px 0; }
 
 /* Table */
-.mpi-tbl { width:100%; border-collapse:collapse; font-size:10pt; }
+.mpi-tbl { width:100%; border-collapse:collapse; font-size:7.5pt; }
 .mpi-tbl th {
     background:#fff; color:#111; padding:5px 8px;
-    border:1px solid #1a3a6e; text-align:center; font-size:9.5pt; line-height:1.3;
+    border:1px solid #1a3a6e; text-align:center; font-size:7.125pt; line-height:1.3;
 }
 .mpi-tbl td { border:1px solid #7a7a7a; padding:4px 8px; vertical-align:top; }
 .mpi-tbl tr { page-break-inside:avoid; }
@@ -108,20 +109,20 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .mpi-tbl td.tr { text-align:right; }
 .mpi-tbl tr.ref-row td { border:none; padding:3px 8px 1px; }
 .mpi-tbl tr.total-row td { font-weight:700; border-top:2px solid #1a3a6e; }
-.mpi-ref-bold { font-weight:700; font-size:10pt; }
+.mpi-ref-bold { font-weight:700; font-size:7.5pt; }
 
 /* Total words */
 .mpi-words {
-    font-size:10pt; font-weight:700; text-transform:uppercase;
+    font-size:7.5pt; font-weight:700; text-transform:uppercase;
     margin:8px 0 12px; color:#000;
     border-top:1px dashed #333; border-bottom:1px dashed #333;
     padding:4px 0;
 }
 
 /* Terms */
-.mpi-terms-title { font-size:10pt; font-weight:700; text-decoration:underline; margin:0 0 4px; }
-.mpi-terms-list  { margin:0; padding-left:32px; font-size:9.5pt; line-height:1.65; }
-.mpi-terms-list li { margin-bottom:1px; }
+.mpi-terms-title { font-size:6.375pt; font-weight:700; text-decoration:underline; margin:0 0 4px; }
+.mpi-terms-list  { margin:0; padding-left:32px; font-size:6.05625pt; line-height:1.3; }
+.mpi-terms-list li { margin-bottom:0; }
 
 /* Signatures */
 .mpi-sig-area { margin-top:36px; }
@@ -129,12 +130,12 @@ require_once __DIR__ . '/../includes/print-brand.php';
     display:flex; justify-content:space-between;
     padding-top:6px; margin-top:160px;
 }
-.mpi-sig-bottom-label { font-size:10pt; font-weight:700; }
+.mpi-sig-bottom-label { font-size:7.5pt; font-weight:700; }
 
 /* Footer bar */
 .mpi-footer-bar {
     margin-top:24px; border:1.5px solid #000;
-    padding:6px 12px; font-size:8.5pt; line-height:1.7;
+    padding:6px 12px; font-size:6.375pt; line-height:1.7;
     text-align:center;
 }
 
@@ -145,13 +146,17 @@ require_once __DIR__ . '/../includes/print-brand.php';
 @media print {
     .mpi-ctrl, nav.page-nav, .order-id-bar { display:none !important; }
     #mpiWrap { background:none !important; padding:0 !important; }
-    .mpi-doc { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:14mm 14mm 30mm!important; overflow:hidden; display:flex!important; flex-direction:column!important; }
+    .mpi-doc { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:4mm 14mm 12mm!important; overflow:hidden; display:flex!important; flex-direction:column!important; }
     .mpi-doc .zzal-print-brand--footer { position:static!important; margin-top:auto!important; }
-    .mpi-content { min-height:100%!important; display:flex!important; flex-direction:column!important; }
+    .mpi-content { min-height:0!important; flex:1 1 auto!important; display:flex!important; flex-direction:column!important; }
+    .mpi-continuation:not(.is-active) { display:none!important; }
     .mpi-hd { display:none !important; }
     body, html, .app-shell { width:210mm!important; min-height:297mm!important; margin:0!important; padding:0!important; background:#fff !important; overflow:visible!important; }
     .form-stack { padding:0 !important; }
     .no-print { display:none !important; }
+}
+html.pi-preview .mpi-ctrl {
+    display:none!important;
 }
 </style>
 
@@ -184,6 +189,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
     set('mpiDays',      p.get('days'));
     set('mpiLcType',    p.get('lctype'));
     set('mpiTolerance', p.get('tol'));
+    if (p.get('preview') === '1') document.documentElement.classList.add('pi-preview');
     window._mpiHsCode = p.get('hs') || '4819.10.00';
     window._mpiDocMust = p.get('doc') || 'UD';
     window._mpiBank = p.get('bank') || 'ncc';
@@ -344,13 +350,28 @@ function mpiFormatDate(d) {
     return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
 }
 function mpiRenderTerms(terms) {
-    const firstPageTerms = terms.slice(0, 10);
-    const continuedTerms = terms.slice(10);
-    document.getElementById('mpiTerms').innerHTML = firstPageTerms.map(t => `<li>${t}</li>`).join('');
-    document.getElementById('mpiTermsCont').innerHTML = continuedTerms.map(t => `<li>${t}</li>`).join('');
-    document.getElementById('mpiTermsCont').start = firstPageTerms.length + 1;
-    document.getElementById('mpiContinuation').style.display = continuedTerms.length ? 'block' : 'none';
-    document.getElementById('mpiSigArea').style.display = continuedTerms.length ? 'none' : 'block';
+    const firstTermsEl = document.getElementById('mpiTerms');
+    const contTermsEl = document.getElementById('mpiTermsCont');
+    const continuationEl = document.getElementById('mpiContinuation');
+    const sigAreaEl = document.getElementById('mpiSigArea');
+    const docEl = document.getElementById('mpiDocument');
+
+    function splitAt(firstCount) {
+        const firstPageTerms = terms.slice(0, firstCount);
+        const continuedTerms = terms.slice(firstCount);
+        firstTermsEl.innerHTML = firstPageTerms.map(t => `<li>${t}</li>`).join('');
+        contTermsEl.innerHTML = continuedTerms.map(t => `<li>${t}</li>`).join('');
+        contTermsEl.start = firstPageTerms.length + 1;
+        continuationEl.classList.toggle('is-active', continuedTerms.length > 0);
+        sigAreaEl.style.display = continuedTerms.length ? 'none' : 'block';
+    }
+
+    let firstCount = terms.length;
+    splitAt(firstCount);
+    while (firstCount > 1 && docEl.scrollHeight > docEl.clientHeight + 2) {
+        firstCount -= 1;
+        splitAt(firstCount);
+    }
 }
 
 /* ── Build PI checklist ───────────────────────────────────────── */

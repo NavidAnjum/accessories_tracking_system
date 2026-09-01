@@ -46,6 +46,8 @@ $priceMatrix     = is_array($extra['priceMatrix'] ?? null)     ? $extra['priceMa
 $docChecklist    = is_array($extra['docChecklist'] ?? null)    ? $extra['docChecklist']    : [];
 $competitor      = is_array($extra['competitorAnalysis'] ?? null) ? $extra['competitorAnalysis'] : [];
 $risk            = is_array($extra['riskAssessment'] ?? null) ? $extra['riskAssessment'] : [];
+$scorecard       = is_array($extra['scorecard'] ?? null) ? $extra['scorecard'] : [];
+$scoreSections   = is_array($scorecard['sections'] ?? null) ? $scorecard['sections'] : [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -73,6 +75,11 @@ $risk            = is_array($extra['riskAssessment'] ?? null) ? $extra['riskAsse
     table.matrix { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
     table.matrix th { background: #f5f7ff; color: #4f46e5; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; padding: 7px 9px; border: 1px solid #e0e3ff; text-align: left; }
     table.matrix td { padding: 6px 9px; border: 1px solid #eceffe; }
+    .score-summary { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 10px; margin-bottom: 10px; }
+    .score-box { border: 1px solid #e0e3ff; background: #f8f9ff; border-radius: 8px; padding: 8px; }
+    .score-box label { display:block; font-size:9.5px; font-weight:800; text-transform:uppercase; color:#9ca3af; margin-bottom:3px; }
+    .score-box strong { font-size:16px; color:#1e1e2e; }
+    .score-section { break-inside: avoid; margin-top: 8px; }
     .sigs { display: flex; gap: 40px; flex-wrap: wrap; margin-top: 12px; }
     .sig { text-align: center; min-width: 180px; }
     .sig img { max-height: 60px; max-width: 170px; display: block; margin: 0 auto 4px; }
@@ -114,26 +121,29 @@ $risk            = is_array($extra['riskAssessment'] ?? null) ? $extra['riskAsse
 
     <div class="sec">1. Customer Information</div>
     <div class="grid">
-        <div class="item"><label>Customer Category</label><span><?= ex($extra,'customerCategory') ?></span></div>
         <div class="item"><label>Customer Code</label><span><?= val($custCode) ?></span></div>
-        <div class="item"><label>Industry</label><span><?= ex($extra,'industry') ?></span></div>
+        <div class="item"><label>Group Name</label><span><?= val($company) ?></span></div>
+        <div class="item"><label>Customer Type</label><span><?= val($c['customer_type'] ?? 'Regular') ?></span></div>
+        <div class="item"><label>Business Type</label><span><?= ex($extra,'industry') ?></span></div>
         <div class="item"><label>Website</label><span><?= ex($extra,'website') ?></span></div>
         <div class="item"><label>Head Office Address</label><span><?= val($c['address_head_office']) ?></span></div>
         <div class="item"><label>Factory Address</label><span><?= val($c['factory_address']) ?></span></div>
         <div class="item"><label>Chairman / MD (<?= val($c['chairman_role'] ?? ($extra['chairmanRole'] ?? '')) ?>)</label><span><?= val($c['chairman_name']) ?></span></div>
         <div class="item"><label>Chairman Phone</label><span><?= val($c['chairman_mobile']) ?></span></div>
-        <div class="item"><label>Commercial Contact</label><span><?= ex($extra,'commercialName') ?> | <?= ex($extra,'commercialNumber') ?></span></div>
+        <div class="item"><label>Chairman Email</label><span><?= ex($extra,'chairmanEmail') ?></span></div>
+        <div class="item"><label>Commercial Contact</label><span><?= ex($extra,'commercialName') ?> | <?= ex($extra,'commercialNumber') ?> | <?= ex($extra,'commercialEmail') ?></span></div>
         <div class="item"><label>Merchandiser</label><span><?= ex($extra,'merchandiserContact') ?> | <?= ex($extra,'merchandiserMobile') ?></span></div>
         <div class="item"><label>Email</label><span><?= ex($extra,'email') ?></span></div>
     </div>
 
-    <div class="sec">2. Business &amp; Compliance</div>
+    <div class="sec">2. KYC</div>
     <div class="grid three">
         <div class="item"><label>Trade License</label><span><?= ex($extra,'tradelicense') ?></span></div>
         <div class="item"><label>BIN</label><span><?= ex($extra,'bin') ?></span></div>
         <div class="item"><label>TIN</label><span><?= ex($extra,'tin') ?></span></div>
+        <div class="item"><label>ERC</label><span><?= ex($extra,'erc') ?></span></div>
         <div class="item"><label>Bond License</label><span><?= ex($extra,'bondLicense') ?></span></div>
-        <div class="item"><label>Bond Expiry</label><span><?= ex($extra,'bondLicenseExpiry') ?></span></div>
+        <div class="item"><label>Bond License Expiry Date</label><span><?= ex($extra,'bondLicenseExpiry') ?></span></div>
         <div class="item"><label>Compliance Status</label><span><?= ex($extra,'complianceStatus') ?></span></div>
         <div class="item"><label>Factory Building</label><span><?= ex($extra,'factoryBuilding') ?></span></div>
         <div class="item"><label>Political Exposure</label><span><?= !empty($c['politics_yes']) ? 'Yes' : 'No' ?></span></div>
@@ -143,7 +153,34 @@ $risk            = is_array($extra['riskAssessment'] ?? null) ? $extra['riskAsse
         <div class="badges"><?php if ($certifications): foreach ($certifications as $cert): ?><span class="badge"><?= h($cert) ?></span><?php endforeach; else: ?><span style="color:#9ca3af;font-size:12px;">None</span><?php endif; ?></div>
     </div>
 
-    <div class="sec">3. Production Capability</div>
+    <div class="sec">3. Scorecard Questionnaire</div>
+    <?php if ($scorecard): ?>
+        <div class="score-summary">
+            <div class="score-box"><label>Total Score</label><strong><?= val(($scorecard['total'] ?? 0) . '/100') ?></strong></div>
+            <div class="score-box"><label>Grade</label><strong><?= val($scorecard['grade'] ?? '') ?></strong></div>
+            <div class="score-box"><label>Recommended Action</label><strong style="font-size:12px;"><?= val($scorecard['action'] ?? '') ?></strong></div>
+        </div>
+        <?php foreach ($scoreSections as $sec): ?>
+            <div class="score-section">
+                <div class="item"><label><?= val($sec['title'] ?? '') ?></label><span><?= val(($sec['subtotal'] ?? 0) . '/' . ($sec['max'] ?? 0) . ' pts') ?></span></div>
+                <table class="matrix">
+                    <tbody>
+                    <?php foreach (($sec['answers'] ?? []) as $ans): ?>
+                        <tr>
+                            <td style="width:55%;"><?= val($ans['question'] ?? '') ?></td>
+                            <td><?= val($ans['answer'] ?? '') ?></td>
+                            <td style="width:70px;text-align:right;"><?= val(($ans['score'] ?? 0) . ' pts') ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <div class="item"><span style="color:#9ca3af;font-size:12px;">No scorecard saved.</span></div>
+    <?php endif; ?>
+
+    <div class="sec">4. Production Capability</div>
     <div class="grid three">
         <div class="item"><label>Factory Type</label><span><?= ex($extra,'factoryType') ?></span></div>
         <div class="item"><label>Monthly Capacity</label><span><?= ex($extra,'monthlyCapacity') ?></span></div>
@@ -156,7 +193,7 @@ $risk            = is_array($extra['riskAssessment'] ?? null) ? $extra['riskAsse
         <div class="item"><label>Subcontract Factory</label><span><?= ex($extra,'subcontractFactory') ?></span></div>
     </div>
 
-    <div class="sec">4. Commercial Assessment</div>
+    <div class="sec">5. Commercial Assessment</div>
     <div class="grid three">
         <div class="item"><label>Expected Monthly Business</label><span><?= ex($extra,'expectedMonthlyBiz') ?></span></div>
         <div class="item"><label>Average Monthly Order</label><span><?= ex($extra,'avgMonthlyOrder') ?></span></div>
@@ -169,14 +206,14 @@ $risk            = is_array($extra['riskAssessment'] ?? null) ? $extra['riskAsse
         <div class="item"><label>Zone</label><span><?= ex($extra,'zone') ?></span></div>
     </div>
 
-    <div class="sec">5. Product Interest &amp; Lead Time</div>
+    <div class="sec">6. Product Interest &amp; Lead Time</div>
     <div class="badges" style="margin-bottom:8px;">
         <?php if ($productInterest): foreach ($productInterest as $pi): ?>
             <span class="badge"><?= h($pi) ?><?php if (!empty($leadTimes[$pi])): ?> | <?= h($leadTimes[$pi]) ?>d<?php endif; ?></span>
         <?php endforeach; else: ?><span style="color:#9ca3af;font-size:12px;">None selected</span><?php endif; ?>
     </div>
 
-    <div class="sec">6. Competitor Analysis</div>
+    <div class="sec">7. Competitor Analysis</div>
     <div class="grid">
         <div class="item"><label>Existing Supplier</label><span><?= val($competitor['supplier'] ?? ($extra['compSupplier'] ?? '')) ?></span></div>
         <div class="item"><label>Current Price</label><span><?= val($competitor['currentPrice'] ?? ($extra['compCurrentPrice'] ?? '')) ?></span></div>
@@ -185,7 +222,7 @@ $risk            = is_array($extra['riskAssessment'] ?? null) ? $extra['riskAsse
         <div class="item" style="grid-column:1/-1;"><label>Reason for Change</label><span><?= val($competitor['reasonForChange'] ?? ($extra['compReasonForChange'] ?? '')) ?></span></div>
     </div>
 
-    <div class="sec">7. Risk Assessment</div>
+    <div class="sec">8. Risk Assessment</div>
     <div class="grid">
         <div class="item"><label>Financial Risk</label><span><?= val($risk['financialRisk'] ?? ($extra['financialRisk'] ?? '')) ?></span></div>
         <div class="item"><label>Payment History</label><span><?= val($risk['paymentHistory'] ?? ($extra['paymentHistory'] ?? '')) ?></span></div>
@@ -193,7 +230,7 @@ $risk            = is_array($extra['riskAssessment'] ?? null) ? $extra['riskAsse
         <div class="item"><label>Remarks</label><span><?= val($risk['remarks'] ?? ($extra['riskRemarks'] ?? '')) ?></span></div>
     </div>
 
-    <div class="sec">8. Price Approval Matrix</div>
+    <div class="sec">9. Price Approval Matrix</div>
     <table class="matrix">
         <thead><tr><th>Product</th><th>Existing</th><th>Target</th><th>Approved</th><th>Commission</th></tr></thead>
         <tbody>
@@ -211,7 +248,7 @@ $risk            = is_array($extra['riskAssessment'] ?? null) ? $extra['riskAsse
         </tbody>
     </table>
 
-    <div class="sec">9. Document Checklist</div>
+    <div class="sec">10. Document Checklist</div>
     <div class="badges"><?php if ($docChecklist): foreach ($docChecklist as $doc): ?><span class="badge">&#10003; <?= h($doc) ?></span><?php endforeach; else: ?><span style="color:#9ca3af;font-size:12px;">No documents checked.</span><?php endif; ?></div>
 
     <div class="sec">Approvals &amp; Signatures</div>

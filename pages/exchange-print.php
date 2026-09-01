@@ -147,7 +147,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
     display:flex;
     flex-direction:column;
     background:#fff; box-shadow:0 4px 24px rgba(0,0,0,.14);
-    padding:14mm 14mm 24mm;
+    padding:14mm 14mm 12mm;
     font-family:'Times New Roman',Times,serif; color:#111; font-size:11pt; line-height:1.45;
     break-inside:avoid;
     page-break-inside:avoid;
@@ -191,7 +191,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .boe-body { font-size:10.5px; text-align:justify; margin-bottom:14px; }
 .boe-value { font-size:12px; font-weight:700; margin:12px 0 10px; }
 .boe-bottom {
-    margin-top:auto;
+    margin-top:60mm;
     display:grid; grid-template-columns:1fr 220px; gap:32px; align-items:end;
 }
 .boe-left-bottom { display:flex; flex-direction:column; gap:24px; min-height:100px; }
@@ -209,13 +209,16 @@ require_once __DIR__ . '/../includes/print-brand.php';
 @media print {
     @page { size: A4; margin: 0; }
     .boe-ctrl, nav.page-nav, .order-id-bar, .no-print { display:none !important; }
-    #boeWrap { background:none !important; padding:0 !important; }
+    .form-stack { display:block!important; margin:0!important; padding:0!important; min-height:0!important; }
+    .form-stack > *:not(#boeWrap) { display:none!important; }
+    #boeWrap { display:block!important; background:none!important; padding:0!important; margin:0!important; width:210mm!important; min-height:0!important; height:auto!important; overflow:visible!important; }
+    #boePages { display:block!important; margin:0!important; padding:0!important; min-height:0!important; height:auto!important; }
     .boe-page {
         box-shadow:none;
         box-sizing:border-box;
         width:210mm;
-        height:auto;
-        min-height:286mm;   /* fills the sheet while keeping the footer lower on the office pad without pushing content to a blank page */
+        height:296mm;
+        min-height:296mm;
         max-width:210mm;
         margin:0;
         overflow:hidden;
@@ -223,8 +226,10 @@ require_once __DIR__ . '/../includes/print-brand.php';
         flex-direction:column;
         break-inside:avoid;
         page-break-inside:avoid;
+        padding:14mm 14mm 12mm;
     }
     /* Break BEFORE each later copy (never after the last) so no trailing blank page is produced. */
+    .boe-page:not(:last-child) { break-after:auto; page-break-after:auto; }
     .boe-page + .boe-page { break-before:page; page-break-before:always; }
     .boe-page .zzal-print-brand--footer {
         position:static;
@@ -232,7 +237,10 @@ require_once __DIR__ . '/../includes/print-brand.php';
         margin-top:auto;
         padding-top:10px;
     }
-    .form-stack, body, html, .app-shell { background:#fff !important; }
+    html, body { width:210mm!important; min-height:0!important; margin:0!important; padding:0!important; overflow:visible!important; background:#fff!important; }
+    body::before { display:none!important; content:none!important; }
+    .app-shell { width:210mm!important; max-width:210mm!important; min-height:0!important; margin:0!important; padding:0!important; background:#fff!important; }
+    .form-stack { background:#fff!important; }
     .boe-page, .boe-page * { color:#111 !important; }
     .boe-watermark { color:rgba(120,120,120,.12) !important; }
     .zzal-print-brand__title,
@@ -465,10 +473,11 @@ function renderBoePages() {
     const sales = res.pages?.sales || {};
     const order = res.order || {};
     const docs  = buildExchangeDocs(res);
-    const sel   = document.getElementById('boeDocSel')?.value || 'all';
-    const copies = parseInt(document.getElementById('boeCopies')?.value || '2', 10) || 2;
+    const params = new URLSearchParams(window.location.search);
+    const sel = document.getElementById('boeDocSel')?.value || params.get('doc') || docs[0]?.key || '';
+    const copies = parseInt(document.getElementById('boeCopies')?.value || params.get('copies') || '2', 10) || 2;
 
-    const chosenDocs = sel === 'all' ? docs : docs.filter(d => d.key === sel);
+    const chosenDocs = docs.filter(d => d.key === sel);
     if (!chosenDocs.length) {
         holder.innerHTML = '<div class="boe-empty">No Bill of Exchange source found for this order.</div>';
         return;
@@ -544,7 +553,7 @@ function populateBoeSelector() {
     const sel = document.getElementById('boeDocSel');
     if (!sel || !window._boeRes) return;
     const docs = buildExchangeDocs(window._boeRes);
-    sel.innerHTML = '<option value="all">All Bill of Exchange</option>' + docs.map(doc =>
+    sel.innerHTML = docs.map(doc =>
         `<option value="${boeEsc(doc.key)}">${boeEsc(doc.title)}</option>`
     ).join('');
 }
@@ -560,6 +569,8 @@ function downloadBoeExcel() {
 function downloadBoePdf() {
     const url = new URL(window.location.href);
     url.searchParams.set('pdf', '1');
+    url.searchParams.set('doc', document.getElementById('boeDocSel')?.value || '');
+    url.searchParams.set('copies', document.getElementById('boeCopies')?.value || '2');
     window.open(url.toString(), '_blank', 'noopener');
 }
 window.onOrderLoad = function(res) {

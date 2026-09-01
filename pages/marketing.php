@@ -122,8 +122,43 @@ include __DIR__ . '/../includes/header.php';
 .mkt-sales-po-meta strong {
     display:block; font-size:10px; color:#94a3b8; text-transform:uppercase; margin-bottom:2px;
 }
+.mkt-review-panel {
+    margin:18px 0;
+    border:1.5px solid #dbe4ff;
+    border-radius:16px;
+    overflow:hidden;
+    background:#f8faff;
+}
+.mkt-review-head {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    padding:16px 18px;
+    border-bottom:1.5px solid #e0e7ff;
+    background:#fff;
+}
+.mkt-review-head h3 { margin:0 0 4px; font-size:18px; color:#111827; }
+.mkt-review-head p { margin:0; color:#64748b; font-size:13px; }
+.mkt-review-actions { display:flex; gap:10px; flex-wrap:wrap; }
+.mkt-pi-frame {
+    display:block;
+    width:100%;
+    min-height:760px;
+    border:0;
+    background:#d1d5db;
+}
+.mkt-review-note {
+    padding:12px 18px;
+    color:#475569;
+    font-size:13px;
+    border-top:1px solid #e0e7ff;
+    background:#eef4ff;
+}
 @media (max-width: 900px) {
     .mkt-sales-grid, .mkt-sales-po-meta { grid-template-columns:1fr; }
+    .mkt-review-head { align-items:flex-start; flex-direction:column; }
+    .mkt-pi-frame { min-height:620px; }
 }
 </style>
 
@@ -178,26 +213,26 @@ include __DIR__ . '/../includes/header.php';
         <div class="source-glance-item"><span>Consignee Address</span><strong data-pi-bind="buyerAddress">-</strong></div>
         <div class="source-glance-item"><span>Consignee Bank</span><strong data-pi-bind="consigneeBank">-</strong></div>
     </div>
-    <div class="form-grid">
-        <div class="field span-6">
-            <label for="requestedDate">Requested Date</label>
-            <input id="requestedDate" name="requestedDate" type="date">
+    <div class="mkt-review-panel">
+        <div class="mkt-review-head">
+            <div>
+                <h3>Submitted PI Review</h3>
+                <p>Review the submitted PI exactly as Commercial prints it. No Marketing input is required here.</p>
+            </div>
+            <div class="mkt-review-actions">
+                <a class="ghost-btn" id="mktOpenPiBtn" href="#" target="_blank" rel="noopener">Open Printable PI</a>
+                <button type="button" class="secondary-btn" id="mktPrintPiBtn" onclick="printMarketingPi()">Print PI</button>
+            </div>
         </div>
-        <div class="field span-6">
-            <label for="deliveryDate">Scheduled Shipment Date</label>
-            <input id="deliveryDate" name="deliveryDate" type="date">
-        </div>
-        <div class="field span-12">
-            <label for="marketingNotes">Buyer Requirement / Marketing Notes</label>
-            <textarea id="marketingNotes" name="marketingNotes" rows="3" placeholder="Notes for marketing review..."></textarea>
-        </div>
+        <iframe id="mktPiPreview" class="mkt-pi-frame" title="Submitted PI Preview"></iframe>
+        <div class="mkt-review-note">After checking the PI, approve it to send the work order back to PI for printing and Summary/Master PI work.</div>
     </div>
     <div class="page-actions">
         <div class="page-actions-left">
             <button type="button" class="ghost-btn js-prev-page" data-prev-page="sales">Previous</button>
         </div>
         <div class="page-actions-right">
-            <button type="button" class="primary-btn" id="universalSaveBtn" onclick="submitToLc()">✅ Approve PI &amp; Send to LC</button>
+            <button type="button" class="primary-btn" id="universalSaveBtn" onclick="approvePiAndReturnToPi()">Approve PI &amp; Send to PI</button>
         </div>
     </div>
 </section>
@@ -339,6 +374,49 @@ function removeMarketingSalesOrderFields() {
     });
 }
 
+// Map the order's PI type to its printable page + build the embed URL. The L/C
+// term params aren't stored on the order, so use the same defaults the sales
+// page uses (days 90, Sight, 5% tolerance, UD, NCC); hsCode is persisted.
+function marketingPiUrl(orderId, salesData, embed) {
+    const piType  = (salesData?.piType || 'single');
+    const pageMap = { single: 'single-pi', summary: 'summary-pi', master: 'master-pi' };
+    const page    = pageMap[piType] || 'single-pi';
+    const hs      = salesData?.hsCode || '4819.10.00';
+    const params = new URLSearchParams({
+        order_id: orderId || '',
+        days: '90',
+        lctype: 'Sight',
+        tol: '5',
+        hs: hs,
+        doc: 'UD',
+        bank: 'ncc'
+    });
+    if (embed) params.set('embed', '1');
+    return APP_BASE + '/pages/' + page + '.php?' + params.toString();
+}
+
+function setMarketingPiPreview(orderId, salesData) {
+    const frame  = document.getElementById('mktPiPreview');
+    const openBtn = document.getElementById('mktOpenPiBtn');
+    if (!frame || !orderId) return;
+    // The iframe shares sessionStorage (same origin) and auto-loads the current
+    // order, so ensure the id is stored before it navigates.
+    try { sessionStorage.setItem('ats_current_order_id', orderId); } catch (e) {}
+    const embedUrl = marketingPiUrl(orderId, salesData, true);
+    if (frame.getAttribute('src') !== embedUrl) frame.src = embedUrl;
+    if (openBtn) openBtn.href = marketingPiUrl(orderId, salesData, false);
+}
+
+function printMarketingPi() {
+    const frame = document.getElementById('mktPiPreview');
+    if (frame && frame.contentWindow) {
+        frame.contentWindow.focus();
+        frame.contentWindow.print();
+    } else {
+        window.print();
+    }
+}
+
 function loadMktSummary(orderId, order, salesData, mktData) {
     const panel = document.getElementById('mktSummary');
     if (!orderId) { panel.style.display = 'none'; return; }
@@ -382,6 +460,9 @@ function loadMktSummary(orderId, order, salesData, mktData) {
 
     renderSalesSnapshot(salesData, order, mktData);
     removeMarketingSalesOrderFields();
+
+    // Load the submitted PI into the read-only preview (single / summary / master).
+    setMarketingPiPreview(orderId, salesData);
 
     // Fetch PIs for this order
     document.getElementById('mktPiList').innerHTML = '<p class="mkt-empty" style="color:#94a3b8;">Loading PIs...</p>';
@@ -566,7 +647,7 @@ function toggleMktPiCard(id) {
     if (arrow) arrow.textContent = open ? '?' : '?';
 }
 
-async function submitToLc() {
+async function approvePiAndReturnToPi() {
     const orderId  = window.getCurrentOrderId();
     const pageName = 'marketing';
     if (!orderId) { alert('No order loaded.'); return; }
@@ -581,24 +662,37 @@ async function submitToLc() {
             if (el.tagName === 'INPUT' && el.type !== 'button' && el.type !== 'submit') fields[el.id] = el.value;
             else if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') fields[el.id] = el.value;
         });
-        await fetch(APP_BASE + '/api/save_page.php', {
+        const approvalRes = await fetch(APP_BASE + '/api/save_page.php', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ order_id: orderId, page_name: pageName, ...fields }),
+            body:    JSON.stringify({
+                order_id: orderId,
+                page_name: pageName,
+                ...fields,
+                marketingApproved: true,
+                piApprovalStatus: 'approved',
+                approvedAt: new Date().toISOString(),
+            }),
         });
-        // Hand off to LC (advances the workflow + notifies LC dept) but stay on this page -
-        // marketing users can't open lc.php, so navigating there would bounce them to intake.
-        await fetch(APP_BASE + '/api/orders.php?id=' + encodeURIComponent(orderId) + '&step=lc', { method: 'PUT' })
-            .catch(() => {});
+        const approvalJson = await approvalRes.json();
+        if (!approvalRes.ok || approvalJson.error) {
+            throw new Error(approvalJson.error || 'Marketing approval could not be saved.');
+        }
+        // Marketing approval returns the order to PI so Commercial can print/create Summary/Master PI.
+        const orderRes = await fetch(APP_BASE + '/api/orders.php?id=' + encodeURIComponent(orderId) + '&step=sales', { method: 'PUT' });
+        const orderJson = await orderRes.json();
+        if (!orderRes.ok || orderJson.error) {
+            throw new Error(orderJson.error || 'Order could not be returned to PI.');
+        }
         if (btn) {
-            btn.textContent = ' Submitted to LC';
+            btn.textContent = ' Approved - sent to PI';
             btn.style.background = '#16a34a';
             btn.disabled = false;
-            setTimeout(() => { btn.textContent = 'ðŸ“¤ Submit'; btn.style.background = ''; }, 3000);
+            setTimeout(() => { btn.textContent = 'Approve PI & Send to PI'; btn.style.background = ''; }, 3000);
         }
     } catch (e) {
-        if (btn) { btn.textContent = 'ðŸ“¤ Submit'; btn.disabled = false; }
-        alert('Could not reach server.');
+        if (btn) { btn.textContent = 'Approve PI & Send to PI'; btn.disabled = false; }
+        alert('Approval failed: ' + (e.message || 'Could not reach server.'));
     }
 }
 

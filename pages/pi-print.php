@@ -8,66 +8,66 @@ require_once __DIR__ . '/../includes/print-brand.php';
 <style>
 /* ── Controls (hidden on print) ─────────────────────────────────── */
 .pi-ctrl { background:#1e1e3a; color:#fff; padding:14px 24px; display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
-.pi-ctrl label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#a5b4fc; margin-right:4px; }
+.pi-ctrl label { font-size:8.25px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#a5b4fc; margin-right:4px; }
 .pi-ctrl select, .pi-ctrl input[type=number] {
     background:#2d2d50; color:#fff; border:1.5px solid #4f46e5; border-radius:6px;
-    padding:5px 10px; font-size:12px; outline:none;
+    padding:5px 10px; font-size:9px; outline:none;
 }
-.pi-type-btn { padding:7px 18px; border:1.5px solid #6366f1; border-radius:6px; background:transparent; color:#a5b4fc; font-size:12px; font-weight:700; cursor:pointer; transition:.15s; }
+.pi-type-btn { padding:7px 18px; border:1.5px solid #6366f1; border-radius:6px; background:transparent; color:#a5b4fc; font-size:9px; font-weight:700; cursor:pointer; transition:.15s; }
 .pi-type-btn.active { background:#4f46e5; color:#fff; border-color:#4f46e5; }
-.pi-print-btn { margin-left:auto; background:#22c55e; color:#fff; border:none; border-radius:8px; padding:9px 24px; font-size:13px; font-weight:700; cursor:pointer; }
+.pi-print-btn { margin-left:auto; background:#22c55e; color:#fff; border:none; border-radius:8px; padding:9px 24px; font-size:9.75px; font-weight:700; cursor:pointer; }
 .pi-po-sel { display:none; }
 
 /* ── PI Document ─────────────────────────────────────────────────── */
-.pi-wrap { position:relative; box-sizing:border-box; width:210mm; height:297mm; max-width:900px; margin:24px auto 10px; font-family:'Times New Roman',Times,serif; font-size:11pt; color:#000; background:#fff; padding:14mm 14mm 30mm; box-shadow:0 2px 20px rgba(0,0,0,.12); overflow:hidden; display:flex; flex-direction:column; }
+.pi-wrap { position:relative; box-sizing:border-box; width:210mm; height:297mm; max-width:900px; margin:24px auto 10px; font-family:'Times New Roman',Times,serif; font-size:8.25pt; color:#000; background:#fff; padding:14mm 14mm 12mm; box-shadow:0 2px 20px rgba(0,0,0,.12); overflow:hidden; display:flex; flex-direction:column; }
 .pi-wrap .zzal-print-brand--footer { position:static; margin-top:auto!important; padding-top:6px!important; }
 .pi-continuation { display:none; }
 
 /* Header */
 .pi-header { display:none; align-items:center; border-bottom:3px solid #1a3a6e; padding-bottom:10px; margin-bottom:6px; }
-.pi-logo { width:64px; height:64px; background:#1a3a6e; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:18px; font-weight:900; border-radius:4px; flex-shrink:0; margin-right:14px; letter-spacing:1px; }
-.pi-logo span { font-size:7px; font-weight:400; letter-spacing:2px; margin-top:1px; }
+.pi-logo { width:64px; height:64px; background:#1a3a6e; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:13.5px; font-weight:900; border-radius:4px; flex-shrink:0; margin-right:14px; letter-spacing:1px; }
+.pi-logo span { font-size:5.25px; font-weight:400; letter-spacing:2px; margin-top:1px; }
 .pi-company { flex:1; }
-.pi-company h1 { font-size:24pt; font-weight:900; color:#1a3a6e; margin:0; letter-spacing:1px; font-family:Georgia,serif; }
-.pi-title-line { text-align:center; font-size:14pt; font-weight:700; letter-spacing:4px; color:#1a3a6e; border-top:2px solid #1a3a6e; border-bottom:2px solid #1a3a6e; padding:4px 0; margin:8px 0; }
+.pi-company h1 { font-size:18pt; font-weight:900; color:#1a3a6e; margin:0; letter-spacing:1px; font-family:Georgia,serif; }
+.pi-title-line { text-align:center; font-size:10.5pt; font-weight:700; letter-spacing:4px; color:#1a3a6e; border-top:2px solid #1a3a6e; border-bottom:2px solid #1a3a6e; padding:4px 0; margin:8px 0; }
 
 /* PI meta */
-.pi-meta { display:flex; justify-content:space-between; margin:10px 0 6px; font-size:11pt; }
+.pi-meta { display:flex; justify-content:space-between; margin:10px 0 6px; font-size:8.25pt; }
 .pi-meta b { font-weight:700; }
-.pi-to { margin:6px 0 10px; font-size:11pt; line-height:1.6; }
-.pi-confirm { font-size:10pt; margin:8px 0 12px; font-style:italic; }
+.pi-to { margin:6px 0 10px; font-size:8.25pt; line-height:1.6; }
+.pi-confirm { font-size:7.5pt; margin:8px 0 12px; font-style:italic; }
 
 /* Table */
-.pi-table { width:100%; border-collapse:collapse; margin-bottom:8px; font-size:10pt; }
-.pi-table th { background:#fff; color:#111; padding:6px 8px; text-align:center; border:1px solid #1a3a6e; font-size:9.5pt; }
+.pi-table { width:100%; border-collapse:collapse; margin-bottom:8px; font-size:7.5pt; }
+.pi-table th { background:#fff; color:#111; padding:6px 8px; text-align:center; border:1px solid #1a3a6e; font-size:7.125pt; }
 .pi-table td { border:1px solid #888; padding:5px 8px; vertical-align:top; }
 .pi-table td.center { text-align:center; }
 .pi-table td.right  { text-align:right; }
 .pi-table tr.total-row td { font-weight:700; background:#f0f4ff; border-top:2.5px solid #1a3a6e; }
-.pi-ref { font-weight:700; font-size:9.5pt; }
-.pi-words { font-size:10pt; font-weight:700; margin:6px 0 12px; text-transform:uppercase; }
+.pi-ref { font-weight:700; font-size:7.125pt; }
+.pi-words { font-size:7.5pt; font-weight:700; margin:6px 0 12px; text-transform:uppercase; }
 
 /* Terms */
 .pi-terms { margin-top:10px; }
 .pi-terms-grow { flex:1; display:flex; flex-direction:column; }
 .pi-terms-grow .pi-terms { flex:1; }
-.pi-terms h3 { font-size:10pt; font-weight:700; text-decoration:underline; margin-bottom:4px; }
-.pi-terms ol { margin:0; padding-left:28px; font-size:9.5pt; line-height:1.55; }
+.pi-terms h3 { font-size:7.5pt; font-weight:700; text-decoration:underline; margin-bottom:4px; }
+.pi-terms ol { margin:0; padding-left:28px; font-size:7.125pt; line-height:1.55; }
 .pi-terms ol li { margin-bottom:2px; }
 
 /* Signatures */
 .pi-sigs { display:flex; justify-content:space-between; margin-top:16px; }
 .pi-sig-box { text-align:center; }
 .pi-sig-line { border-top:1.5px solid #000; width:200px; margin:0 auto 4px; }
-.pi-sig-label { font-size:9.5pt; font-weight:700; }
-.pi-sig-sub { font-size:8.5pt; color:#444; }
+.pi-sig-label { font-size:7.125pt; font-weight:700; }
+.pi-sig-sub { font-size:6.375pt; color:#444; }
 
 /* Print */
 @media print {
     @page { size:A4 portrait; margin:0; }
     .pi-ctrl, nav, .order-id-bar, .form-stack > *:not(#piWrap) { display:none !important; }
     body, html { width:210mm!important; min-height:297mm!important; margin:0!important; padding:0!important; background:#fff !important; overflow:visible!important; }
-    .pi-wrap { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:14mm 14mm 30mm!important; overflow:hidden; display:flex!important; flex-direction:column!important; }
+    .pi-wrap { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:14mm 14mm 12mm!important; overflow:hidden; display:flex!important; flex-direction:column!important; }
     .pi-wrap .zzal-print-brand--footer { position:static!important; margin-top:auto!important; }
     .pi-header { display:none !important; }
     .app-shell { display:block !important; }

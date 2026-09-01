@@ -1,8 +1,9 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
+date_default_timezone_set('Asia/Dhaka');
 
 const ERP_BACKFILL_ACCESS_KEY = '123';
-const ERP_BACKFILL_START_DATE = '10/07/2026';
+const ERP_BACKFILL_START_DATE = '01/09/2026';
 const ERP_BACKFILL_JOB_NAME = 'sale_orders_full_backfill';
 
 $isCli = (PHP_SAPI === 'cli');
@@ -20,7 +21,50 @@ if ($isCli) {
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/erp_sale_orders_cache.php';
 require_once __DIR__ . '/../includes/erp_order_inbox.php';
-require_once __DIR__ . '/../includes/erp_order_inbox.php';
+
+if (!function_exists('erpSaleOrdersFetchDateRange')) {
+    function erpSaleOrdersFetchDateRange(string $fromDate, string $toDate, int $offset = 0, int $limit = ERP_SALE_ORDERS_LIMIT): array
+    {
+        $url = ERP_SALE_ORDERS_BASE
+            . '?p_from_date=' . rawurlencode($fromDate)
+            . '&p_to_date=' . rawurlencode($toDate)
+            . '&offset=' . max(0, $offset)
+            . '&limit=' . max(1, $limit);
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $url,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_TIMEOUT => 60,
+                CURLOPT_HTTPHEADER => ['Accept: application/json'],
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
+            ]);
+            $body = curl_exec($ch);
+            $error = curl_error($ch);
+            curl_close($ch);
+            if ($body === false) {
+                return ['ok' => false, 'error' => $error ?: 'Unknown cURL error', 'url' => $url];
+            }
+            return ['ok' => true, 'body' => $body, 'url' => $url];
+        }
+
+        $ctx = stream_context_create([
+            'http' => ['method' => 'GET', 'timeout' => 60, 'header' => "Accept: application/json\r\n"],
+            'ssl'  => ['verify_peer' => false, 'verify_peer_name' => false],
+        ]);
+        $body = @file_get_contents($url, false, $ctx);
+        if ($body === false) {
+            $lastError = error_get_last();
+            return ['ok' => false, 'error' => $lastError['message'] ?? 'file_get_contents failed', 'url' => $url];
+        }
+
+        return ['ok' => true, 'body' => $body, 'url' => $url];
+    }
+}
 
 function cronBackfillOut(array $payload): void
 {
@@ -149,7 +193,7 @@ function updateErpBackfillState(PDO $db, array $values): void
 
 function normalizeBackfillDate(string $value): ?DateTimeImmutable
 {
-    $date = DateTimeImmutable::createFromFormat('d/m/Y', trim($value));
+    $date = DateTimeImmutable::createFromFormat('!d/m/Y', trim($value), new DateTimeZone('Asia/Dhaka'));
     return $date instanceof DateTimeImmutable ? $date : null;
 }
 
@@ -166,7 +210,7 @@ try {
         throw new RuntimeException('Invalid ERP backfill start date configuration.');
     }
 
-    $today = new DateTimeImmutable(date('Y-m-d'));
+    $today = new DateTimeImmutable('today', new DateTimeZone('Asia/Dhaka'));
     if ($nextDate > $today) {
         $stats = erpSaleOrdersCacheStats($db);
         cronBackfillOut([

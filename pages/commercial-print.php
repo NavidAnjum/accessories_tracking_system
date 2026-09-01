@@ -79,7 +79,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
     margin:0 auto 18px;
     background:#fff;
     box-shadow:0 4px 24px rgba(0,0,0,.14);
-    padding:14mm 14mm 30mm;
+    padding:14mm 14mm 12mm;
     font-family:'Times New Roman', Times, serif;
     color:#111;
     font-size:10px;
@@ -149,7 +149,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .ci-items td.center { text-align:center; }
 .ci-items td.right { text-align:right; }
 .ci-footnote { margin-top:6px; }
-.ci-sign-block { margin-top:24px; }
+.ci-sign-block { margin-top:48px; }
 .ci-sign-line {
     width:120px;
     border-top:1px solid #000;
@@ -201,9 +201,9 @@ require_once __DIR__ . '/../includes/print-brand.php';
         margin:0;
         max-width:210mm;
         width:210mm !important;
-        height:auto !important;
-        min-height:286mm !important;
-        padding:14mm 14mm 30mm !important;
+        height:297mm !important;
+        min-height:297mm !important;
+        padding:14mm 14mm 12mm !important;
         overflow:hidden;
         display:flex;
         flex-direction:column;
@@ -326,6 +326,25 @@ function ciResolveDocs(res) {
     const comm = res.pages?.commercial || {};
     const resolved = window.atsResolveDisplayPos ? window.atsResolveDisplayPos(res) : { pos: sales.pos || [] };
     const pos = resolved.pos || [];
+    const isCombinedPi = sales.piType === 'summary'
+        || sales.piType === 'master'
+        || resolved.label === 'Summary PI'
+        || resolved.label === 'Master PI';
+    if (isCombinedPi && pos.length) {
+        const poNumbers = [...new Set(pos.map(po => po.poNum || po.customerPo || '').filter(Boolean))];
+        const buyers = [...new Set(pos.map(po => po.buyer || '').filter(Boolean))];
+        return [{
+            key: sales.piType === 'master' || resolved.label === 'Master PI' ? 'master' : 'summary',
+            title: sales.piNum || comm.proformaNo || (sales.piType === 'master' ? 'Master PI' : 'Summary PI'),
+            po: {
+                poNum: poNumbers.join(', '),
+                buyer: buyers.join(', '),
+                qty: pos.reduce((sum, po) => sum + (parseFloat(po.qty || 0) || 0), 0),
+                val: pos.reduce((sum, po) => sum + (parseFloat(po.val || 0) || 0), 0),
+                items: pos.flatMap(po => po.items || [])
+            }
+        }];
+    }
     if (pos.length) {
         return pos.map((po, idx) => ({
             key: `po_${idx}`,

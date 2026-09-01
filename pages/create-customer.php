@@ -58,36 +58,25 @@ if (!$canCreate) {
         <!-- ── Section 1: Customer Information ── -->
         <div class="cp-section-head">1. Customer Information</div>
         <div class="form-grid">
-            <div class="span-4">
-                <label class="field-label">Customer Category <span style="color:#dc2626;">*</span></label>
-                <select id="cp_customerCategory" class="field-input">
-                    <option value="">-- Select Category --</option>
-                    <option value="Sample Production">Sample Production</option>
-                    <option value="Bulk Production">Bulk Production</option>
-                    <option value="Negotiation Stage">Negotiation Stage</option>
-                </select>
-            </div>
             <div class="span-3">
                 <label class="field-label">Customer Code</label>
                 <input type="text" id="cp_customerCode" class="field-input" placeholder="Auto-generated" readonly
                        style="background:#f8f9ff;color:#374151;cursor:default;">
             </div>
             <div class="span-6">
-                <label class="field-label">Company Name <span style="color:#dc2626;">*</span></label>
-                <input type="text" id="cp_companyName" class="field-input" placeholder="Full legal company name">
+                <label class="field-label">Group Name <span style="color:#dc2626;">*</span></label>
+                <input type="text" id="cp_companyName" class="field-input" placeholder="Full legal group name">
             </div>
             <div class="span-3">
                 <label class="field-label">Customer Type</label>
                 <select id="cp_customerType" class="field-input">
-                    <option value="Regular">Regular</option>
-                    <option value="Premium">Premium</option>
                     <option value="New">New</option>
-                    <option value="Strategic">Strategic</option>
+                    <option value="Regular">Regular</option>
                 </select>
             </div>
             <input type="hidden" id="cp_salesPersonId" value="<?= (int)($__user['id'] ?? 0) ?>">
             <div class="span-4">
-                <label class="field-label">Industry</label>
+                <label class="field-label">Business Type</label>
                 <input type="text" id="cp_industry" class="field-input" placeholder="e.g. Garments, Textile">
             </div>
             <div class="span-4">
@@ -119,7 +108,7 @@ if (!$canCreate) {
                     </label>
                     <?php endforeach; ?>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
                     <div>
                         <label class="field-label">Name</label>
                         <input type="text" id="cp_chairmanName" class="field-input" placeholder="Full name">
@@ -128,11 +117,15 @@ if (!$canCreate) {
                         <label class="field-label">Phone</label>
                         <input type="text" id="cp_chairmanMobile" class="field-input" placeholder="+880...">
                     </div>
+                    <div>
+                        <label class="field-label">Email</label>
+                        <input type="email" id="cp_chairmanEmail" class="field-input" placeholder="chairman@company.com">
+                    </div>
                 </div>
             </div>
             <div class="span-12" style="background:#f8f9ff;border:1.5px solid #e0e3ff;border-radius:10px;padding:14px 16px;">
                 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6366f1;margin-bottom:12px;">Commercial Contact</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
                     <div>
                         <label class="field-label">Name</label>
                         <input type="text" id="cp_commercialName" class="field-input" placeholder="Contact name">
@@ -140,6 +133,10 @@ if (!$canCreate) {
                     <div>
                         <label class="field-label">Number</label>
                         <input type="text" id="cp_commercialNumber" class="field-input" placeholder="+880...">
+                    </div>
+                    <div>
+                        <label class="field-label">Email</label>
+                        <input type="email" id="cp_commercialEmail" class="field-input" placeholder="commercial@company.com">
                     </div>
                 </div>
             </div>
@@ -162,8 +159,8 @@ if (!$canCreate) {
             </div>
         </div>
 
-        <!-- ── Section 2: Business & Compliance ── -->
-        <div class="cp-section-head">2. Business &amp; Compliance</div>
+        <!-- ── Section 2: KYC ── -->
+        <div class="cp-section-head">2. KYC</div>
         <div class="form-grid">
             <div class="span-4">
                 <label class="field-label">Trade License No.</label>
@@ -178,11 +175,15 @@ if (!$canCreate) {
                 <input type="text" id="cp_tin" class="field-input" placeholder="TIN number">
             </div>
             <div class="span-4">
+                <label class="field-label">ERC</label>
+                <input type="text" id="cp_erc" class="field-input" placeholder="ERC number">
+            </div>
+            <div class="span-4">
                 <label class="field-label">Bond License No.</label>
                 <input type="text" id="cp_bondLicense" class="field-input" placeholder="Bond license number">
             </div>
             <div class="span-4">
-                <label class="field-label">Bond License Expiry</label>
+                <label class="field-label">Bond License Expiry Date</label>
                 <input type="date" id="cp_bondLicenseExpiry" class="field-input">
             </div>
             <div class="span-4">
@@ -228,7 +229,28 @@ if (!$canCreate) {
         </div>
 
         <!-- ── Section 3: Production Capability ── -->
-        <div class="cp-section-head">3. Production Capability</div>
+        <div class="cp-section-head">3. Scorecard Questionnaire</div>
+        <div class="scorecard-wrap">
+            <div class="scorecard-top">
+                <div>
+                    <div class="scorecard-kicker">Buyer Onboarding Scorecard</div>
+                    <h3 id="scorecardStepTitle">Operational Substance</h3>
+                    <p id="scorecardStepMeta">Step 1 of 8</p>
+                </div>
+                <div class="scorecard-score">
+                    <span id="scorecardTotal">0</span><small>/100</small>
+                    <strong id="scorecardGrade">Incomplete</strong>
+                </div>
+            </div>
+            <div class="scorecard-steps" id="scorecardSteps"></div>
+            <div class="scorecard-panel" id="scorecardPanel"></div>
+            <div class="scorecard-actions">
+                <button type="button" class="ghost-btn" id="scorecardPrevBtn" onclick="scorecardPrev()">Previous</button>
+                <button type="button" class="primary-btn" id="scorecardNextBtn" onclick="scorecardNext()">Next</button>
+            </div>
+        </div>
+
+        <div class="cp-section-head">4. Production Capability</div>
         <div class="form-grid">
             <div class="span-4">
                 <label class="field-label">Factory Type</label>
@@ -276,7 +298,7 @@ if (!$canCreate) {
         </div>
 
         <!-- ── Section 4: Commercial Assessment ── -->
-        <div class="cp-section-head">4. Commercial Assessment</div>
+        <div class="cp-section-head">5. Commercial Assessment</div>
         <div class="form-grid">
             <div class="span-4">
                 <label class="field-label">Expected Monthly Business</label>
@@ -320,7 +342,7 @@ if (!$canCreate) {
         </div>
 
         <!-- ── Section 5: Product Interest ── -->
-        <div class="cp-section-head">5. Product Interest</div>
+        <div class="cp-section-head">6. Product Interest</div>
         <div class="form-grid">
             <div class="span-12">
                 <div style="display:flex;gap:14px;flex-wrap:wrap;padding:4px 0;">
@@ -362,7 +384,7 @@ if (!$canCreate) {
         </div>
 
         <!-- ── Section 6: Competitor Analysis ── -->
-        <div class="cp-section-head">6. Competitor Analysis</div>
+        <div class="cp-section-head">7. Competitor Analysis</div>
         <div class="form-grid">
             <div class="span-6">
                 <label class="field-label">Existing Supplier</label>
@@ -387,7 +409,7 @@ if (!$canCreate) {
         </div>
 
         <!-- ── Section 7: Risk Assessment ── -->
-        <div class="cp-section-head">7. Risk Assessment</div>
+        <div class="cp-section-head">8. Risk Assessment</div>
         <div class="form-grid">
             <div class="span-3">
                 <label class="field-label">Financial Risk</label>
@@ -413,7 +435,7 @@ if (!$canCreate) {
         </div>
 
         <!-- ── Section 8: Price Approval Matrix ── -->
-        <div class="cp-section-head">8. Price Approval Matrix</div>
+        <div class="cp-section-head">9. Price Approval Matrix</div>
         <div style="overflow-x:auto;margin-bottom:16px;">
             <table class="cp-matrix-table" id="priceMatrixTable">
                 <thead>
@@ -440,9 +462,9 @@ if (!$canCreate) {
         </div>
         <button type="button" class="ghost-btn" style="font-size:12px;padding:5px 14px;" onclick="addPriceRow()">+ Add Row</button>
 
-        <!-- ── Section 9: Document Checklist (Team Lead only) ── -->
+        <!-- Section 10: Document Checklist (Team Lead only) -->
         <?php if ($isTeamLead): ?>
-        <div class="cp-section-head">9. Document Checklist <span style="font-size:10px;font-weight:500;color:#0284c7;background:#e0f2fe;padding:2px 8px;border-radius:12px;margin-left:6px;">Team Lead</span></div>
+        <div class="cp-section-head">10. Document Checklist <span style="font-size:10px;font-weight:500;color:#0284c7;background:#e0f2fe;padding:2px 8px;border-radius:12px;margin-left:6px;">Team Lead</span></div>
         <div class="form-grid">
             <div class="span-12">
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;">
@@ -454,6 +476,9 @@ if (!$canCreate) {
                     </label>
                     <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 12px;border:1.5px solid #d1d5db;border-radius:8px;" id="dclbl_tin">
                         <input type="checkbox" id="cp_dc_tin" value="TIN" onchange="pillHighlight('dclbl_tin',this)"> TIN
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 12px;border:1.5px solid #d1d5db;border-radius:8px;" id="dclbl_erc">
+                        <input type="checkbox" id="cp_dc_erc" value="ERC" onchange="pillHighlight('dclbl_erc',this)"> ERC
                     </label>
                     <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 12px;border:1.5px solid #d1d5db;border-radius:8px;" id="dclbl_bondlic">
                         <input type="checkbox" id="cp_dc_bondlic" value="Bond License" onchange="pillHighlight('dclbl_bondlic',this)"> Bond License
@@ -478,7 +503,7 @@ if (!$canCreate) {
         </div>
         <?php else: ?>
         <div style="background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:10px;padding:16px 20px;margin:20px 0;text-align:center;color:#94a3b8;font-size:13px;">
-            🔒 Section 9 — Document Checklist is completed by the <strong>Team Lead</strong> after review.
+            Section 10 - Document Checklist is completed by the <strong>Team Lead</strong> after review.
         </div>
         <?php endif; ?>
 
@@ -535,9 +560,193 @@ select.field-input { appearance:auto; }
     display:flex; align-items:center; justify-content:center;
 }
 .cp-rm-row-btn:hover { background:#fecaca; }
+.scorecard-wrap {
+    border:1.5px solid #dbe4ff; border-radius:14px; background:#f8fbff;
+    padding:16px; margin-bottom:18px;
+}
+.scorecard-top { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:14px; }
+.scorecard-kicker { font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#4f46e5; }
+.scorecard-top h3 { margin:4px 0; color:#111827; font-size:18px; }
+.scorecard-top p { margin:0; color:#64748b; font-size:12px; }
+.scorecard-score { min-width:130px; text-align:center; background:#fff; border:1.5px solid #dbe4ff; border-radius:12px; padding:10px; }
+.scorecard-score span { font-size:30px; font-weight:900; color:#4f46e5; }
+.scorecard-score small { color:#64748b; font-weight:700; }
+.scorecard-score strong { display:block; margin-top:2px; color:#111827; font-size:13px; }
+.scorecard-steps { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:14px; }
+.scorecard-step {
+    border:1.5px solid #c7d2fe; background:#fff; color:#4f46e5; border-radius:999px;
+    padding:6px 10px; font-size:11px; font-weight:800; cursor:pointer;
+}
+.scorecard-step.active { background:#4f46e5; color:#fff; }
+.scorecard-panel { background:#fff; border:1.5px solid #dbe4ff; border-radius:12px; padding:14px; }
+.scorecard-question { padding:12px 0; border-bottom:1px solid #eef2ff; }
+.scorecard-question:last-child { border-bottom:none; }
+.scorecard-question h4 { margin:0 0 8px; font-size:14px; color:#111827; }
+.scorecard-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; }
+.scorecard-options label {
+    display:flex; align-items:center; gap:8px; padding:9px 10px; border:1.5px solid #e0e7ff;
+    border-radius:9px; cursor:pointer; font-size:13px; color:#334155; background:#fbfdff;
+}
+.scorecard-options label:has(input:checked) { border-color:#4f46e5; background:#eef2ff; color:#3730a3; }
+.scorecard-options em { margin-left:auto; color:#64748b; font-size:12px; font-style:normal; font-weight:700; }
+.scorecard-actions { display:flex; justify-content:space-between; gap:10px; margin-top:14px; }
+.scorecard-result-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
+.scorecard-result-card { border:1.5px solid #e0e7ff; border-radius:10px; padding:12px; background:#fbfdff; }
+.scorecard-result-card b { display:block; color:#4f46e5; margin-bottom:4px; }
+.scorecard-result-card span { font-size:22px; font-weight:900; color:#111827; }
+.scorecard-action-text { margin-top:12px; padding:12px; border-radius:10px; background:#ecfeff; color:#155e75; font-weight:700; }
 </style>
 
 <script>
+const SCORECARD_SECTIONS = [
+    {
+        title: 'Operational Substance', max: 15, questions: [
+            { key:'yearsExport', text:'1.1 Years in export business', options:[['0-1 year',1],['2-3 years',2],['4-7 years',3],['8+ years',4]] },
+            { key:'capacityObserved', text:'1.2 Claimed monthly production capacity verifiable vs observed', options:[['Not verifiable',0],['Roughly consistent',2],['Fully consistent',4]] },
+            { key:'factoryVisit', text:'1.3 Factory visit by our team completed?', options:[['Not visited',0],['Visited - concerns noted',1],['Visited - normal operation',3],['Visited - strong operation',4]] },
+            { key:'headcountAlignment', text:'1.4 Worker headcount vs claimed capacity alignment', options:[["Doesn't match",0],['Roughly matches',2],['Clearly matches',3]] },
+        ]
+    },
+    {
+        title: 'Brand Portfolio', max: 30, questions: [
+            { key:'topTierBrands', text:'2.1 Top-tier brand buyers actively shipping to - count with evidence', options:[['None',0],['1 claimed, no evidence',2],['1 with evidence',6],['2 with evidence',11],['3+ with evidence',15]] },
+            { key:'midTierBrands', text:'2.2 Mid-tier international brand buyers - count with evidence', options:[['None',0],['1-2',2],['3 or more',4]] },
+            { key:'longestBrandRelation', text:'2.3 Longest continuous brand relationship', options:[['Under 1 year',0],['1-2 years',2],['3-5 years',4],['5+ years',6]] },
+            { key:'brandConcentration', text:"2.4 Brand concentration - share of buyer's revenue from top 3 brands", options:[['Over 80% - very concentrated',1],['60-80%',2],['40-60%',4],['Under 40% - diversified',5]] },
+        ]
+    },
+    {
+        title: 'Banking & LC Discipline', max: 10, questions: [
+            { key:'primaryBank', text:'3.1 Primary bank disclosed where they open BB LCs', options:[['Not disclosed',0],['Small local bank',2],['Mid-tier local bank',3],['Top-tier bank',4]] },
+            { key:'masterLcSharing', text:'3.2 Willingness to share Master LC number and advising bank at PO stage', options:[['Refuses',0],['Shares partially / sometimes',2],['Shares consistently',3]] },
+            { key:'bankReference', text:'3.3 Bank-to-bank reference conduct assessment', options:[['Not done / refused',0],['Neutral / no negatives',2],['Positive',3]] },
+        ]
+    },
+    {
+        title: 'Compliance & Audit Standing', max: 10, questions: [
+            { key:'majorCompliance', text:'4.1 Major social and safety compliance status', options:[['None',0],['One valid certification',2],['Two or more valid',4]] },
+            { key:'sustainabilityCerts', text:'4.2 Product or sustainability certifications', options:[['None',0],['One',2],['Multiple',3]] },
+            { key:'auditFailures', text:'4.3 Known recent audit failures, fire/safety red findings, or incidents', options:[['Known failure/incident',-3],['Unknown',1],['Clean with evidence',3]] },
+        ]
+    },
+    {
+        title: 'Peer & Trade Network References', max: 15, questions: [
+            { key:'peerCall1', text:'5.1 Peer Supplier Call #1 - payment behaviour feedback', options:[['Strongly negative',-3],['Mildly negative',0],['No feedback / new',1],['Neutral-positive',3],['Strongly positive',5]] },
+            { key:'peerCall2', text:'5.2 Peer Supplier Call #2 - payment behaviour feedback', options:[['Strongly negative',-3],['Mildly negative',0],['No feedback / new',1],['Neutral-positive',3],['Strongly positive',5]] },
+            { key:'peerCall3', text:'5.3 Peer Supplier Call #3 - payment behaviour feedback', options:[['Strongly negative',-3],['Mildly negative',0],['No feedback / new',1],['Neutral-positive',3],['Strongly positive',5]] },
+        ]
+    },
+    {
+        title: 'Team Observations', max: 10, questions: [
+            { key:'merchTeam', text:'6.1 Merchandising team professionalism and quality', options:[['Poor / disorganised',0],['Average',2],['Strong / professional',3]] },
+            { key:'responsiveness', text:'6.2 Responsiveness during pre-PO discussions', options:[['Slow / inconsistent',0],['Normal',2],['Quick & reliable',3]] },
+            { key:'managementTransparency', text:'6.3 Management interaction - transparency signal', options:[['Evasive / guarded',0],['Neutral',2],['Open & transparent',4]] },
+        ]
+    },
+    {
+        title: 'Structural Protections Secured', max: 10, questions: [
+            { key:'arthaRinContract', text:'7.1 Signed sales contract with Artha Rin jurisdiction clause in place?', options:[['No',0],['Yes',3]] },
+            { key:'deliveryChallanProcess', text:'7.2 Delivery challan process - signed and sealed on receipt', options:[['No process yet',0],['Agreed in writing',2],['Agreed & demonstrated',3]] },
+            { key:'personalGuarantee', text:"7.3 Directors' personal guarantee offered", options:[['No',0],['Offered verbally',1],['Provided in writing',4]] },
+        ]
+    },
+];
+
+let scorecardStep = 0;
+const scorecardSelections = {};
+
+function scorecardGrade(total) {
+    if (total >= 80) return {grade:'A', action:'Full onboarding at recommended ceiling.'};
+    if (total >= 60) return {grade:'B', action:'Onboard at reduced ceiling with enhanced monitoring.'};
+    if (total >= 45) return {grade:'C', action:'Restricted 3-6-month trial with hard cap; upgrade or discontinue.'};
+    return {grade:'D', action:'Do not onboard. Walk away.'};
+}
+
+function getScorecardData() {
+    let total = 0;
+    const sections = SCORECARD_SECTIONS.map(section => {
+        let subtotal = 0;
+        const answers = section.questions.map(q => {
+            const answer = scorecardSelections[q.key] || null;
+            const score = answer ? Number(answer.score) : 0;
+            subtotal += score;
+            return { key:q.key, question:q.text, answer:answer?.label || '', score };
+        });
+        total += subtotal;
+        return { title:section.title, max:section.max, subtotal, answers };
+    });
+    const grade = scorecardGrade(total);
+    return { total, grade:grade.grade, action:grade.action, sections };
+}
+
+function renderScorecardSteps() {
+    const wrap = document.getElementById('scorecardSteps');
+    if (!wrap) return;
+    wrap.innerHTML = SCORECARD_SECTIONS.map((s, i) => `<button type="button" class="scorecard-step ${i === scorecardStep ? 'active' : ''}" onclick="scorecardGo(${i})">${i + 1}</button>`).join('') +
+        `<button type="button" class="scorecard-step ${scorecardStep === SCORECARD_SECTIONS.length ? 'active' : ''}" onclick="scorecardGo(${SCORECARD_SECTIONS.length})">Result</button>`;
+}
+
+function renderScorecard() {
+    const panel = document.getElementById('scorecardPanel');
+    if (!panel) return;
+    renderScorecardSteps();
+    const data = getScorecardData();
+    document.getElementById('scorecardTotal').textContent = data.total;
+    document.getElementById('scorecardGrade').textContent = data.grade === 'D' && data.total === 0 ? 'Incomplete' : `Grade ${data.grade}`;
+    document.getElementById('scorecardPrevBtn').disabled = scorecardStep === 0;
+    const scorecardNextBtn = document.getElementById('scorecardNextBtn');
+    scorecardNextBtn.textContent = scorecardStep >= SCORECARD_SECTIONS.length - 1 ? 'Show Result' : 'Next';
+    scorecardNextBtn.style.display = '';
+
+    if (scorecardStep >= SCORECARD_SECTIONS.length) {
+        document.getElementById('scorecardStepTitle').textContent = 'Scorecard Result';
+        document.getElementById('scorecardStepMeta').textContent = 'Final score and action';
+        scorecardNextBtn.disabled = true;
+        scorecardNextBtn.style.display = 'none';
+        panel.innerHTML = `
+            <div class="scorecard-result-grid">
+                <div class="scorecard-result-card"><b>Total Score</b><span>${data.total}/100</span></div>
+                <div class="scorecard-result-card"><b>Grade</b><span>${data.grade}</span></div>
+                ${data.sections.map(s => `<div class="scorecard-result-card"><b>${s.title}</b><span>${s.subtotal}/${s.max}</span></div>`).join('')}
+            </div>
+            <div class="scorecard-action-text">${data.action}</div>`;
+        return;
+    }
+
+    scorecardNextBtn.disabled = false;
+    const section = SCORECARD_SECTIONS[scorecardStep];
+    document.getElementById('scorecardStepTitle').textContent = section.title;
+    document.getElementById('scorecardStepMeta').textContent = `Step ${scorecardStep + 1} of ${SCORECARD_SECTIONS.length + 1} - Max ${section.max} pts`;
+    panel.innerHTML = section.questions.map(q => `
+        <div class="scorecard-question">
+            <h4>${q.text}</h4>
+            <div class="scorecard-options">
+                ${q.options.map(([label, score], idx) => `
+                    <label>
+                        <input type="radio" name="scorecard_${q.key}" value="${idx}" ${scorecardSelections[q.key]?.label === label ? 'checked' : ''} onchange="scorecardChoose('${q.key}', ${score}, this.closest('label').querySelector('span').textContent)">
+                        <span>${label}</span><em>${score >= 0 ? '+' : ''}${score} pts</em>
+                    </label>`).join('')}
+            </div>
+        </div>`).join('');
+}
+
+function scorecardChoose(key, score, label) {
+    scorecardSelections[key] = { score:Number(score), label };
+    renderScorecard();
+}
+function scorecardGo(step) { scorecardStep = Math.max(0, Math.min(SCORECARD_SECTIONS.length, step)); renderScorecard(); }
+function scorecardNext() { scorecardGo(scorecardStep + 1); }
+function scorecardPrev() { scorecardGo(scorecardStep - 1); }
+function loadScorecardData(saved) {
+    Object.keys(scorecardSelections).forEach(k => delete scorecardSelections[k]);
+    (saved?.sections || []).forEach(section => {
+        (section.answers || []).forEach(a => {
+            if (a.key && a.answer !== '') scorecardSelections[a.key] = { label:a.answer, score:Number(a.score || 0) };
+        });
+    });
+    renderScorecard();
+}
+
 let _cpCodeLocked = false;
 
 function cpExtractCodeNumber(code) {
@@ -566,6 +775,7 @@ async function cpGenerateCustomerCode() {
 document.addEventListener('DOMContentLoaded', function() {
     const d = document.getElementById('cp_dateForm');
     if (d && !d.value) d.value = new Date().toISOString().slice(0,10);
+    renderScorecard();
     cpGenerateCustomerCode();
 });
 
@@ -716,9 +926,9 @@ async function tlLoadSelected() {
 
 function tlPopulateForm(d) {
     const extra = (typeof d.extra_data === 'string') ? JSON.parse(d.extra_data || '{}') : (d.extra_data || {});
+    loadScorecardData(extra.scorecard || {});
     const set = (id, val) => { const el = document.getElementById(id); if (el) { el.value = val || ''; el.disabled = true; } };
     _cpCodeLocked = true;
-    set('cp_customerCategory',  extra.customerCategory  || '');
     set('cp_customerCode',      extra.customerCode      || '');
     set('cp_companyName',       d.company_name          || '');
     set('cp_industry',          extra.industry          || '');
@@ -728,11 +938,14 @@ function tlPopulateForm(d) {
     set('cp_factoryAddress',    d.factory_address       || '');
     set('cp_chairmanName',      d.chairman_name         || '');
     set('cp_chairmanMobile',    d.chairman_mobile       || '');
+    set('cp_chairmanEmail',     extra.chairmanEmail     || '');
     set('cp_commercialName',    extra.commercialName    || '');
     set('cp_commercialNumber',  extra.commercialNumber  || '');
+    set('cp_commercialEmail',   extra.commercialEmail   || '');
     set('cp_merchandiserContact', extra.merchandiserContact || '');
     set('cp_merchandiserMobile',  extra.merchandiserMobile  || '');
     set('cp_email',             extra.email             || '');
+    set('cp_erc',               extra.erc               || '');
     set('cp_expectedMonthlyBiz',extra.expectedMonthlyBiz|| '');
     set('cp_avgMonthlyOrder',   extra.avgMonthlyOrder   || '');
     set('cp_creditFacility',    extra.creditFacility    || '');
@@ -831,14 +1044,8 @@ function cpSetFeedback(msg, isError) {
 
 async function cpSubmit() {
     const companyName = (document.getElementById('cp_companyName')?.value || '').trim();
-    const customerCategory = (document.getElementById('cp_customerCategory')?.value || '').trim();
-    if (!customerCategory) {
-        cpSetFeedback('Customer Category is required before submitting.', true);
-        document.getElementById('cp_customerCategory')?.focus();
-        return;
-    }
     if (!companyName) {
-        cpSetFeedback('Company Name is required before submitting.', true);
+        cpSetFeedback('Group Name is required before submitting.', true);
         document.getElementById('cp_companyName')?.focus();
         return;
     }
@@ -849,7 +1056,7 @@ async function cpSubmit() {
     const piIds = ['cp_pi_carton','cp_pi_poly','cp_pi_hangtag','cp_pi_label','cp_pi_offset','cp_pi_thread','cp_pi_elastic','cp_pi_narrowfabric','cp_pi_others'];
     const productInterest = piIds.map(id => document.getElementById(id)).filter(el => el?.checked).map(el => el.value);
 
-    const dcIds = ['cp_dc_tradelic','cp_dc_bin','cp_dc_tin','cp_dc_bondlic','cp_dc_banksol','cp_dc_compprofile','cp_dc_compliancecert','cp_dc_facphotos','cp_dc_sampleapproval'];
+    const dcIds = ['cp_dc_tradelic','cp_dc_bin','cp_dc_tin','cp_dc_erc','cp_dc_bondlic','cp_dc_banksol','cp_dc_compprofile','cp_dc_compliancecert','cp_dc_facphotos','cp_dc_sampleapproval'];
     const docChecklist = dcIds.map(id => document.getElementById(id)).filter(el => el?.checked).map(el => el.value);
 
     const priceMatrix = [];
@@ -870,13 +1077,14 @@ async function cpSubmit() {
     const udRequired       = document.querySelector('input[name="cp_udRequired"]:checked')?.value || 'No';
 
     const extraData = {
-        customerCategory,
+        customerCategory: '',
         customerCode: document.getElementById('cp_customerCode')?.value?.trim() || '',
         industry: document.getElementById('cp_industry')?.value?.trim() || '',
         website: document.getElementById('cp_website')?.value?.trim() || '',
         tradelicense: document.getElementById('cp_tradeLicense')?.value?.trim() || '',
         bin: document.getElementById('cp_bin')?.value?.trim() || '',
         tin: document.getElementById('cp_tin')?.value?.trim() || '',
+        erc: document.getElementById('cp_erc')?.value?.trim() || '',
         bondLicenseExpiry: document.getElementById('cp_bondLicenseExpiry')?.value?.trim() || '',
         complianceStatus: document.getElementById('cp_complianceStatus')?.value?.trim() || '',
         factoryBuilding, factoryCertifications: certifications,
@@ -890,8 +1098,10 @@ async function cpSubmit() {
         majorProducts: document.getElementById('cp_majorProducts')?.value?.trim() || '',
         peakCapacity: document.getElementById('cp_peakCapacity')?.value?.trim() || '',
         subcontractFactory: subcontract,
+        chairmanEmail: document.getElementById('cp_chairmanEmail')?.value?.trim() || '',
         commercialName: document.getElementById('cp_commercialName')?.value?.trim() || '',
         commercialNumber: document.getElementById('cp_commercialNumber')?.value?.trim() || '',
+        commercialEmail: document.getElementById('cp_commercialEmail')?.value?.trim() || '',
         merchandiserContact: document.getElementById('cp_merchandiserContact')?.value?.trim() || '',
         merchandiserMobile: document.getElementById('cp_merchandiserMobile')?.value?.trim() || '',
         email: document.getElementById('cp_email')?.value?.trim() || '',
@@ -918,6 +1128,7 @@ async function cpSubmit() {
             creditLimitRec: document.getElementById('cp_creditLimitRec')?.value?.trim() || '',
             remarks: document.getElementById('cp_riskRemarks')?.value?.trim() || '',
         },
+        scorecard: getScorecardData(),
         priceMatrix, docChecklist,
     };
 
@@ -931,7 +1142,7 @@ async function cpSubmit() {
         chairmanRole:      document.querySelector('input[name="cp_chairmanRole"]:checked')?.value || 'Chairman',
         chairmanName:      document.getElementById('cp_chairmanName')?.value?.trim() || '',
         chairmanMobile:    document.getElementById('cp_chairmanMobile')?.value?.trim() || '',
-        customerType:      document.getElementById('cp_customerType')?.value || 'Regular',
+        customerType:      document.getElementById('cp_customerType')?.value || 'New',
         dateForm:          document.getElementById('cp_dateForm')?.value || '',
         politicsYes, politicsParty: '', extraData, creatorSig,
         creatorRole: <?= json_encode($userRole) ?>,
@@ -971,9 +1182,9 @@ const CP_DRAFT_KEY = 'cp_draft';
 function cpSaveDraft() {
     const textIds = [
         'cp_customerCode','cp_companyName','cp_industry','cp_website',
-        'cp_addressHeadOffice','cp_factoryAddress','cp_chairmanName','cp_chairmanMobile',
-        'cp_commercialName','cp_commercialNumber','cp_merchandiserContact','cp_merchandiserMobile','cp_email',
-        'cp_tradeLicense','cp_bin','cp_tin','cp_bondLicense','cp_bondLicenseExpiry',
+        'cp_addressHeadOffice','cp_factoryAddress','cp_chairmanName','cp_chairmanMobile','cp_chairmanEmail',
+        'cp_commercialName','cp_commercialNumber','cp_commercialEmail','cp_merchandiserContact','cp_merchandiserMobile','cp_email',
+        'cp_tradeLicense','cp_bin','cp_tin','cp_erc','cp_bondLicense','cp_bondLicenseExpiry',
         'cp_complianceStatus','cp_bankName',
         'cp_monthlyCapacity','cp_dailyProduction','cp_noOfMachines','cp_noOfLines',
         'cp_peakCapacity','cp_majorBuyers','cp_majorProducts',
@@ -982,9 +1193,9 @@ function cpSaveDraft() {
         'cp_compSupplier','cp_compCurrentPrice','cp_compStrength','cp_compWeakness','cp_compReasonForChange',
         'cp_financialRisk','cp_paymentHistory','cp_creditLimitRec','cp_riskRemarks',
     ];
-    const d = { texts: {}, selects: {}, radios: {}, checks: {}, priceMatrix: [] };
+    const d = { texts: {}, selects: {}, radios: {}, checks: {}, priceMatrix: [], scorecard: getScorecardData() };
     textIds.forEach(id => { const el = document.getElementById(id); if (el) d.texts[id] = el.value; });
-    ['cp_customerCategory','cp_customerType','cp_financialRisk'].forEach(id => { const el = document.getElementById(id); if (el) d.selects[id] = el.value; });
+    ['cp_customerType','cp_financialRisk'].forEach(id => { const el = document.getElementById(id); if (el) d.selects[id] = el.value; });
     ['cp_chairmanRole','cp_politics','cp_factoryBuilding','cp_factoryType','cp_subcontract','cp_udRequired'].forEach(name => {
         const el = document.querySelector(`input[name="${name}"]:checked`);
         if (el) d.radios[name] = el.value;
@@ -993,7 +1204,7 @@ function cpSaveDraft() {
         'cp_cert_bsci','cp_cert_wrap','cp_cert_sedex','cp_cert_iso','cp_cert_others',
         'cp_pi_carton','cp_pi_poly','cp_pi_hangtag','cp_pi_label','cp_pi_offset',
         'cp_pi_thread','cp_pi_elastic','cp_pi_narrowfabric','cp_pi_others',
-        'cp_dc_tradelic','cp_dc_bin','cp_dc_tin','cp_dc_bondlic','cp_dc_banksol',
+        'cp_dc_tradelic','cp_dc_bin','cp_dc_tin','cp_dc_erc','cp_dc_bondlic','cp_dc_banksol',
         'cp_dc_compprofile','cp_dc_compliancecert','cp_dc_facphotos','cp_dc_sampleapproval',
     ].forEach(id => { const el = document.getElementById(id); if (el) d.checks[id] = el.checked; });
     document.querySelectorAll('#priceMatrixBody tr').forEach(tr => {
@@ -1028,6 +1239,7 @@ function cpSaveDraft() {
             if (el) el.checked = true;
         });
         Object.entries(d.checks || {}).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.checked = val; });
+        loadScorecardData(d.scorecard || {});
         // restore lead times: tick checkboxes first (already done above), then syncLeadTimeFields, then fill values
         if (d.leadTimes && Object.keys(d.leadTimes).length) {
             syncLeadTimeFields();

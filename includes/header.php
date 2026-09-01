@@ -6,10 +6,18 @@ require_once __DIR__ . '/db.php';
 requireLogin();
 $__user = currentUser();
 
+// Embed mode (?embed=1): render only the document (no app chrome) so a read-only
+// print page can be iframed elsewhere — e.g. the Marketing PI preview. In embed
+// mode the PI print pages are viewable by any logged-in user without granting
+// them the tab (keeps their normal nav unchanged; direct access stays blocked).
+$__embed = isset($_GET['embed']) && $_GET['embed'] !== '0';
+$__embedViewablePages = ['single-pi', 'summary-pi', 'master-pi'];
+
 // Enforce page-level tab access for restricted roles
 if (!empty($activePage) && !in_array($activePage, ['dashboard', 'notifications'], true)) {
     $__allowed = allowedTabs();
-    if (!empty($__allowed) && !in_array($activePage, $__allowed, true)) {
+    $__embedAllowed = $__embed && in_array($activePage, $__embedViewablePages, true);
+    if (!empty($__allowed) && !in_array($activePage, $__allowed, true) && !$__embedAllowed) {
         // Redirect to first allowed page for this role
         $__first = $__allowed[0] ?? 'dashboard';
         $__map = [
@@ -18,6 +26,7 @@ if (!empty($activePage) && !in_array($activePage, ['dashboard', 'notifications']
             'costing-review'   => 'costing-review.php',
             'production'       => 'production.php',
             'sales'            => 'sales.php',
+            'commercial-pi'    => 'sales.php',
             'erp-orders-report'=> 'erp-orders-report.php',
             'lc'               => 'lc.php',
             'exchange'         => 'exchange.php',
@@ -88,8 +97,19 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
             font-size: 12px; font-weight: 700; color: #4f46e5; text-decoration: none; cursor: pointer;
         }
     </style>
+<?php if (!empty($__embed)): ?>
+<style>
+/* Embed mode: strip all app chrome so only the document shows inside an iframe. */
+body.embed-view .page-nav,
+body.embed-view #orderIdBar,
+body.embed-view .no-print { display: none !important; }
+body.embed-view .app-shell,
+body.embed-view .form-stack { padding: 0 !important; margin: 0 !important; }
+body.embed-view { background: #fff !important; }
+</style>
+<?php endif; ?>
 </head>
-<body data-page="<?= htmlspecialchars($activePage ?? '') ?>">
+<body data-page="<?= htmlspecialchars($activePage ?? '') ?>"<?= !empty($__embed) ? ' class="embed-view"' : '' ?>>
 <div class="app-shell">
 
     <nav class="page-nav" aria-label="Form pages">
@@ -162,6 +182,7 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
             <?php foreach ($visibleTabs as $i => $tab): ?>
                 <?php if ($i > 0): ?><span class="tab-flow-arrow">&#8594;</span><?php endif; ?>
                 <a class="page-tab<?= $activePage === $tab['id'] ? ' active' : '' ?>"
+                   data-workflow-step="<?= htmlspecialchars($tab['id']) ?>"
                    href="<?= BASE_PATH ?>/pages/<?= $tab['href'] ?>"><?= htmlspecialchars($tab['label']) ?></a>
             <?php endforeach; ?>
         </div>
@@ -230,6 +251,48 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
             sessionStorage.setItem(OID_KEY, orderId);
         }
 
+        const marketingApprovalProtectedSteps = [
+            'lc', 'exchange', 'commercial', 'packing', 'delivery', 'truck',
+            'origin', 'beneficiary', 'forwarding', 'bank-forwarding', 'po-status'
+        ];
+        const marketingApprovalProtectedPages = {
+            'lc.php': 'lc',
+            'exchange.php': 'exchange',
+            'commercial.php': 'commercial',
+            'packing.php': 'packing',
+            'delivery.php': 'delivery',
+            'truck.php': 'truck',
+            'origin.php': 'origin',
+            'beneficiary.php': 'beneficiary',
+            'forwarding.php': 'forwarding',
+            'bank-forwarding.php': 'bank-forwarding',
+            'po-status.php': 'po-status'
+        };
+
+        function hasMarketingApproval(response) {
+            const marketing = response?.pages?.marketing || {};
+            return marketing.marketingApproved === true
+                || marketing.marketingApproved === 'true'
+                || marketing.piApprovalStatus === 'approved';
+        }
+
+        function applyMarketingApprovalGate(response) {
+            const approved = hasMarketingApproval(response);
+            document.querySelectorAll('[data-workflow-step]').forEach(function (tab) {
+                const locked = !approved && marketingApprovalProtectedSteps.includes(tab.dataset.workflowStep || '');
+                tab.classList.toggle('workflow-locked', locked);
+                tab.setAttribute('aria-disabled', locked ? 'true' : 'false');
+                tab.title = locked ? 'Marketing must approve the PI before this step is available.' : '';
+                tab.style.pointerEvents = locked ? 'none' : '';
+                tab.style.opacity = locked ? '0.45' : '';
+            });
+
+            const fileName = window.location.pathname.split('/').pop().toLowerCase();
+            if (!approved && marketingApprovalProtectedPages[fileName]) {
+                window.location.replace(BASE + '/pages/marketing.php');
+            }
+        }
+
         function loadOrderById(id, isManual) {
             fetch(BASE + '/api/order_lookup.php?id=' + encodeURIComponent(id))
                 .then(r => r.json())
@@ -251,6 +314,7 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
                             || ''
                     };
                     setOrderDisplay(res.order.order_id, displayOrder);
+                    applyMarketingApprovalGate(res);
                     const inp = document.getElementById('oidInput');
                     if (inp) inp.value = '';
                     if (typeof window.onOrderLoad === 'function') window.onOrderLoad(res);
@@ -329,6 +393,7 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
         'costing-review': 'costing-review.php',
         'production': 'production.php',
         'sales': 'sales.php',
+        'commercial-pi': 'sales.php',
         'marketing': 'marketing.php',
         'lc': 'lc.php',
         'exchange': 'exchange.php',
@@ -354,13 +419,31 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
         return Math.floor(sec / 86400) + 'd ago';
     }
 
+    // API auth failures redirect to login.php (HTML). fetch() follows the redirect,
+    // so a blind response.json() would throw "Unexpected token '<'". Detect that and
+    // surface a clear message instead.
+    async function notifyReadJson(response) {
+        if (response.redirected && /\/login\.php/i.test(response.url || '')) {
+            throw new Error('Your session has expired. Please refresh the page and sign in again.');
+        }
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            if (/login\.php|<!doctype|<html/i.test(text)) {
+                throw new Error('Your session has expired. Please refresh the page and sign in again.');
+            }
+            throw new Error('Server error (' + response.status + '). Please try again.');
+        }
+    }
+
     async function loadNotifications() {
         const countEl = document.getElementById('navNotifyCount');
         const listEl  = document.getElementById('navNotifyList');
         if (!countEl || !listEl) return;
         try {
             const res = await fetch(APP_BASE + '/api/notifications.php?limit=8');
-            const json = await res.json();
+            const json = await notifyReadJson(res);
             const items = json.items || [];
             const unread = Number(json.unreadCount || 0);
 
@@ -400,7 +483,7 @@ header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ erp_order_no: erpOrder })
                             });
-                            const result = await response.json();
+                            const result = await notifyReadJson(response);
                             if (!response.ok || result.error) throw new Error(result.error || 'Could not create work order.');
                             sessionStorage.setItem('ats_current_order_id', result.order_id);
                             window.location.href = APP_BASE + '/pages/sales.php?erp_order=' + encodeURIComponent(erpOrder);
