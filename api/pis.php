@@ -101,10 +101,20 @@ try {
             foreach ($rows as $pi) {
                 $pos = json_decode($pi['pos'], true) ?? [];
                 foreach ($pos as $po) {
-                    if (stripos($po['poNum'] ?? '', $q) !== false) {
-                        $pi['pos'] = $pos;
-                        echo json_encode(['match' => 'po', 'poNum' => $po['poNum'], 'po' => $po, 'pi' => $pi]);
-                        exit;
+                    // Match the customer PO or the ERP sales order so a Summary PI
+                    // can be assembled by typing either identifier.
+                    $haystacks = [
+                        $po['poNum']        ?? '',
+                        $po['customerPo']   ?? '',
+                        $po['salesOrder']   ?? '',
+                        $po['salesOrderNo'] ?? '',
+                    ];
+                    foreach ($haystacks as $hay) {
+                        if ($hay !== '' && stripos((string)$hay, $q) !== false) {
+                            $pi['pos'] = $pos;
+                            echo json_encode(['match' => 'po', 'poNum' => $po['poNum'] ?? '', 'po' => $po, 'pi' => $pi]);
+                            exit;
+                        }
                     }
                 }
             }

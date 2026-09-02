@@ -259,7 +259,7 @@ include __DIR__ . '/../includes/header.php';
         <span style="font-size:12px;font-weight:700;" id="mpiBasketLabel">0 items selected</span>
         <span style="font-size:12px;">Qty: <strong id="mpiBasketQty" style="color:#a5b4fc;">0</strong></span>
         <span style="font-size:12px;">Total: <strong id="mpiBasketVal" style="color:#a5b4fc;">$0.00</strong></span>
-        <button type="button" class="mpi-basket-btn" onclick="generateMasterPi()">Create Master PI</button>
+        <button type="button" class="mpi-basket-btn" onclick="createMasterFromSelection()">Create Master PI</button>
     </div>
 </div>
 
@@ -319,11 +319,29 @@ function hasMarketingApproval() {
     return _marketingApproved === true;
 }
 
+function isPastPiStep() {
+    // Order already advanced to LC or beyond ('marketing' isn't in the list → -1).
+    return _stepIdx(_currentPiStep) > _stepIdx('sales');
+}
+function goToLcPage() {
+    window.location.href = APP_BASE + '/pages/lc.php';
+}
 function resetSubmitBtn() {
     const btn = document.getElementById('universalSaveBtn');
+    const advanced = isPastPiStep();
+    // The PI only needs saving while it's still an editable draft. Once it's
+    // submitted (waiting), Marketing-approved, or already moved to LC, hide
+    // "Save PI" — it's ready.
+    const saveBtn = document.getElementById('savePiBtn');
+    if (saveBtn) saveBtn.style.display = (advanced || hasMarketingApproval() || isWaitingForMarketingApproval()) ? 'none' : '';
     if (!btn) return;
     btn.style.background = '';
-    if (isWaitingForMarketingApproval()) {
+    if (advanced) {
+        // Already sent to LC (or beyond) — don't re-submit; just open LC.
+        btn.textContent = 'Open LC';
+        btn.disabled = false;
+        btn.onclick = goToLcPage;
+    } else if (isWaitingForMarketingApproval()) {
         btn.textContent = 'Waiting for Marketing Approval';
         btn.style.background = '#94a3b8';
         btn.disabled = true;
@@ -356,16 +374,23 @@ function onPiTypeChange() {
     if (btn) btn.textContent = labels[val] || 'Print PI';
     const submitBtn = document.getElementById('universalSaveBtn');
     resetSubmitBtn();
+    // Summary now assembles already-created PIs, so the "+ Add Another PI"
+    // new-block button is no longer used.
     const addBtn = document.getElementById('addAnotherPoBtn');
-    if (addBtn) addBtn.style.display = val === 'summary' ? '' : 'none';
+    if (addBtn) addBtn.style.display = 'none';
     const termsBox = document.getElementById('salesTermsBox');
     if (termsBox) termsBox.style.display = val === 'summary' ? 'none' : '';
+    // Block editor is for Single PI only; Summary uses the picker, Master uses the item list.
     const piBlocksEditor = document.getElementById('piBlocksEditor');
-    if (piBlocksEditor) piBlocksEditor.style.display = val === 'master' ? 'none' : 'block';
+    if (piBlocksEditor) piBlocksEditor.style.display = val === 'single' ? 'block' : 'none';
+    const summaryBuilder = document.getElementById('summaryBuilder');
+    if (summaryBuilder) summaryBuilder.style.display = val === 'summary' ? 'block' : 'none';
     const masterPanel = document.getElementById('masterPiSelectedPanel');
     if (masterPanel) masterPanel.style.display = val === 'master' ? 'block' : 'none';
     if (val === 'master') renderMasterSelectedItems();
-
+    if (val === 'summary' && typeof enterSummaryMode === 'function') enterSummaryMode();
+    // Leaving Summary → restore the top bar to the PO-block (Single PI) totals.
+    if (val === 'single' && typeof updateSummary === 'function') updateSummary();
 }
 document.addEventListener('DOMContentLoaded', onPiTypeChange);
 function goToPiPrint(excelMode = false) {
@@ -392,13 +417,23 @@ function goToPiPrint(excelMode = false) {
         }
         // No selection is fine — master-pi.php loads from saved PI data directly
     }
-    if (val === 'single' || val === 'master') {
+    if (val === 'summary') {
+        if (!_summarySelectedPis.length) {
+            alert('Add at least one already-created PI to the Summary before printing.');
+            return;
+        }
+        // Hand the chosen (already-created) PIs to summary-pi.php — preview/print only.
+        sessionStorage.setItem('summary_selected_pis', JSON.stringify(_summarySelectedPis));
+        url += '?summary=1';
+    }
+    if (val === 'single' || val === 'master' || val === 'summary') {
         const days = document.getElementById('termLcDays')?.value || '90';
         const tol  = document.getElementById('termTolerance')?.value || '5';
         const hs   = document.getElementById('termHsCode')?.value || '4819.10.00';
         const docMust = document.getElementById('termDocMust')?.value || 'UD';
         const bnk  = document.getElementById('termBank')?.value || 'ncc';
-        url += '?days=' + encodeURIComponent(days)
+        const sep = url.includes('?') ? '&' : '?';
+        url += sep + 'days=' + encodeURIComponent(days)
             + '&lctype=Sight&tol=' + encodeURIComponent(tol)
             + '&hs=' + encodeURIComponent(hs)
             + '&doc=' + encodeURIComponent(docMust)
@@ -469,6 +504,27 @@ function goToPiPrint(excelMode = false) {
         + Add Another PI
     </button>
 </div>
+</div>
+
+<!-- Summary PI builder — assemble from already-created PIs (across work orders) -->
+<div id="summaryBuilder" style="display:none;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+        <div>
+            <div class="eyebrow">Summary PI</div>
+            <h3 style="margin:0;font-size:16px;">Add Already-Created PIs</h3>
+        </div>
+        <div style="font-size:12px;color:#64748b;">Find by PI number, work order (ORD-…) or ERP sales order and add it. Combine PIs from different work orders — nothing new is created.</div>
+    </div>
+    <div class="erp-search-row" style="margin-bottom:8px;">
+        <input id="summarySearchInput" placeholder="Enter PI number, work order (ORD-…) or ERP sales order…"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();addSummaryPi();}">
+        <button type="button" class="primary-btn" style="white-space:nowrap;" onclick="addSummaryPi()">Add PI</button>
+    </div>
+    <div id="summaryMsg" style="font-size:12px;color:#64748b;margin-bottom:10px;min-height:16px;"></div>
+    <div id="summaryBasket"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+        <button type="button" class="primary-btn" onclick="saveSummaryPi()">Save Summary</button>
+    </div>
 </div>
 
 <div id="masterPiSelectedPanel" style="display:none;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:20px;">
@@ -572,7 +628,7 @@ function goToPiPrint(excelMode = false) {
 <div class="page-actions" style="margin-top:16px;">
     <div class="page-actions-left">
         <button type="button" class="ghost-btn js-prev-page" data-prev-page="production">Previous</button>
-        <button type="button" class="ghost-btn" onclick="savePi()">Save PI</button>
+        <button type="button" id="savePiBtn" class="ghost-btn" onclick="savePi()">Save PI</button>
         <button type="button" class="ghost-btn" onclick="clearPiForm()">Clear</button>
         <button type="button" class="primary-btn" id="universalSaveBtn" onclick="submitToMarketing()">Submit</button>
     </div>
@@ -1941,7 +1997,12 @@ async function submitToMarketing() {
 }
 
 async function submitApprovedPiToLc() {
-    if (!hasMarketingApproval() || _currentPiStep !== 'sales') {
+    if (_currentPiStep !== 'sales') {
+        // Order already moved to LC (or beyond) — just open the LC page.
+        goToLcPage();
+        return;
+    }
+    if (!hasMarketingApproval()) {
         alert('Marketing approval is required before sending this order to LC.');
         return;
     }
@@ -1951,8 +2012,16 @@ async function submitApprovedPiToLc() {
         alert('No order loaded.');
         return;
     }
+    // The single PI is already saved and Marketing-approved. Confirm a saved PI
+    // exists (fetch once if the cache hasn't loaded yet) — but do NOT re-save it.
     if (!_savedPisCache.length) {
-        alert('Please save at least one PI before sending the order to LC.');
+        try {
+            const pis = await (await fetch(APP_BASE + '/api/pis.php?order_id=' + encodeURIComponent(orderId))).json();
+            _savedPisCache = (pis || []).filter(p => !p.is_master);
+        } catch (_) {}
+    }
+    if (!_savedPisCache.length) {
+        alert('No saved PI found for this order.');
         return;
     }
 
@@ -1963,20 +2032,9 @@ async function submitApprovedPiToLc() {
     }
 
     try {
-        const data = collectPiData();
-        const pageResponse = await fetch(APP_BASE + '/api/save_page.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order_id: orderId, page_name: 'sales', ...data })
-        });
-        const pageText = await pageResponse.text();
-        let pageJson = {};
-        try { pageJson = pageText ? JSON.parse(pageText) : {}; }
-        catch (_) { throw new Error('Final PI save returned an invalid response.'); }
-        if (!pageResponse.ok || pageJson.error) {
-            throw new Error(pageJson.error || 'The approved PI could not be saved before LC handoff.');
-        }
-
+        // Do NOT re-save the PI here — it is already saved and Marketing-approved,
+        // so re-collecting a partially-loaded form could overwrite the approved PI.
+        // Just advance the work order to LC.
         const response = await fetch(
             APP_BASE + '/api/orders.php?id=' + encodeURIComponent(orderId) + '&step=lc',
             { method: 'PUT' }
@@ -2050,6 +2108,264 @@ function refreshSavedPiBadge() {
         .catch(() => {});
 }
 
+// ── Summary PI builder — assemble already-created PIs across work orders ──────
+let _summarySelectedPis = [];
+
+function _summaryPiKey(pi) { return String(pi.id || pi.pi_number || ''); }
+
+function enterSummaryMode() {
+    // Pre-seed with the current order's already-created individual PIs (once), so
+    // the loaded work order's PI is there by default; user can add more / remove.
+    if (!_summarySelectedPis.length && Array.isArray(_savedPisCache) && _savedPisCache.length) {
+        _savedPisCache.forEach(pi => { if (!pi.is_master) _summarySelectedPis.push(pi); });
+    }
+    renderSummaryBasket();
+}
+
+async function addSummaryPi() {
+    const input = document.getElementById('summarySearchInput');
+    const msg   = document.getElementById('summaryMsg');
+    const term  = (input?.value || '').trim();
+    if (!term) return;
+    if (msg) msg.innerHTML = '<span style="color:#94a3b8;">Searching…</span>';
+    try {
+        // A work-order id (ORD-…) adds every already-created PI belonging to it.
+        if (/^ORD-/i.test(term)) {
+            const list = await (await fetch(APP_BASE + '/api/pis.php?order_id=' + encodeURIComponent(term))).json();
+            const orderPis = Array.isArray(list) ? list.filter(p => !p.is_master) : [];
+            if (!orderPis.length) {
+                if (msg) msg.innerHTML = `<span style="color:#f87171;">No already-created PI found for work order <strong>${escHtml(term)}</strong>.</span>`;
+                return;
+            }
+            let added = 0;
+            orderPis.forEach(pi => {
+                const key = _summaryPiKey(pi);
+                if (!_summarySelectedPis.some(p => _summaryPiKey(p) === key)) { _summarySelectedPis.push(pi); added++; }
+            });
+            if (msg) msg.innerHTML = added
+                ? `<span style="color:#16a34a;font-weight:700;">Added ${added} PI(s) from ${escHtml(term)}.</span>`
+                : `<span style="color:#d97706;">All PIs from ${escHtml(term)} are already added.</span>`;
+            if (input) input.value = '';
+            renderSummaryBasket();
+            return;
+        }
+        const resp = await fetch(APP_BASE + '/api/pis.php?q=' + encodeURIComponent(term));
+        const text = await resp.text();
+        let res;
+        try { res = JSON.parse(text); }
+        catch (_) {
+            console.error('addSummaryPi: non-JSON response', resp.status, text.slice(0, 300));
+            if (msg) msg.innerHTML = `<span style="color:#f87171;">Search error (HTTP ${resp.status}). See console.</span>`;
+            return;
+        }
+        const pi = (res && (res.match === 'pi' || res.match === 'po')) ? res.pi : null;
+        if (!pi) {
+            if (msg) msg.innerHTML = `<span style="color:#f87171;">No already-created PI found for <strong>${escHtml(term)}</strong>.</span>`;
+            return;
+        }
+        // Normalize: the ?q= search returns pos already decoded, but be defensive.
+        if (typeof pi.pos === 'string') { try { pi.pos = JSON.parse(pi.pos) || []; } catch (_) { pi.pos = []; } }
+        const key = _summaryPiKey(pi);
+        if (_summarySelectedPis.some(p => _summaryPiKey(p) === key)) {
+            if (msg) msg.innerHTML = `<span style="color:#d97706;">${escHtml(pi.pi_number || term)} is already added.</span>`;
+        } else {
+            _summarySelectedPis.push(pi);
+            if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Added ${escHtml(pi.pi_number || term)}.</span>`;
+        }
+        if (input) input.value = '';
+        renderSummaryBasket();
+    } catch (e) {
+        console.error('addSummaryPi failed', e);
+        if (msg) msg.innerHTML = `<span style="color:#f87171;">Search failed: ${escHtml(e.message || 'network error')}.</span>`;
+    }
+}
+
+function removeSummaryPi(key) {
+    _summarySelectedPis = _summarySelectedPis.filter(p => _summaryPiKey(p) !== key);
+    renderSummaryBasket();
+}
+
+// Persist the assembled Summary to the current order's sales snapshot so it is
+// saved (not just previewed) and is restored when the order is reloaded. Merges
+// onto the existing snapshot so single-PI data isn't clobbered.
+async function saveSummaryPi() {
+    const orderId = sessionStorage.getItem('ats_current_order_id') || '';
+    if (!orderId) { alert('Load an order first.'); return; }
+    if (!_summarySelectedPis.length) { alert('Add at least one PI to the summary first.'); return; }
+
+    let grandQty = 0, grandVal = 0;
+    _summarySelectedPis.forEach(pi => {
+        grandQty += parseFloat(pi.grand_qty || 0) || 0;
+        grandVal += parseFloat(pi.grand_val || 0) || 0;
+    });
+    const first   = _summarySelectedPis[0] || {};
+    const firstPo = (first.pos || [])[0] || {};
+    const data = {
+        ...(window._salesSnapshot || {}),
+        piType: 'summary',
+        summarySelectedPis: _summarySelectedPis,
+        selectedPiNumbers: _summarySelectedPis.map(p => p.pi_number).filter(Boolean),
+        customer: document.getElementById('piCustomer').value.trim() || first.customer || '',
+        buyer: document.getElementById('piBuyer').value.trim() || firstPo.sharedBuyer || '',
+        piDate: document.getElementById('piDate').value || first.pi_date || '',
+        buyerAddress: document.getElementById('piBuyerAddress').value.trim() || firstPo.sharedBuyerAddress || '',
+        grandQty,
+        grandVal: grandVal.toFixed(2),
+    };
+
+    const msg = document.getElementById('summaryMsg');
+    if (msg) msg.innerHTML = '<span style="color:#94a3b8;">Saving…</span>';
+    try {
+        const r = await fetch(APP_BASE + '/api/save_page.php', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_id: orderId, page_name: 'sales', ...data })
+        });
+        const text = await r.text();
+        let j = {};
+        try { j = text ? JSON.parse(text) : {}; } catch (_) { throw new Error('Save returned an invalid response.'); }
+        if (!r.ok || j.error) throw new Error(j.error || 'Save failed.');
+        window._salesSnapshot = data; // keep local snapshot in sync
+        document.getElementById('piStatus').textContent = 'Saved';
+        renderOrderPiOverview(orderId); // show the saved Summary row in "PIs for this Order"
+        if (msg) msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Summary saved · ${_summarySelectedPis.length} PI(s) · Qty ${grandQty.toLocaleString()} · $${grandVal.toFixed(2)}.</span>`;
+    } catch (e) {
+        console.error('saveSummaryPi failed', e);
+        if (msg) msg.innerHTML = `<span style="color:#f87171;">Save failed: ${escHtml(e.message || 'server error')}.</span>`;
+    }
+}
+
+// Build Master PI data from the items ticked in the overview (works regardless of
+// the current PI-type radio — the summary flow selects items while in Summary mode).
+function collectMasterDataFromSelection() {
+    const masterGroups = getSelectedMasterGroups();
+    const selectedPiNumbers = [...new Set(masterGroups.map(g => g.piNumber).filter(Boolean))];
+    let grandQty = 0, grandVal = 0;
+    const pos = masterGroups.map(group => {
+        let qty = 0, val = 0;
+        (group.items || []).forEach(item => {
+            const iq = parseFloat(item.qty || 0) || 0;
+            const iv = parseFloat(item.total || (iq * parseFloat(item.price || item.unitPrice || 0))) || 0;
+            qty += iq; val += iv;
+        });
+        grandQty += qty; grandVal += val;
+        return {
+            piNum: group.piNumber || '', poNum: group.poNum || '',
+            qty, val: val.toFixed(2), items: group.items || [],
+            buyer: group.buyer || group.sharedBuyer || '',
+            salesOrder: group.salesOrder || '', status: group.status || '', reqDate: group.reqDate || ''
+        };
+    });
+    const firstGroup = masterGroups[0] || {};
+    return {
+        piType: 'master',
+        piNum: (document.getElementById('piNumber').value || '').trim(),
+        customer: (document.getElementById('piCustomer').value || '').trim(),
+        buyer: (document.getElementById('piBuyer').value || '').trim() || firstGroup.sharedBuyer || firstGroup.buyer || '',
+        piDate: document.getElementById('piDate').value || '',
+        buyerAddress: (document.getElementById('piBuyerAddress').value || '').trim() || firstGroup.sharedBuyerAddress || '',
+        hsCode: document.getElementById('termHsCode')?.value || '4819.10.00',
+        consigneeBank: '', advisingBank: '',
+        pos, masterPiSelection: masterGroups, selectedPiNumbers,
+        grandQty, grandVal: grandVal.toFixed(2)
+    };
+}
+
+// Create + save the Master PI from the ticked items as a PI *record only*.
+// IMPORTANT: do NOT overwrite the order's sales snapshot — that would wipe the
+// saved Summary and make its PIs disappear. The new Master just shows up as a
+// MASTER row alongside the Summary; no navigation to the print page.
+async function createMasterFromSelection() {
+    const groups = getSelectedMasterGroups();
+    if (!groups.length) { alert('Tick at least one item under the PIs above to include in the Master PI.'); return; }
+    const orderId = sessionStorage.getItem('ats_current_order_id') || '';
+    if (!orderId) { alert('Load an order first.'); return; }
+
+    const data = collectMasterDataFromSelection();
+    const masterPiNum = (data.piNum && data.piNum !== data.selectedPiNumbers?.[0])
+        ? data.piNum
+        : (orderId + '-MASTER');
+    const payload = {
+        piNum: masterPiNum,
+        customer: data.customer, buyer: data.buyer, piDate: data.piDate,
+        buyerAddress: data.buyerAddress, consigneeBank: '', advisingBank: '', productLine: '',
+        pos: data.pos, grandQty: data.grandQty, grandVal: data.grandVal,
+        orderId, isMaster: true, includedPis: data.selectedPiNumbers || []
+    };
+    try {
+        const r = await fetch(APP_BASE + '/api/pis.php', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const j = await r.json();
+        if (j.error) throw new Error(j.error);
+        sessionStorage.setItem('mpi_custom_items', JSON.stringify(data.masterPiSelection || []));
+        document.getElementById('piStatus').textContent = 'Master PI Saved';
+        refreshSavedPiBadge();
+        renderOrderPiOverview(orderId); // Summary snapshot untouched → Summary PIs stay listed + new MASTER row
+        const basket = document.getElementById('mpiBasket');
+        if (basket) basket.style.display = 'none';
+        alert('Master PI created: ' + masterPiNum + ' · $' + data.grandVal + '\nUse the Print button on the Master row when you are ready.');
+    } catch (e) {
+        console.error('createMasterFromSelection failed', e);
+        alert('Master PI create failed: ' + (e.message || 'Could not reach server.'));
+    }
+}
+
+// Open the printable Master PI (loads the saved Master for the current order).
+function printMasterPi() {
+    const days = document.getElementById('termLcDays')?.value || '90';
+    const tol  = document.getElementById('termTolerance')?.value || '5';
+    const hs   = document.getElementById('termHsCode')?.value || '4819.10.00';
+    const docMust = document.getElementById('termDocMust')?.value || 'UD';
+    const bnk  = document.getElementById('termBank')?.value || 'ncc';
+    window.location.href = APP_BASE + '/pages/master-pi.php?days=' + encodeURIComponent(days)
+        + '&lctype=Sight&tol=' + encodeURIComponent(tol)
+        + '&hs=' + encodeURIComponent(hs)
+        + '&doc=' + encodeURIComponent(docMust)
+        + '&bank=' + encodeURIComponent(bnk);
+}
+
+function _summaryUpdateTopBar(count, qty, val) {
+    // Reflect the summary in the top summary bar (PO-block totals are irrelevant here).
+    const sc = document.getElementById('sumPoCount');  if (sc) sc.textContent = count;
+    const sq = document.getElementById('sumTotalQty'); if (sq) sq.textContent = (qty || 0).toLocaleString();
+    const sv = document.getElementById('sumTotalVal'); if (sv) sv.textContent = '$' + (val || 0).toFixed(2);
+}
+
+function renderSummaryBasket() {
+    const box = document.getElementById('summaryBasket');
+    if (!box) return;
+    if (!_summarySelectedPis.length) {
+        box.innerHTML = '<div style="padding:16px;border:1px dashed #cbd5e1;border-radius:10px;color:#64748b;background:#f8fafc;">No PIs added yet. Search an existing PI number or ERP sales order above.</div>';
+        _summaryUpdateTopBar(0, 0, 0);
+        return;
+    }
+    let totalQty = 0, totalVal = 0;
+    const rows = _summarySelectedPis.map(pi => {
+        const qty = parseFloat(pi.grand_qty || 0) || 0;
+        const val = parseFloat(pi.grand_val || 0) || 0;
+        totalQty += qty; totalVal += val;
+        const po = (pi.pos || [])[0] || {};
+        const ref = po.poNum || po.customerPo || po.salesOrder || '';
+        return `<div class="opo-row opo-standalone" style="cursor:default;">
+            <span class="opo-badge b-standalone">PI</span>
+            <div class="opo-num">${escHtml(pi.pi_number || '-')}</div>
+            <div class="opo-meta">${escHtml(pi.customer || '-')}${ref ? ' · ' + escHtml(ref) : ''} · ${qty.toLocaleString()} pcs</div>
+            <div class="opo-val">$${val.toFixed(2)}</div>
+            <button class="ghost-btn" style="font-size:11px;padding:2px 10px;color:#f87171;border-color:#fca5a5;"
+                    onclick="removeSummaryPi('${escHtml(_summaryPiKey(pi))}')">Remove</button>
+        </div>`;
+    }).join('');
+    box.innerHTML =
+        '<div class="opo-list">' + rows + '</div>' +
+        `<div style="display:flex;justify-content:flex-end;gap:18px;padding:12px 6px 0;font-size:13px;font-weight:700;color:#312e81;">
+            <span>${_summarySelectedPis.length} PI(s)</span>
+            <span>Qty: ${totalQty.toLocaleString()}</span>
+            <span>Total: $${totalVal.toFixed(2)}</span>
+        </div>`;
+    _summaryUpdateTopBar(_summarySelectedPis.length, totalQty, totalVal);
+}
+
 function renderOrderPiOverview(orderId) {
     const overview = document.getElementById('orderPiOverview');
     const list     = document.getElementById('opoPiList');
@@ -2065,13 +2381,36 @@ function renderOrderPiOverview(orderId) {
             const individuals = pis.filter(p => !p.is_master);
             const includedNums = new Set(masters.flatMap(m => m.included_pis || []));
 
-            // Store individuals for item-level selection
-            _savedPisOverviewCache = individuals;
+            // When a Summary is saved, its (cross-order) PIs become the selectable
+            // set for building a Master PI; otherwise use this order's own PIs.
+            const savedSummary = (window._salesSnapshot && window._salesSnapshot.piType === 'summary'
+                && Array.isArray(window._salesSnapshot.summarySelectedPis) && window._salesSnapshot.summarySelectedPis.length)
+                ? window._salesSnapshot.summarySelectedPis : null;
+            const selectablePis = (savedSummary && savedSummary.length) ? savedSummary : individuals;
 
-            document.getElementById('opoPiCount').textContent = pis.length + ' PI(s)';
+            // Store the selectable PIs for item-level Master PI selection
+            _savedPisOverviewCache = selectablePis;
+
+            document.getElementById('opoPiCount').textContent = selectablePis.length + ' PI(s)';
             overview.style.display = 'block';
 
             let html = '';
+
+            // Saved Summary header row — the PIs it combines are listed (expandable)
+            // just below so items can be picked from all of them for a Master PI.
+            if (savedSummary) {
+                let sQty = 0, sVal = 0;
+                savedSummary.forEach(p => { sQty += parseFloat(p.grand_qty || 0) || 0; sVal += parseFloat(p.grand_val || 0) || 0; });
+                const nums = savedSummary.map(p => escHtml(p.pi_number || '')).filter(Boolean).join(', ') || '-';
+                html += `<div class="opo-row opo-master" style="background:#eef2ff;border:1.5px solid #c7d2fe;">
+                    <span class="opo-badge b-master" style="background:#4f46e5;">SUMMARY</span>
+                    <div class="opo-num">Summary PI</div>
+                    <div class="opo-meta">${savedSummary.length} PI(s) · Qty ${sQty.toLocaleString()} · expand the PIs below to pick items for a Master PI
+                        <div class="opo-includes">Combines: ${nums}</div>
+                    </div>
+                    <div class="opo-val">$${sVal.toFixed(2)}</div>
+                </div>`;
+            }
 
             masters.forEach(pi => {
                 const combined = (pi.included_pis || []).join(', ') || '-';
@@ -2083,10 +2422,11 @@ function renderOrderPiOverview(orderId) {
                         <div class="opo-includes">Combines: ${combined}</div>
                     </div>
                     <div class="opo-val">$${parseFloat(pi.grand_val||0).toFixed(2)}</div>
+                    <button class="ghost-btn" style="font-size:11px;padding:2px 10px;" onclick="printMasterPi()">Print</button>
                 </div>`;
             });
 
-            individuals.forEach((pi, piIdx) => {
+            selectablePis.forEach((pi, piIdx) => {
                 const inMaster = includedNums.has(pi.pi_number);
                 const badge    = inMaster ? '<span class="opo-badge b-included">IN MASTER</span>' : '';
 
@@ -2574,8 +2914,10 @@ function updatePrintLock(step, forceUnlock = false) {
 window.onOrderLoad = async function(res) {
     setPiContentVisible(true);
     resetSubmitBtn();
+    _summarySelectedPis = []; // re-seeded from this order's PIs when Summary mode opens
     const orderId = res.order?.order_id;
     const salesSnapshot = res.pages?.sales || null;
+    window._salesSnapshot = salesSnapshot; // used by Save Summary to merge without clobbering
     const marketingSnapshot = res.pages?.marketing || null;
     const currentStep = res.order?.current_step || 'sales';
     _marketingApproved = marketingSnapshot?.marketingApproved === true
@@ -2612,6 +2954,16 @@ window.onOrderLoad = async function(res) {
         poCount = 0;
         rowCounters = {};
         renderMasterSelectedItemsFromGroups(salesSnapshot.masterPiSelection || []);
+        document.getElementById('piStatus').textContent = 'Loaded';
+        return;
+    }
+
+    if (salesSnapshot?.piType === 'summary') {
+        // Restore the saved Summary selection (already-created PIs) into the basket.
+        if (Array.isArray(salesSnapshot.summarySelectedPis) && salesSnapshot.summarySelectedPis.length) {
+            _summarySelectedPis = salesSnapshot.summarySelectedPis;
+        }
+        if (typeof enterSummaryMode === 'function') enterSummaryMode();
         document.getElementById('piStatus').textContent = 'Loaded';
         return;
     }
@@ -2692,6 +3044,7 @@ window.onNewOrder = function(orderId) {
     setPiContentVisible(true);
     _currentPiStep = 'sales';
     _marketingApproved = false;
+    _summarySelectedPis = [];
     resetPiFormFields();
     updatePrintLock('sales', false);
     if (orderId) {

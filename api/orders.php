@@ -174,8 +174,12 @@ try {
             // Optional: route the marketing-approval notification to a specific person.
             $assignedUserId = isset($_GET['marketing_user']) && $_GET['marketing_user'] !== ''
                 ? (int)$_GET['marketing_user'] : null;
-            createStepNotifications($db, $id, $step, (int)(currentUser()['id'] ?? 0) ?: null, $assignedUserId);
-            if ($step === 'marketing') {
+            // Guard so the step change never hard-fails if a notification helper is
+            // missing (e.g. a stale includes/notifications.php on the server).
+            if (function_exists('createStepNotifications')) {
+                createStepNotifications($db, $id, $step, (int)(currentUser()['id'] ?? 0) ?: null, $assignedUserId);
+            }
+            if ($step === 'marketing' && function_exists('createCommercialPiNotifications')) {
                 createCommercialPiNotifications($db, $id, (int)(currentUser()['id'] ?? 0) ?: null);
             }
         }
@@ -354,7 +358,7 @@ try {
             }
         }
 
-        if ($existingStep === false || $existingStep !== $step) {
+        if (($existingStep === false || $existingStep !== $step) && function_exists('createStepNotifications')) {
             createStepNotifications($db, $orderId, $step, (int)(currentUser()['id'] ?? 0) ?: null);
         }
 

@@ -154,6 +154,15 @@ html.pi-preview .mspi-ctrl {
     set('mspiLcType',    p.get('lctype'));
     set('mspiTolerance', p.get('tol'));
     if (p.get('preview') === '1') document.documentElement.classList.add('pi-preview');
+    // Cross-order Summary: render the exact already-created PIs picked on the PI
+    // page (preview/print only). Gated by ?summary=1 so a stale selection never
+    // affects a normal single-order summary load.
+    if (p.get('summary') === '1') {
+        try {
+            const sel = JSON.parse(sessionStorage.getItem('summary_selected_pis') || 'null');
+            if (Array.isArray(sel) && sel.length) window._mspiSelectionPis = sel;
+        } catch (e) {}
+    }
     window._mspiBank = p.get('bank') || 'ncc';
     window._mspiBin  = p.get('bin')  || '';
     window._mspiHsCode = p.get('hs') || '4819.10.00';
@@ -300,8 +309,11 @@ function mspiShortNum(piNum) {
 
 /* ── Render ───────────────────────────────────────────────────── */
 function renderSummaryPi() {
-    const res = _mspiOrderData;
-    if (!res) return;
+    // Cross-order Summary uses the picked already-created PIs; otherwise fall back
+    // to the current order's PIs (single-order summary — unchanged behavior).
+    const usingSelection = Array.isArray(window._mspiSelectionPis) && window._mspiSelectionPis.length;
+    const res = _mspiOrderData || {};
+    if (!usingSelection && !_mspiOrderData) return;
 
     const days      = document.getElementById('mspiDays').value;
     const daysLabel = days === 'At Sight' ? 'At Sight' : days + ' Days';
@@ -309,7 +321,7 @@ function renderSummaryPi() {
     const hsCode    = window._mspiHsCode || '4819.10.00';
     const docMust   = window._mspiDocMust || 'UD';
 
-    const pis     = res.pis   || [];
+    const pis     = usingSelection ? window._mspiSelectionPis : (res.pis || []);
     const order   = res.order || {};
     const salesPg = res.pages?.sales || {};
     const intake  = res.pages?.['marketing-intake'] || {};
@@ -319,7 +331,8 @@ function renderSummaryPi() {
 
     // Header uses first PI's number
     const firstPi = pis[0] || {};
-    const piNum   = firstPi.pi_number || salesPg.piNum || order.order_id + '-SPI';
+    const firstPo0 = firstPi.pos?.[0] || {};
+    const piNum   = firstPi.pi_number || salesPg.piNum || (order.order_id || '') + '-SPI';
     const piDate  = firstPi.pi_date   || salesPg.piDate || order.created_at?.slice(0,10) || '';
     document.getElementById('mspiNum').textContent  = piNum;
     document.getElementById('mspiDate').textContent = mspiFormatDate(piDate);
@@ -328,11 +341,10 @@ function renderSummaryPi() {
     if (contNumEl) contNumEl.textContent = piNum;
     if (contDateEl) contDateEl.textContent = mspiFormatDate(piDate);
 
-    // Buyer / TO
-    const firstPo0 = firstPi.pos?.[0] || {};
-    const buyer    = salesPg.buyer || firstPo0.sharedBuyer || firstPo0.endBuyer || intake.pos?.[0]?.endBuyer || '—';
-    const custName = salesPg.customer || intake.customer || order.customer_name || '—';
-    const custAddr = salesPg.buyerAddress || firstPo0.sharedBuyerAddress || '';
+    // Buyer / TO — when using a selection, take them from the first picked PI.
+    const buyer    = (usingSelection ? (firstPo0.sharedBuyer || firstPo0.buyer || firstPo0.endBuyer) : (salesPg.buyer || firstPo0.sharedBuyer || firstPo0.endBuyer || intake.pos?.[0]?.endBuyer)) || '—';
+    const custName = (usingSelection ? firstPi.customer : (salesPg.customer || intake.customer || order.customer_name)) || '—';
+    const custAddr = (usingSelection ? firstPo0.sharedBuyerAddress : (salesPg.buyerAddress || firstPo0.sharedBuyerAddress)) || '';
     document.getElementById('mspiBuyer').textContent = buyer;
     document.getElementById('mspiTo').innerHTML =
         `<strong>${custName}</strong>` + (custAddr ? '<br>' + custAddr.replace(/\n/g,'<br>') : '');
@@ -392,21 +404,22 @@ function renderSummaryPi() {
 }
 
 async function downloadSummaryPiExcel() {
-    const res = _mspiOrderData;
-    if (!res) { alert('No order loaded.'); return; }
+    const usingSelection = Array.isArray(window._mspiSelectionPis) && window._mspiSelectionPis.length;
+    const res = _mspiOrderData || {};
+    if (!usingSelection && !_mspiOrderData) { alert('No order loaded.'); return; }
 
-    const pis     = res.pis   || [];
+    const pis     = usingSelection ? window._mspiSelectionPis : (res.pis || []);
     const order   = res.order || {};
     const salesPg = res.pages?.sales || {};
     const intake  = res.pages?.['marketing-intake'] || {};
 
     const firstPi  = pis[0] || {};
     const firstPo0 = firstPi.pos?.[0] || {};
-    const piNum    = firstPi.pi_number || salesPg.piNum || order.order_id + '-SPI';
+    const piNum    = firstPi.pi_number || salesPg.piNum || (order.order_id || 'SUMMARY') + '-SPI';
     const piDate   = firstPi.pi_date   || salesPg.piDate || order.created_at?.slice(0,10) || '';
-    const buyer    = salesPg.buyer || firstPo0.sharedBuyer || firstPo0.endBuyer || intake.pos?.[0]?.endBuyer || '';
-    const custName = salesPg.customer || intake.customer || order.customer_name || '';
-    const custAddr = salesPg.buyerAddress || firstPo0.sharedBuyerAddress || '';
+    const buyer    = (usingSelection ? (firstPo0.sharedBuyer || firstPo0.buyer || firstPo0.endBuyer) : (salesPg.buyer || firstPo0.sharedBuyer || firstPo0.endBuyer || intake.pos?.[0]?.endBuyer)) || '';
+    const custName = (usingSelection ? firstPi.customer : (salesPg.customer || intake.customer || order.customer_name)) || '';
+    const custAddr = (usingSelection ? firstPo0.sharedBuyerAddress : (salesPg.buyerAddress || firstPo0.sharedBuyerAddress)) || '';
 
     let totalQty = 0, totalVal = 0;
     const piRows = [];
@@ -459,6 +472,18 @@ window.onOrderLoad = (function(_prev) {
         }
     };
 })(window.onOrderLoad);
+
+// Cross-order Summary: render immediately from the picked PIs — this path doesn't
+// depend on an order being auto-loaded.
+document.addEventListener('DOMContentLoaded', function () {
+    if (Array.isArray(window._mspiSelectionPis) && window._mspiSelectionPis.length) {
+        renderSummaryPi();
+        if (atsShouldAutoExcel() && !_mspiExcelDone) {
+            _mspiExcelDone = true;
+            setTimeout(downloadSummaryPiExcel, 250);
+        }
+    }
+});
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

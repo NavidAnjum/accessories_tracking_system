@@ -647,6 +647,24 @@ function toggleMktPiCard(id) {
     if (arrow) arrow.textContent = open ? '?' : '?';
 }
 
+// API auth failures redirect to login.php (HTML); a server error may return an
+// HTML page too. Detect that so the user sees the real cause, not "Unexpected
+// token '<'". Returns the parsed JSON or throws a clear Error.
+async function mktReadJson(response) {
+    if (response.redirected && /\/login\.php/i.test(response.url || '')) {
+        throw new Error('Your session has expired on the server. Please refresh the page and sign in again.');
+    }
+    const text = await response.text();
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        if (/login\.php|<!doctype|<html/i.test(text)) {
+            throw new Error('Your session has expired on the server. Please refresh the page and sign in again.');
+        }
+        throw new Error('Server error ' + response.status + ': ' + text.slice(0, 200));
+    }
+}
+
 async function approvePiAndReturnToPi() {
     const orderId  = window.getCurrentOrderId();
     const pageName = 'marketing';
@@ -674,13 +692,13 @@ async function approvePiAndReturnToPi() {
                 approvedAt: new Date().toISOString(),
             }),
         });
-        const approvalJson = await approvalRes.json();
+        const approvalJson = await mktReadJson(approvalRes);
         if (!approvalRes.ok || approvalJson.error) {
             throw new Error(approvalJson.error || 'Marketing approval could not be saved.');
         }
         // Marketing approval returns the order to PI so Commercial can print/create Summary/Master PI.
         const orderRes = await fetch(APP_BASE + '/api/orders.php?id=' + encodeURIComponent(orderId) + '&step=sales', { method: 'PUT' });
-        const orderJson = await orderRes.json();
+        const orderJson = await mktReadJson(orderRes);
         if (!orderRes.ok || orderJson.error) {
             throw new Error(orderJson.error || 'Order could not be returned to PI.');
         }
