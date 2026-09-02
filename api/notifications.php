@@ -84,6 +84,35 @@ function canSeeCommercialPiWorklist(string $role): bool
     return in_array($role, ['admin', 'commercial', 'commercial_dept'], true);
 }
 
+function normalizeNotificationCustomer(string $name): string
+{
+    return strtolower(trim(preg_replace('/\s+/', ' ', (string)$name)));
+}
+
+function isBlockedNotificationCustomer(string $name): bool
+{
+    static $blocked = null;
+    if ($blocked === null) {
+        $blocked = array_map(
+            static fn($value) => normalizeNotificationCustomer($value),
+            [
+                'Noman Terry Towel Mills Limited',
+                'R S TRADERS',
+                'Zaber & Zubair Fabrics Ltd. - Home',
+                'Zakaria Enterprise',
+                'Nice Denim Mills Ltd. ( Solid Dyeing Fabrics )',
+                'Sufia Cotton Mills Limited-(Spinning) (Saad Group)',
+                'Noman Fashion Fabrics Limited',
+                'Noman Textile Mills Limited',
+                'Noman Fabrics Limited - Unit-2',
+                'Nice Fabrics Processing Ltd. - 2'
+            ]
+        );
+    }
+
+    return in_array(normalizeNotificationCustomer($name), $blocked, true);
+}
+
 function summarizeSalesPageForCommercial(?string $salesJson, array $order = []): array
 {
     $summary = [
@@ -166,6 +195,9 @@ try {
                 $erpOrderNo = (string)$erpRow['sale_order_no'];
                 $po = trim((string)($erpRow['customer_po_no'] ?? ''));
                 $customer = trim((string)($erpRow['customer_name'] ?? ''));
+                if (isBlockedNotificationCustomer($customer)) {
+                    continue;
+                }
                 $itemSummary = summarizeErpNotificationItems($erpRow['snapshot_json'] ?? '');
                 $items[] = [
                     'id' => 'erp:' . $erpOrderNo,
@@ -313,9 +345,9 @@ try {
         $erpItems = [];
         $erpPendingCount = 0;
         $seenErpOrders = [];
-        foreach ($items as $item) {
-            if (($item['type'] ?? '') === 'erp_order') {
-                $seenErpOrders[(string)($item['erp_order_no'] ?? $item['order_id'] ?? '')] = true;
+            foreach ($items as $item) {
+                if (($item['type'] ?? '') === 'erp_order') {
+                    $seenErpOrders[(string)($item['erp_order_no'] ?? $item['order_id'] ?? '')] = true;
             }
         }
         if (canManageErpOrderInbox($userRole)) {
@@ -335,6 +367,9 @@ try {
                 if (isset($seenErpOrders[$erpOrderNo])) continue;
                 $po = trim((string)($erpRow['customer_po_no'] ?? ''));
                 $customer = trim((string)($erpRow['customer_name'] ?? ''));
+                if (isBlockedNotificationCustomer($customer)) {
+                    continue;
+                }
                 $itemSummary = summarizeErpNotificationItems($erpRow['snapshot_json'] ?? '');
                 $erpItems[] = [
                     'id' => 'erp:' . $erpOrderNo,
@@ -371,11 +406,20 @@ try {
         usort($items, static function (array $a, array $b): int {
             return strcmp((string)($b['created_at'] ?? ''), (string)($a['created_at'] ?? ''));
         });
+        $items = array_values(array_filter($items, static function (array $item): bool {
+            return !isBlockedNotificationCustomer((string)($item['customer_name'] ?? ''));
+        }));
+        $unreadCount = 0;
+        foreach ($items as $item) {
+            if (empty($item['is_read'])) {
+                $unreadCount++;
+            }
+        }
         if (!$full) $items = array_slice($items, 0, $limit);
 
         echo json_encode([
             'ok' => true,
-            'unreadCount' => $activeCount + $erpPendingCount,
+            'unreadCount' => $unreadCount,
             'activeCount' => count($items),
             'items' => $items,
         ]);

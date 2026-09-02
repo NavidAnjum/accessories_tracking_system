@@ -13,7 +13,6 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <div class="page-actions-right" style="display:flex;gap:10px;align-items:center;">
             <button type="button" class="ghost-btn" id="notifRefreshBtn">Refresh</button>
-            <button type="button" class="primary-btn" id="notifMarkAllBtn">Mark All Read</button>
         </div>
     </div>
 
