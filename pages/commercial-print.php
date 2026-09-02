@@ -497,9 +497,7 @@ function ciBuildPages() {
             <div class="ci-footnote">${ciEsc(applicantsText)}</div>
 
             <div class="ci-sign-block">
-                <div><strong>For ${ciEsc(CI_COMPANY_NAME)}</strong></div>
-                <div class="ci-sign-line"></div>
-                <div>Authorized signature</div>
+                <img src="<?= BASE_PATH ?>/AKM.png" alt="For Zaber & Zubair Accessories Ltd. — Authorised Signature" style="height:100px;max-width:300px;object-fit:contain;display:block;">
             </div>
 
             ${CI_BRAND_FOOTER}

@@ -65,6 +65,11 @@ include __DIR__ . '/../includes/header.php';
                                 </tbody>
                             </table>
                         </div>
+                        <div class="packing-footer" style="margin-top:28px;">
+                            <div class="packing-sign">
+                                <img src="<?= BASE_PATH ?>/AKM.png" alt="For Zaber & Zubair Accessories Ltd. — Authorised Signature" style="height:100px;max-width:300px;object-fit:contain;display:block;">
+                            </div>
+                        </div>
                     </div>
 
                     <div class="page-actions">

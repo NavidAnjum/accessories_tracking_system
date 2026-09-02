@@ -93,9 +93,7 @@ include __DIR__ . '/../includes/header.php';
 
                         <div class="packing-footer">
                             <div class="packing-sign">
-                                <div class="signature-image" aria-hidden="true"></div>
-                                <strong>For <span id="deliveryFooterCompany">—</span></strong>
-                                <span>Authorized signature</span>
+                                <img src="<?= BASE_PATH ?>/AKM.png" alt="For Zaber & Zubair Accessories Ltd. — Authorised Signature" style="height:100px;max-width:300px;object-fit:contain;display:block;">
                             </div>
                             <div class="packing-sign">
                                 <div class="signature-image" aria-hidden="true"></div>

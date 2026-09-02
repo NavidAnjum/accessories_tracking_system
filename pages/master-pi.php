@@ -127,7 +127,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 /* Signatures */
 .mpi-sig-area { margin-top:36px; }
 .mpi-sig-bottom {
-    display:flex; justify-content:space-between;
+    display:flex; justify-content:space-between; align-items:flex-end;
     padding-top:6px; margin-top:160px;
 }
 .mpi-sig-bottom-label { font-size:7.5pt; font-weight:700; }
@@ -265,7 +265,10 @@ html.pi-preview .mpi-ctrl {
         <div class="mpi-sig-area" id="mpiSigArea">
             <div class="mpi-sig-bottom">
                 <div class="mpi-sig-bottom-label">SIGNATURE OF BUYER</div>
-                <div class="mpi-sig-bottom-label">SIGNATURE OF SELLER</div>
+                <div class="mpi-sig-bottom-label" style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+                <img src="<?= BASE_PATH ?>/AKM.png" alt="Authorised Signature" style="height:75px;max-width:270px;object-fit:contain;">
+                <span>SIGNATURE OF SELLER</span>
+            </div>
             </div>
         </div>
 
@@ -288,7 +291,10 @@ html.pi-preview .mpi-ctrl {
     <div class="mpi-sig-area" style="margin-top:28mm;">
         <div class="mpi-sig-bottom">
             <div class="mpi-sig-bottom-label">SIGNATURE OF BUYER</div>
-            <div class="mpi-sig-bottom-label">SIGNATURE OF SELLER</div>
+            <div class="mpi-sig-bottom-label" style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+                <img src="<?= BASE_PATH ?>/AKM.png" alt="Authorised Signature" style="height:75px;max-width:270px;object-fit:contain;">
+                <span>SIGNATURE OF SELLER</span>
+            </div>
         </div>
     </div>
     <?= zzal_print_brand_footer() ?>

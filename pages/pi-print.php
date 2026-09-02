@@ -177,7 +177,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
             </div>
             <div class="pi-sig-box" style="text-align:right;">
                 <div class="pi-sig-line" style="margin-left:auto;margin-right:0;margin-top:40px;"></div>
-                <div class="pi-sig-label">Authorised Signature</div>
+                <img src="<?= BASE_PATH ?>/AKM.png" alt="For Zaber & Zubair Accessories Ltd. — Authorised Signature" style="height:70px;max-width:240px;object-fit:contain;display:block;margin:0 0 1px auto;">
             </div>
         </div>
     </div>
@@ -204,7 +204,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
             </div>
             <div class="pi-sig-box" style="text-align:right;">
                 <div class="pi-sig-line" style="margin-left:auto;margin-right:0;margin-top:40px;"></div>
-                <div class="pi-sig-label">Authorised Signature</div>
+                <img src="<?= BASE_PATH ?>/AKM.png" alt="For Zaber & Zubair Accessories Ltd. — Authorised Signature" style="height:70px;max-width:240px;object-fit:contain;display:block;margin:0 0 1px auto;">
             </div>
         </div>
         </div>

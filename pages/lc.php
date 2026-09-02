@@ -409,13 +409,19 @@ window.onOrderLoad = (function(_prev) {
     return function(res) {
         if (typeof _prev === 'function') _prev(res);
 
-        // Guard: warn if the order hasn't been approved by Marketing yet (step is before LC).
+        // Guard: warn only if Marketing hasn't approved the PI yet. The order is
+        // returned to the Sales step after approval, so checking step position
+        // alone would wrongly flag an approved order as "awaiting approval".
         const WF = ['marketing-intake','costing-review','sales','marketing','lc','exchange','commercial','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding','po-status'];
         const step = res.order?.current_step || '';
+        const marketingSnap = res.pages?.marketing || {};
+        const marketingApproved = marketingSnap.marketingApproved === true
+            || marketingSnap.marketingApproved === 'true'
+            || marketingSnap.piApprovalStatus === 'approved';
         const notice = document.getElementById('lcApprovalNotice');
         if (notice) {
             const idx = WF.indexOf(step);
-            notice.style.display = (idx > -1 && idx < WF.indexOf('lc')) ? 'block' : 'none';
+            notice.style.display = (!marketingApproved && idx > -1 && idx < WF.indexOf('lc')) ? 'block' : 'none';
         }
 
         // Restore the UP table from the saved LC page snapshot

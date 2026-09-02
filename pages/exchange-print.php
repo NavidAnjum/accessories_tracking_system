@@ -536,8 +536,7 @@ function renderBoePages() {
                         </div>
                     </div>
                     <div class="boe-sign">
-                        <div class="boe-sign-line"></div>
-                        <div class="boe-sign-label">Authorized signature</div>
+                        <img src="<?= BASE_PATH ?>/AKM.png" alt="For Zaber & Zubair Accessories Ltd. — Authorised Signature" style="height:100px;max-width:300px;object-fit:contain;display:block;margin-left:auto;">
                     </div>
                 </div>
                 </div>
