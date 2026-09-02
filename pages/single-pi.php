@@ -335,6 +335,9 @@ html.pi-preview .spi-ctrl {
 let _spiOrderData = null;
 let _spiExcelDone = false;
 
+// PI number → safe file name, e.g. "ZZAL/PI/26/2" → "ZZAL-PI-26-2"
+function spiFileName(piNum){ return String(piNum || 'PI').replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'PI'; }
+
 /* ── Number to words ─────────────────────────────────────────── */
 function spiNumWords(n) {
     const amount = parseFloat(n || 0) || 0;
@@ -439,6 +442,7 @@ function renderSinglePi() {
     const piNum  = pi.pi_number || salesPg.piNum  || order.order_id + '-PI';
     const piDate = pi.pi_date   || salesPg.piDate || order.created_at?.slice(0,10) || '';
     document.getElementById('spiNum').textContent  = piNum;
+    document.title = spiFileName(piNum); // Save-as-PDF / print default file name
     document.getElementById('spiDate').textContent = spiFormatDate(piDate);
     document.getElementById('spiContNum').textContent  = piNum;
     document.getElementById('spiContDate').textContent = spiFormatDate(piDate);
@@ -628,7 +632,7 @@ async function downloadSinglePiExcel() {
         const blob = await resp.blob();
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'single-pi-' + payload.orderId + '.xls';
+        a.download = spiFileName(piNum) + '.xls';
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     } catch(e) { alert('Excel export failed.'); }
 }

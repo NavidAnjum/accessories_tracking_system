@@ -448,6 +448,7 @@ function renderMasterPi() {
     const masterPiNum = firstPi.pi_number || order.order_id + '-MPI';
     const masterPiDate = mpiFormatDate(firstPi.pi_date || salesPg.piDate || order.created_at?.slice(0,10) || '');
     document.getElementById('mpiNum').textContent  = masterPiNum;
+    document.title = mpiFileName(masterPiNum); // Save-as-PDF / print default file name
     document.getElementById('mpiDate').textContent = masterPiDate;
     document.getElementById('mpiContNum').textContent  = masterPiNum;
     document.getElementById('mpiContDate').textContent = masterPiDate;
@@ -550,6 +551,7 @@ function renderMasterPiFromCustom(groups, res) {
     const customPiNum = firstGrp.piNumber || firstPi.pi_number || order.order_id + '-MPI';
     const customPiDate = mpiFormatDate(firstPi.pi_date || salesPg.piDate || '');
     document.getElementById('mpiNum').textContent  = customPiNum;
+    document.title = mpiFileName(customPiNum); // Save-as-PDF / print default file name
     document.getElementById('mpiDate').textContent = customPiDate;
     document.getElementById('mpiContNum').textContent  = customPiNum;
     document.getElementById('mpiContDate').textContent = customPiDate;
@@ -616,10 +618,12 @@ function renderMasterPiFromCustom(groups, res) {
     mpiRenderTerms(terms);
 }
 
+// PI number → safe file name, e.g. "ZZAL/PI/26/2" → "ZZAL-PI-26-2"
+function mpiFileName(piNum){ return String(piNum || 'PI').replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'PI'; }
 function downloadMasterPiExcel() {
     atsDownloadExcelFromElement({
         elementId:'mpiDocument',
-        filename:'master-pi-'+((window.getCurrentOrderId && window.getCurrentOrderId()) || 'document'),
+        filename: document.title || 'master-pi',
         title:document.title
     });
 }

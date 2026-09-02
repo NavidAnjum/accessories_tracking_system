@@ -251,6 +251,9 @@ html.pi-preview .mspi-ctrl {
 let _mspiOrderData = null;
 let _mspiExcelDone = false;
 
+// PI number → safe file name, e.g. "ZZAL/PI/26/2" → "ZZAL-PI-26-2"
+function mspiFileName(piNum){ return String(piNum || 'PI').replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'PI'; }
+
 /* ── Helpers ─────────────────────────────────────────────────── */
 function mspiNumWords(n) {
     const amount = parseFloat(n || 0) || 0;
@@ -338,6 +341,7 @@ function renderSummaryPi() {
     const piNum   = firstPi.pi_number || salesPg.piNum || (order.order_id || '') + '-SPI';
     const piDate  = firstPi.pi_date   || salesPg.piDate || order.created_at?.slice(0,10) || '';
     document.getElementById('mspiNum').textContent  = piNum;
+    document.title = mspiFileName(piNum); // Save-as-PDF / print default file name
     document.getElementById('mspiDate').textContent = mspiFormatDate(piDate);
     const contNumEl = document.getElementById('mspiContNum');
     const contDateEl = document.getElementById('mspiContDate');
@@ -458,7 +462,7 @@ async function downloadSummaryPiExcel() {
         const blob = await resp.blob();
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'summary-pi-' + payload.orderId + '.xls';
+        a.download = mspiFileName(piNum) + '.xls';
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     } catch(e) { alert('Excel export failed.'); }
 }

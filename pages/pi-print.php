@@ -310,6 +310,7 @@ function renderPi() {
     const custAddr = salesPage.buyerAddress     || intake.address            || '';
 
     document.getElementById('piDocNum').textContent   = piNum;
+    document.title = String(piNum || 'PI').replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'PI';
     document.getElementById('piDocDate').textContent  = displayDate;
     document.getElementById('piContDocNum').textContent   = piNum;
     document.getElementById('piContDocDate').textContent  = displayDate;
