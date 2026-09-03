@@ -284,6 +284,55 @@ include __DIR__ . '/../includes/header.php';
 .um-input { width: 100%; padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 9px; font-size: 13px; outline: none; box-sizing: border-box; transition: border-color .15s; }
 .um-input:focus { border-color: #6366f1; }
 .um-modal-actions { display: flex; gap: 10px; margin-top: 22px; }
+
+@media screen and (max-width: 760px) {
+    .um-topbar {
+        align-items: stretch;
+        margin-bottom: 18px;
+    }
+    .um-topbar > button {
+        width: 100%;
+    }
+    .um-stats-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 22px;
+    }
+    .um-sig-grid {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+    }
+    .um-modal-shell {
+        align-items: flex-start;
+        justify-content: center;
+        overflow: auto;
+        padding: 12px;
+    }
+    .um-modal-card {
+        max-width: 100%;
+        max-height: calc(100vh - 24px);
+        overflow: auto;
+        padding: 22px 18px;
+        border-radius: 14px;
+    }
+    .um-modal-actions {
+        flex-direction: column;
+    }
+    .um-modal-actions > * {
+        width: 100%;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .um-stats-row,
+    .um-sig-grid {
+        grid-template-columns: 1fr;
+    }
+    .um-sig-actions {
+        flex-direction: column;
+    }
+}
 </style>
 
 <div style="padding: 4px 0 8px;">

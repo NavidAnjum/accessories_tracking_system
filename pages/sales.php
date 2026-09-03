@@ -210,6 +210,257 @@ include __DIR__ . '/../includes/header.php';
     border-radius: 6px; transition: background .15s;
 }
 .si-del-btn:hover { background: #fee2e2; }
+
+/* Responsive sales layout */
+#piContent,
+#noOrderPrompt {
+    width: 100%;
+    max-width: 100%;
+}
+#piContent {
+    min-width: 0;
+}
+.pi-summary-bar > div {
+    min-width: 0;
+}
+.pi-summary-bar > div:last-child {
+    margin-left: auto;
+}
+.mpi-bar > div:last-child {
+    min-width: 0;
+    justify-content: flex-end;
+}
+.pi-type-lbl {
+    white-space: nowrap;
+}
+.pi-hdr-card,
+.po-block,
+.order-pi-overview,
+#summaryBuilder,
+#masterPiSelectedPanel,
+#salesTermsBox {
+    max-width: 100%;
+}
+.po-block {
+    min-width: 0;
+}
+.po-block-hdr > div {
+    min-width: 0;
+}
+.po-block-hdr span[id^="poLabel_"] {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.erp-search-row {
+    min-width: 0;
+}
+.erp-search-row input {
+    min-width: 180px;
+}
+.si-table {
+    min-width: 760px;
+}
+.si-table th:nth-child(1),
+.si-table td:nth-child(1) { width: 42px; }
+.si-table th:nth-child(2),
+.si-table td:nth-child(2) { min-width: 260px; }
+.si-table th:nth-child(3),
+.si-table td:nth-child(3),
+.si-table th:nth-child(4),
+.si-table td:nth-child(4),
+.si-table th:nth-child(5),
+.si-table td:nth-child(5),
+.si-table th:nth-child(6),
+.si-table td:nth-child(6) { min-width: 96px; }
+.si-table td input {
+    min-width: 0;
+}
+.opo-title {
+    flex-wrap: wrap;
+}
+.opo-row {
+    min-width: 0;
+}
+.opo-meta,
+.opo-num {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.opo-items-wrap {
+    overflow-x: auto;
+}
+.opo-item-hdr,
+.opo-item-row {
+    min-width: 680px;
+}
+.mpi-grp {
+    overflow-x: auto;
+}
+.mpi-item-row {
+    min-width: 620px;
+}
+#mpiBasket {
+    min-width: 0;
+}
+#salesTermsBox {
+    overflow-wrap: anywhere;
+}
+.term-sel {
+    max-width: 100%;
+}
+.mpi-modal-shell {
+    padding: 14px;
+}
+.mpi-modal {
+    max-width: min(780px, calc(100vw - 28px));
+}
+
+@media (max-width: 1180px) {
+    .pi-summary-bar {
+        gap: 18px;
+        padding: 14px 18px;
+    }
+    .mpi-bar {
+        align-items: flex-start;
+    }
+    .mpi-bar > div:last-child {
+        flex: 1 1 520px;
+    }
+    .pi-hdr-card,
+    .po-block-body,
+    #summaryBuilder,
+    #masterPiSelectedPanel {
+        padding: 16px;
+    }
+    #piContent .form-grid {
+        gap: 12px;
+    }
+}
+
+@media (max-width: 980px) {
+    .pi-summary-bar {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .pi-summary-bar > div:last-child {
+        margin-left: 0;
+        text-align: left;
+    }
+    .mpi-bar {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+    .mpi-bar > div:last-child {
+        justify-content: flex-start;
+    }
+    .po-block-hdr {
+        align-items: flex-start;
+    }
+    .erp-search-row {
+        flex-wrap: wrap;
+    }
+    .erp-search-row input {
+        flex: 1 1 320px;
+    }
+}
+
+@media (max-width: 760px) {
+    .pi-summary-bar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .pi-sum-badge {
+        justify-content: center;
+    }
+    .pi-sum-item {
+        text-align: left;
+    }
+    .mpi-bar-left {
+        align-items: flex-start;
+    }
+    .mpi-bar > div:last-child,
+    .erp-search-row,
+    #piContent .page-actions-left,
+    #piContent .page-actions-right {
+        width: 100%;
+    }
+    .mpi-bar > div:last-child > *,
+    .erp-search-row > *,
+    #piContent .page-actions-left > *,
+    #piContent .page-actions-right > * {
+        flex: 1 1 100%;
+    }
+    .pi-type-lbl {
+        justify-content: center;
+    }
+    .po-block-hdr {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+    .po-block-hdr > div:last-child {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+    .opo-row {
+        align-items: flex-start;
+    }
+    .opo-val {
+        width: 100%;
+    }
+    #mpiBasket {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 8px;
+    }
+    .mpi-basket-btn {
+        margin-left: 0;
+        width: 100%;
+    }
+    .mpi-modal-head,
+    .mpi-modal-body,
+    .mpi-modal-foot {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+    .mpi-modal-foot {
+        flex-direction: column-reverse;
+    }
+    .mpi-modal-foot > button {
+        width: 100%;
+    }
+}
+
+@media (max-width: 520px) {
+    .pi-summary-bar {
+        grid-template-columns: 1fr;
+        border-radius: 12px;
+    }
+    .pi-sum-badge,
+    .pi-sum-item,
+    .pi-summary-bar > div:last-child {
+        text-align: left;
+        justify-content: flex-start;
+    }
+    .pi-hdr-card,
+    .po-block-body,
+    .order-pi-overview,
+    #summaryBuilder,
+    #masterPiSelectedPanel {
+        padding: 14px;
+        border-radius: 12px;
+    }
+    #salesTermsBox {
+        padding: 14px 16px !important;
+        font-size: 9.5pt !important;
+    }
+    #salesTermsList {
+        padding-left: 20px !important;
+    }
+    .term-sel {
+        width: 100%;
+        margin: 3px 0;
+    }
+}
 </style>
 
 <!-- No-order prompt (shown when no order loaded) -->

@@ -836,6 +836,34 @@ select.field-input { appearance:auto; }
     align-items:center; justify-content:center; transition:background .15s;
 }
 .cp-rm-row-btn:hover { background:#fecaca; }
+
+@media screen and (max-width: 760px) {
+    .cp-search-form {
+        align-items: stretch;
+    }
+    .cp-search-input,
+    .cp-search-form > * {
+        width: 100%;
+    }
+    .cp-list-table {
+        min-width: 760px;
+    }
+    .cp-modal-shell {
+        align-items: flex-start;
+        overflow: auto;
+        padding: 12px;
+    }
+    .cp-modal-card {
+        max-width: 100%;
+        max-height: calc(100vh - 24px);
+        overflow: auto;
+        padding: 18px;
+        border-radius: 12px;
+    }
+    .cp-detail-grid {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 
 <script>

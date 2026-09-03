@@ -123,21 +123,22 @@ include __DIR__ . '/../includes/header.php';
     display:block; font-size:10px; color:#94a3b8; text-transform:uppercase; margin-bottom:2px;
 }
 .mkt-review-panel {
-    margin:18px 0;
-    border:1.5px solid #dbe4ff;
-    border-radius:16px;
+    margin:0;
+    border:0;
+    border-radius:0;
     overflow:hidden;
-    background:#f8faff;
+    background:#fff;
 }
 .mkt-review-head {
     display:flex;
     align-items:center;
-    justify-content:space-between;
+    justify-content:flex-end;
     gap:16px;
-    padding:16px 18px;
-    border-bottom:1.5px solid #e0e7ff;
+    padding:0 0 12px;
+    border-bottom:0;
     background:#fff;
 }
+.mkt-review-head > div:first-child { display:none; }
 .mkt-review-head h3 { margin:0 0 4px; font-size:18px; color:#111827; }
 .mkt-review-head p { margin:0; color:#64748b; font-size:13px; }
 .mkt-review-actions { display:flex; gap:10px; flex-wrap:wrap; }
@@ -145,8 +146,15 @@ include __DIR__ . '/../includes/header.php';
     display:block;
     width:100%;
     min-height:760px;
-    border:0;
-    background:#d1d5db;
+    border:1px solid #d9e1ea;
+    background:#f8fafc;
+}
+.mkt-pi-scroll {
+    width:100%;
+    max-width:100%;
+    min-width:0;
+    overflow:auto;
+    -webkit-overflow-scrolling:touch;
 }
 .mkt-review-note {
     padding:12px 18px;
@@ -155,10 +163,51 @@ include __DIR__ . '/../includes/header.php';
     border-top:1px solid #e0e7ff;
     background:#eef4ff;
 }
+[data-page="marketing"] > .section-head,
+[data-page="marketing"] > .source-glance,
+.mkt-summary,
+.mkt-review-note {
+    display:none !important;
+}
 @media (max-width: 900px) {
     .mkt-sales-grid, .mkt-sales-po-meta { grid-template-columns:1fr; }
-    .mkt-review-head { align-items:flex-start; flex-direction:column; }
-    .mkt-pi-frame { min-height:620px; }
+    .mkt-review-head {
+        align-items:stretch;
+        flex-direction:column;
+        padding:0 0 10px;
+    }
+    .mkt-review-actions,
+    .mkt-review-actions .ghost-btn {
+        width:100%;
+    }
+    .mkt-review-actions .ghost-btn {
+        text-align:center;
+    }
+    /* Scale the fixed A4 PI to fit the phone width (no horizontal scroll). */
+    .mkt-pi-scroll {
+        position:relative;
+        overflow:hidden;
+        contain:inline-size;
+    }
+    .mkt-pi-frame {
+        position:absolute;
+        inset:0 auto auto 0;
+        width:794px;               /* A4 width @96dpi */
+        height:1123px;             /* A4 height */
+        min-height:0;
+        max-width:none;
+        transform-origin:top left;
+        transform:scale(var(--mkt-pi-scale, 1));
+    }
+    [data-page="marketing"] {
+        padding-top:12px;
+    }
+}
+@media (max-width: 640px) {
+    [data-page="marketing"] {
+        padding-left:10px;
+        padding-right:10px;
+    }
 }
 </style>
 
@@ -221,10 +270,11 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="mkt-review-actions">
                 <a class="ghost-btn" id="mktOpenPiBtn" href="#" target="_blank" rel="noopener">Open Printable PI</a>
-                <button type="button" class="secondary-btn" id="mktPrintPiBtn" onclick="printMarketingPi()">Print PI</button>
             </div>
         </div>
-        <iframe id="mktPiPreview" class="mkt-pi-frame" title="Submitted PI Preview"></iframe>
+        <div class="mkt-pi-scroll">
+            <iframe id="mktPiPreview" class="mkt-pi-frame" title="Submitted PI Preview"></iframe>
+        </div>
         <div class="mkt-review-note">After checking the PI, approve it to send the work order back to PI for printing and Summary/Master PI work.</div>
     </div>
     <div class="page-actions">
@@ -405,7 +455,53 @@ function setMarketingPiPreview(orderId, salesData) {
     const embedUrl = marketingPiUrl(orderId, salesData, true);
     if (frame.getAttribute('src') !== embedUrl) frame.src = embedUrl;
     if (openBtn) openBtn.href = marketingPiUrl(orderId, salesData, false);
+    frame.addEventListener('load', mktScheduleFit, { once: true });
+    mktScheduleFit();
 }
+
+// On phones, scale the fixed-width A4 PI iframe down so the whole page fits the
+// screen (no horizontal scrolling / cut-off). On desktop it stays full width.
+// Screen-agnostic: driven by a ResizeObserver so it re-fits on any resize/rotate.
+function mktFitPreview() {
+    const scroll = document.querySelector('.mkt-pi-scroll');
+    const frame  = document.getElementById('mktPiPreview');
+    if (!scroll || !frame) return;
+    const A4_W = 794, A4_H = 1123;
+    const width = scroll.getBoundingClientRect().width || scroll.clientWidth || 0;
+    if (width <= 0) return; // not laid out yet
+    if (window.innerWidth <= 900) {
+        const scale = Math.max(0.1, Math.min(1, width / A4_W));
+        frame.style.setProperty('--mkt-pi-scale', scale);
+        scroll.style.height = (A4_H * scale) + 'px';
+    } else {
+        frame.style.removeProperty('--mkt-pi-scale');
+        scroll.style.height = '';
+    }
+}
+
+// Recompute now, next frame, and shortly after — catches late layout/reflow.
+function mktScheduleFit() {
+    mktFitPreview();
+    requestAnimationFrame(mktFitPreview);
+    setTimeout(mktFitPreview, 250);
+}
+
+(function mktInitPreviewFit() {
+    const start = function () {
+        mktScheduleFit();
+        const scroll = document.querySelector('.mkt-pi-scroll');
+        if (scroll && window.ResizeObserver) {
+            new ResizeObserver(function () { mktFitPreview(); }).observe(scroll);
+        }
+        window.addEventListener('resize', mktFitPreview);
+        window.addEventListener('orientationchange', mktScheduleFit);
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+    } else {
+        start();
+    }
+})();
 
 function printMarketingPi() {
     const frame = document.getElementById('mktPiPreview');

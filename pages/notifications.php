@@ -12,7 +12,10 @@ include __DIR__ . '/../includes/header.php';
             <h2>Notification Worklist</h2>
         </div>
         <div class="page-actions-right" style="display:flex;gap:10px;align-items:center;">
-            <button type="button" class="ghost-btn" id="notifRefreshBtn">Refresh</button>
+            <span id="notifLiveStatus" style="display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid #dbeafe;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:13px;font-weight:800;">
+                <span style="width:8px;height:8px;border-radius:999px;background:#22c55e;"></span>
+                Live
+            </span>
         </div>
     </div>
 
@@ -47,6 +50,22 @@ include __DIR__ . '/../includes/header.php';
             <span style="display:block;margin-bottom:6px;font-size:11px;font-weight:800;text-transform:uppercase;color:#64748b;">Sales Person</span>
             <input type="search" id="notifSearchSalesPerson" class="form-control" placeholder="Search sales person">
         </label>
+    </div>
+
+    <div id="notifBlockedCustomerPanel" style="display:none;margin-bottom:16px;padding:14px 16px;border:1.5px solid #e0e7ff;border-radius:14px;background:#fff;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+            <div>
+                <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6366f1;">Hidden Customers</div>
+                <div style="font-size:13px;color:#64748b;margin-top:2px;">ERP notifications for these customers are hidden from Commercial worklists.</div>
+            </div>
+            <button type="button" class="ghost-btn" id="notifBlockedRefreshBtn" style="padding:7px 12px;font-size:12px;">Refresh</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+            <input type="text" id="notifBlockedCustomerInput" class="form-control" placeholder="Customer name to hide" style="flex:1;min-width:240px;">
+            <button type="button" class="primary-btn" id="notifBlockedAddBtn">Add Customer</button>
+        </div>
+        <div id="notifBlockedMsg" style="min-height:16px;font-size:12px;color:#64748b;margin-bottom:8px;"></div>
+        <div id="notifBlockedCustomerList" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
     </div>
 
     <div class="packing-items-wrap">
@@ -96,6 +115,9 @@ const NOTIF_STEP_PAGE_MAP = {
 };
 
 let notifItems = [];
+let notifBlockedCustomers = [];
+let notifLoading = false;
+let notifAutoRefreshTimer = null;
 
 function notifEscape(s) {
     return String(s || '')
@@ -183,17 +205,136 @@ function renderNotificationWorklist() {
     `).join('');
 }
 
-async function loadNotificationWorklist() {
+function setNotifLiveStatus(text, tone = 'live') {
+    const status = document.getElementById('notifLiveStatus');
+    if (!status) return;
+    const dotColor = tone === 'error' ? '#ef4444' : (tone === 'loading' ? '#f59e0b' : '#22c55e');
+    status.innerHTML = `<span style="width:8px;height:8px;border-radius:999px;background:${dotColor};"></span>${notifEscape(text)}`;
+}
+
+async function loadNotificationWorklist(silent = false) {
+    if (notifLoading) return;
+    notifLoading = true;
     const body = document.getElementById('notifTableBody');
     const unreadEl = document.getElementById('notifUnreadCount');
+    if (!silent) setNotifLiveStatus('Updating...', 'loading');
     try {
         const res = await fetch(APP_BASE + '/api/notifications.php?full=1');
         const json = await res.json();
         notifItems = json.items || [];
         unreadEl.textContent = String(notifItems.length);
         renderNotificationWorklist();
+        setNotifLiveStatus('Live', 'live');
     } catch (e) {
         body.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#dc2626;padding:28px;">Could not load notifications.</td></tr>';
+        setNotifLiveStatus('Offline', 'error');
+    } finally {
+        notifLoading = false;
+    }
+}
+
+function renderBlockedCustomers() {
+    const list = document.getElementById('notifBlockedCustomerList');
+    if (!list) return;
+    if (!notifBlockedCustomers.length) {
+        list.innerHTML = '<span style="font-size:12px;color:#94a3b8;">No hidden customers yet.</span>';
+        return;
+    }
+    list.innerHTML = notifBlockedCustomers.map(customer => `
+        <span style="display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:12px;font-weight:700;">
+            ${notifEscape(customer.customer_name || '')}
+            <button type="button"
+                    title="Remove"
+                    onclick="removeBlockedCustomer(${Number(customer.id || 0)})"
+                    style="border:none;background:#fff;color:#dc2626;border-radius:999px;width:20px;height:20px;line-height:18px;cursor:pointer;font-weight:800;">x</button>
+        </span>
+    `).join('');
+}
+
+async function loadBlockedCustomers() {
+    const panel = document.getElementById('notifBlockedCustomerPanel');
+    const msg = document.getElementById('notifBlockedMsg');
+    try {
+        const res = await fetch(APP_BASE + '/api/notifications.php?blocked_customers=1');
+        if (res.status === 403) {
+            if (panel) panel.style.display = 'none';
+            return;
+        }
+        const json = await res.json();
+        if (!res.ok || json.error) throw new Error(json.error || 'Could not load hidden customers.');
+        notifBlockedCustomers = json.items || [];
+        if (panel) panel.style.display = 'block';
+        if (msg) msg.textContent = '';
+        renderBlockedCustomers();
+    } catch (e) {
+        if (panel) panel.style.display = 'block';
+        if (msg) {
+            msg.style.color = '#dc2626';
+            msg.textContent = e.message || 'Could not load hidden customers.';
+        }
+    }
+}
+
+async function addBlockedCustomer() {
+    const input = document.getElementById('notifBlockedCustomerInput');
+    const msg = document.getElementById('notifBlockedMsg');
+    const customer = String(input?.value || '').trim();
+    if (!customer) return;
+    if (msg) {
+        msg.style.color = '#64748b';
+        msg.textContent = 'Saving...';
+    }
+    try {
+        const res = await fetch(APP_BASE + '/api/notifications.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'add_blocked_customer', customer_name: customer })
+        });
+        const json = await res.json();
+        if (!res.ok || json.error) throw new Error(json.error || 'Could not add customer.');
+        notifBlockedCustomers = json.items || [];
+        if (input) input.value = '';
+        if (msg) {
+            msg.style.color = '#16a34a';
+            msg.textContent = 'Customer hidden from notifications.';
+        }
+        renderBlockedCustomers();
+        loadNotificationWorklist();
+    } catch (e) {
+        if (msg) {
+            msg.style.color = '#dc2626';
+            msg.textContent = e.message || 'Could not add customer.';
+        }
+    }
+}
+
+async function removeBlockedCustomer(id) {
+    const msg = document.getElementById('notifBlockedMsg');
+    if (!id) return;
+    if (msg) {
+        msg.style.color = '#64748b';
+        msg.textContent = 'Removing...';
+    }
+    try {
+        const res = await fetch(APP_BASE + '/api/notifications.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'remove_blocked_customer', id })
+        });
+        const json = await res.json();
+        if (!res.ok || json.error) throw new Error(json.error || 'Could not remove customer.');
+        notifBlockedCustomers = json.items || [];
+        if (msg) {
+            msg.style.color = '#16a34a';
+            msg.textContent = 'Customer removed from hidden list.';
+        }
+        renderBlockedCustomers();
+        loadNotificationWorklist();
+    } catch (e) {
+        if (msg) {
+            msg.style.color = '#dc2626';
+            msg.textContent = e.message || 'Could not remove customer.';
+        }
     }
 }
 
@@ -234,7 +375,20 @@ async function openNotificationStep(id, encodedOrderId, step, type, encodedErpOr
 
 document.addEventListener('DOMContentLoaded', function () {
     loadNotificationWorklist();
-    document.getElementById('notifRefreshBtn')?.addEventListener('click', loadNotificationWorklist);
+    loadBlockedCustomers();
+    notifAutoRefreshTimer = window.setInterval(() => loadNotificationWorklist(true), 15000);
+    window.addEventListener('focus', () => loadNotificationWorklist(true));
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) loadNotificationWorklist(true);
+    });
+    document.getElementById('notifBlockedRefreshBtn')?.addEventListener('click', loadBlockedCustomers);
+    document.getElementById('notifBlockedAddBtn')?.addEventListener('click', addBlockedCustomer);
+    document.getElementById('notifBlockedCustomerInput')?.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            addBlockedCustomer();
+        }
+    });
     ['notifSearchOrder', 'notifSearchPo', 'notifSearchCustomer', 'notifSearchBuyer', 'notifSearchSalesPerson'].forEach(id => {
         document.getElementById(id)?.addEventListener('input', renderNotificationWorklist);
     });

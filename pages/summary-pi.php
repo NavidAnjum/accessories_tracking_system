@@ -252,7 +252,8 @@ let _mspiOrderData = null;
 let _mspiExcelDone = false;
 
 // PI number → safe file name, e.g. "ZZAL/PI/26/2" → "ZZAL-PI-26-2"
-function mspiFileName(piNum){ return String(piNum || 'PI').replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'PI'; }
+function mspiSanitizeName(s){ return String(s || '').replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, ''); }
+function mspiFileName(piNum, customer){ const c = mspiSanitizeName(customer); const p = mspiSanitizeName(piNum) || 'PI'; return (c ? c + '-' : '') + p; }
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 function mspiNumWords(n) {
@@ -341,7 +342,7 @@ function renderSummaryPi() {
     const piNum   = firstPi.pi_number || salesPg.piNum || (order.order_id || '') + '-SPI';
     const piDate  = firstPi.pi_date   || salesPg.piDate || order.created_at?.slice(0,10) || '';
     document.getElementById('mspiNum').textContent  = piNum;
-    document.title = mspiFileName(piNum); // Save-as-PDF / print default file name
+    document.title = mspiFileName(piNum, (usingSelection ? firstPi.customer : (salesPg.customer || intake.customer || order.customer_name)) || ''); // Save-as-PDF / print default file name = Customer-PINumber
     document.getElementById('mspiDate').textContent = mspiFormatDate(piDate);
     const contNumEl = document.getElementById('mspiContNum');
     const contDateEl = document.getElementById('mspiContDate');
@@ -462,7 +463,7 @@ async function downloadSummaryPiExcel() {
         const blob = await resp.blob();
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = mspiFileName(piNum) + '.xls';
+        a.download = mspiFileName(piNum, custName) + '.xls';
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     } catch(e) { alert('Excel export failed.'); }
 }

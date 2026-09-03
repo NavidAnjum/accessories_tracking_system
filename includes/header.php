@@ -113,6 +113,55 @@ body.embed-view { background: #fff !important; }
 <div class="app-shell">
 
     <nav class="page-nav" aria-label="Form pages">
+        <details class="mobile-nav-menu">
+            <summary>
+                <span>Menu</span>
+                <strong><?= htmlspecialchars($pageTitle ?? 'Dashboard') ?></strong>
+            </summary>
+            <div class="mobile-nav-menu-panel">
+                <a class="mobile-nav-link<?= $navSection === 'master' ? ' active' : '' ?>"
+                   href="<?= BASE_PATH ?>/pages/customer-profile.php">Master Data</a>
+                <a class="mobile-nav-link<?= $navSection === 'order' ? ' active' : '' ?>"
+                   href="<?= BASE_PATH ?>/pages/dashboard.php">Order &amp; Documents</a>
+                <a class="mobile-nav-link<?= $activePage === 'dashboard' ? ' active' : '' ?>"
+                   href="<?= BASE_PATH ?>/pages/dashboard.php">Dashboard</a>
+                <?php if (canAccessTab('erp-orders-report')): ?>
+                <a class="mobile-nav-link<?= $activePage === 'erp-orders-report' ? ' active' : '' ?>"
+                   href="<?= BASE_PATH ?>/pages/erp-live-orders-report.php">ERP Orders</a>
+                <?php endif; ?>
+                <?php
+                $mobileOrderLinks = [
+                    ['id' => 'costing-review',   'href' => 'costing-review.php',        'label' => 'Costing Review'],
+                    ['id' => 'production',       'href' => 'production.php',            'label' => 'Production'],
+                    ['id' => 'sales',            'href' => 'sales.php',                 'label' => 'PI'],
+                    ['id' => 'marketing',        'href' => 'marketing.php',            'label' => 'Marketing'],
+                    ['id' => 'lc',               'href' => 'lc.php',                    'label' => 'LC'],
+                    ['id' => 'exchange',         'href' => 'exchange.php',              'label' => 'Bill of Exchange'],
+                    ['id' => 'commercial',       'href' => 'commercial.php',            'label' => 'Commercial Invoice'],
+                    ['id' => 'packing',          'href' => 'packing.php',               'label' => 'Packing List'],
+                    ['id' => 'delivery',         'href' => 'delivery.php',              'label' => 'Delivery Challan'],
+                    ['id' => 'truck',            'href' => 'truck.php',                 'label' => 'Truck Challan'],
+                    ['id' => 'origin',           'href' => 'origin.php',                'label' => 'Certificate of Origin'],
+                    ['id' => 'beneficiary',      'href' => 'beneficiary.php',           'label' => "Beneficiary's Certificate"],
+                    ['id' => 'forwarding',       'href' => 'forwarding.php',            'label' => 'Forwarding'],
+                    ['id' => 'bank-forwarding',  'href' => 'bank-forwarding.php',       'label' => 'Bank Forwarding'],
+                    ['id' => 'po-status',        'href' => 'po-status.php',             'label' => 'Challan Sheet'],
+                ];
+                foreach ($mobileOrderLinks as $mobileLink):
+                    if (!canAccessTab($mobileLink['id'])) continue;
+                ?>
+                <a class="mobile-nav-link<?= $activePage === $mobileLink['id'] ? ' active' : '' ?>"
+                   data-workflow-step="<?= htmlspecialchars($mobileLink['id']) ?>"
+                   href="<?= BASE_PATH ?>/pages/<?= $mobileLink['href'] ?>"><?= htmlspecialchars($mobileLink['label']) ?></a>
+                <?php endforeach; ?>
+                <div class="mobile-nav-user">
+                    <span><?= htmlspecialchars($__user['name']) ?></span>
+                    <strong><?= htmlspecialchars(ucwords(str_replace('_', ' ', $__user['role'] ?? ''))) ?></strong>
+                </div>
+                <a class="mobile-nav-link" href="<?= BASE_PATH ?>/pages/change-password.php">Password</a>
+                <a class="mobile-nav-link danger" href="<?= BASE_PATH ?>/pages/logout.php">Sign Out</a>
+            </div>
+        </details>
         <div class="nav-section-row">
             <a class="nav-section-btn<?= $navSection === 'master' ? ' active' : '' ?>"
                href="<?= BASE_PATH ?>/pages/customer-profile.php">Master Data</a>
@@ -174,8 +223,12 @@ body.embed-view { background: #fff !important; }
             ['id' => 'bank-forwarding',  'href' => 'bank-forwarding.php',       'label' => 'Bank Forwarding'],
             ['id' => 'po-status',        'href' => 'po-status.php',             'label' => 'Challan Sheet'],
         ];
-        // Filter tabs by role
-        $visibleTabs = array_values(array_filter($orderTabs, fn($t) => canAccessTab($t['id'])));
+        // Filter tabs by role; Marketing Intake remains available by URL/workflow,
+        // but is no longer shown in the menu.
+        $visibleTabs = array_values(array_filter(
+            $orderTabs,
+            fn($t) => $t['id'] !== 'marketing-intake' && canAccessTab($t['id'])
+        ));
         ?>
         <?php if ($navSection === 'order'): ?>
         <div class="nav-tab-group">
@@ -494,13 +547,10 @@ body.embed-view { background: #fff !important; }
                         }
                         return;
                     }
-                    try {
-                        await fetch(APP_BASE + '/api/notifications.php', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'mark_read', id })
-                        });
-                    } catch (_) {}
+                    // Do NOT mark the item read just because it was opened. A pending
+                    // workflow task (e.g. Marketing approval) must stay in the worklist
+                    // until the order actually moves to the next step. Use "Mark all
+                    // read" to clear manually.
 
                     if (step === 'erp-order') {
                         window.location.href = APP_BASE + '/pages/erp-live-orders-report.php?create_erp_order=' + encodeURIComponent(orderId);

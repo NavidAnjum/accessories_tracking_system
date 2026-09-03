@@ -89,25 +89,73 @@ function normalizeNotificationCustomer(string $name): string
     return strtolower(trim(preg_replace('/\s+/', ' ', (string)$name)));
 }
 
+function defaultBlockedNotificationCustomers(): array
+{
+    return [
+        'Noman Terry Towel Mills Limited',
+        'R S TRADERS',
+        'Zaber & Zubair Fabrics Ltd. - Home',
+        'Zakaria Enterprise',
+        'Nice Denim Mills Ltd. ( Solid Dyeing Fabrics )',
+        'Sufia Cotton Mills Limited-(Spinning) (Saad Group)',
+        'Noman Fashion Fabrics Limited',
+        'Noman Textile Mills Limited',
+        'Noman Fabrics Limited - Unit-2',
+        'Nice Fabrics Processing Ltd. - 2',
+        'Nice Denim Mills Ltd.(Saad Group)',
+    ];
+}
+
+function ensureNotificationBlockedCustomersTable(PDO $db): void
+{
+    static $done = false;
+    if ($done) return;
+
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS notification_blocked_customers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            customer_name VARCHAR(255) NOT NULL,
+            normalized_name VARCHAR(255) NOT NULL,
+            created_by INT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_notification_blocked_customer (normalized_name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
+    $count = (int)$db->query('SELECT COUNT(*) FROM notification_blocked_customers')->fetchColumn();
+    if ($count === 0) {
+        $stmt = $db->prepare("
+            INSERT IGNORE INTO notification_blocked_customers
+                (customer_name, normalized_name, created_by)
+            VALUES
+                (?, ?, NULL)
+        ");
+        foreach (defaultBlockedNotificationCustomers() as $customer) {
+            $stmt->execute([$customer, normalizeNotificationCustomer($customer)]);
+        }
+    }
+
+    $done = true;
+}
+
+function blockedNotificationCustomers(PDO $db): array
+{
+    ensureNotificationBlockedCustomersTable($db);
+    return $db->query("
+        SELECT id, customer_name
+        FROM notification_blocked_customers
+        ORDER BY customer_name
+    ")->fetchAll();
+}
+
 function isBlockedNotificationCustomer(string $name): bool
 {
     static $blocked = null;
     if ($blocked === null) {
-        $blocked = array_map(
-            static fn($value) => normalizeNotificationCustomer($value),
-            [
-                'Noman Terry Towel Mills Limited',
-                'R S TRADERS',
-                'Zaber & Zubair Fabrics Ltd. - Home',
-                'Zakaria Enterprise',
-                'Nice Denim Mills Ltd. ( Solid Dyeing Fabrics )',
-                'Sufia Cotton Mills Limited-(Spinning) (Saad Group)',
-                'Noman Fashion Fabrics Limited',
-                'Noman Textile Mills Limited',
-                'Noman Fabrics Limited - Unit-2',
-                'Nice Fabrics Processing Ltd. - 2'
-            ]
-        );
+        $db = getDB();
+        ensureNotificationBlockedCustomersTable($db);
+        $blocked = $db->query('SELECT normalized_name FROM notification_blocked_customers')
+            ->fetchAll(PDO::FETCH_COLUMN);
     }
 
     return in_array(normalizeNotificationCustomer($name), $blocked, true);
@@ -172,6 +220,19 @@ function summarizeSalesPageForCommercial(?string $salesJson, array $order = []):
 
 try {
     if ($method === 'GET') {
+        if (!empty($_GET['blocked_customers'])) {
+            if (!canManageErpOrderInbox($userRole)) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Not allowed']);
+                exit;
+            }
+            echo json_encode([
+                'ok' => true,
+                'items' => blockedNotificationCustomers($db),
+            ]);
+            exit;
+        }
+
         $limit = max(1, min(200, (int)($_GET['limit'] ?? 8)));
         $full  = !empty($_GET['full']);
 
@@ -184,10 +245,8 @@ try {
             $erpStmt = $db->prepare("SELECT e.sale_order_no, e.customer_po_no, e.customer_name, e.buyer, e.sales_person,
                                               e.header_status, e.line_count, e.snapshot_json, e.header_creation_date, e.first_seen_at, e.read_at
                                        FROM erp_order_inbox e
-                                       LEFT JOIN orders o ON BINARY o.order_id = BINARY e.work_order_id
                                        WHERE e.work_order_id IS NULL
                                           OR e.work_order_id = ''
-                                          OR LOWER(COALESCE(o.current_step, 'sales')) = 'sales'
                                        ORDER BY COALESCE(NULLIF(e.header_creation_date, ''), e.first_seen_at) DESC, e.sale_order_no DESC");
             $erpStmt->execute();
 
@@ -225,6 +284,67 @@ try {
             }
         }
 
+        // Normal workflow notifications, e.g. orders sent from PI to Marketing.
+        // ERP inbox rows above are virtual Commercial worklist items; the rows
+        // below are the saved per-user notifications created by workflow moves.
+        // Commercial's bell is ERP-orders-only — skip workflow rows (incl. the
+        // "PI submitted"/commercial-pi item) for the commercial roles.
+        if (!in_array($userRole, ['commercial', 'commercial_dept'], true)) {
+        $notifyFloor = (defined('NOTIFY_FLOOR_DATE') ? NOTIFY_FLOOR_DATE : '2026-09-01') . ' 00:00:00';
+        $workflowWhere = "n.user_id = ? AND n.created_at >= ? AND n.step_name <> 'erp-order'";
+        $workflowParams = [$userId, $notifyFloor];
+
+        if (canSeeCommercialPiWorklist($userRole)) {
+            $workflowWhere .= " AND (n.step_name <> 'commercial-pi' OR n.source_user_id = ?)";
+            $workflowParams[] = $userId;
+        } else {
+            $workflowWhere .= " AND n.step_name <> 'commercial-pi'";
+        }
+
+        $workflowStepMatch = "(
+            BINARY COALESCE(o.current_step, '') = BINARY COALESCE(n.step_name, '')
+            OR (n.step_name = 'commercial-pi' AND o.current_step IN ('sales', 'marketing'))
+        )";
+
+        $workflowSql = "
+            SELECT n.id, n.user_id, n.order_id, n.step_name, n.target_role, n.title, n.message,
+                   n.is_read, n.created_at, 'workflow' AS type,
+                   '' AS erp_order_no,
+                   COALESCE(o.po_number, '') AS customer_po_no,
+                   COALESCE(o.customer_name, '') AS customer_name,
+                   COALESCE(o.to_buyer, '') AS buyer,
+                   COALESCE(o.salesperson, '') AS sales_person,
+                   '' AS header_status,
+                   0 AS line_count,
+                   '' AS item_name,
+                   0 AS total_qty,
+                   '' AS price,
+                   0 AS total_value
+            FROM notifications n
+            LEFT JOIN orders o ON BINARY o.order_id = BINARY n.order_id
+            WHERE {$workflowWhere}
+              AND {$workflowStepMatch}
+            ORDER BY n.created_at DESC
+        ";
+        $workflowStmt = $db->prepare($workflowSql);
+        $workflowStmt->execute($workflowParams);
+
+        foreach ($workflowStmt->fetchAll() as $workflowItem) {
+            if (($workflowItem['step_name'] ?? '') === 'commercial-pi') {
+                $workflowItem['type'] = 'commercial_pi';
+                $workflowItem['item_name'] = 'PI submitted - create another PI';
+            }
+            $items[] = $workflowItem;
+        }
+        } // end non-commercial workflow notifications
+
+        usort($items, static function (array $a, array $b): int {
+            return strcmp((string)($b['created_at'] ?? ''), (string)($a['created_at'] ?? ''));
+        });
+
+        // The bell reflects the number of PENDING worklist tasks (all items shown),
+        // not just the unread ones — opening a task no longer marks it read, so the
+        // badge must match the list. A task clears only when the order moves on.
         $activeCount = count($items);
         if (!$full) {
             $items = array_slice($items, 0, $limit);
@@ -355,10 +475,8 @@ try {
             $erpStmt = $db->prepare("SELECT e.sale_order_no, e.customer_po_no, e.customer_name, e.buyer, e.sales_person,
                                              header_status, line_count, snapshot_json, header_creation_date, first_seen_at, read_at
                                      FROM erp_order_inbox e
-                                     LEFT JOIN orders o ON BINARY o.order_id = BINARY e.work_order_id
                                      WHERE (e.work_order_id IS NULL
-                                            OR e.work_order_id = ''
-                                            OR LOWER(COALESCE(o.current_step, 'sales')) = 'sales')
+                                            OR e.work_order_id = '')
                                          AND " . erpNotificationDateExpr() . " >= ?
                                       ORDER BY COALESCE(NULLIF(header_creation_date, ''), first_seen_at) DESC, sale_order_no DESC");
             $erpStmt->execute([$erpFloorDate]);
@@ -429,6 +547,62 @@ try {
     if ($method === 'POST') {
         $body = json_decode(file_get_contents('php://input'), true) ?: [];
         $action = $body['action'] ?? '';
+
+        if ($action === 'add_blocked_customer') {
+            if (!canManageErpOrderInbox($userRole)) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Not allowed']);
+                exit;
+            }
+            $customer = trim((string)($body['customer_name'] ?? ''));
+            if ($customer === '') {
+                http_response_code(400);
+                echo json_encode(['error' => 'Customer name required']);
+                exit;
+            }
+            ensureNotificationBlockedCustomersTable($db);
+            $stmt = $db->prepare("
+                INSERT INTO notification_blocked_customers
+                    (customer_name, normalized_name, created_by)
+                VALUES
+                    (?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    customer_name = VALUES(customer_name)
+            ");
+            $stmt->execute([$customer, normalizeNotificationCustomer($customer), $userId ?: null]);
+            echo json_encode([
+                'ok' => true,
+                'items' => blockedNotificationCustomers($db),
+            ]);
+            exit;
+        }
+
+        if ($action === 'remove_blocked_customer') {
+            if (!canManageErpOrderInbox($userRole)) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Not allowed']);
+                exit;
+            }
+            $id = (int)($body['id'] ?? 0);
+            $customer = trim((string)($body['customer_name'] ?? ''));
+            ensureNotificationBlockedCustomersTable($db);
+            if ($id > 0) {
+                $stmt = $db->prepare('DELETE FROM notification_blocked_customers WHERE id = ?');
+                $stmt->execute([$id]);
+            } elseif ($customer !== '') {
+                $stmt = $db->prepare('DELETE FROM notification_blocked_customers WHERE normalized_name = ?');
+                $stmt->execute([normalizeNotificationCustomer($customer)]);
+            } else {
+                http_response_code(400);
+                echo json_encode(['error' => 'Customer id or name required']);
+                exit;
+            }
+            echo json_encode([
+                'ok' => true,
+                'items' => blockedNotificationCustomers($db),
+            ]);
+            exit;
+        }
 
         if ($action === 'mark_read') {
             $id = (int)($body['id'] ?? 0);

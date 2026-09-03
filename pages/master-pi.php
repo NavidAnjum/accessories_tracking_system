@@ -146,7 +146,9 @@ require_once __DIR__ . '/../includes/print-brand.php';
 @media print {
     .mpi-ctrl, nav.page-nav, .order-id-bar { display:none !important; }
     #mpiWrap { background:none !important; padding:0 !important; }
-    .mpi-doc { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:4mm 14mm 12mm!important; overflow:hidden; display:flex!important; flex-direction:column!important; }
+    .mpi-doc { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; min-height:297mm!important; max-width:210mm; padding:4mm 14mm 12mm!important; overflow:hidden; display:flex!important; flex-direction:column!important; break-after:page; page-break-after:always; }
+    .mpi-continuation.is-active { break-before:page; page-break-before:always; break-after:auto; page-break-after:auto; }
+    .mpi-doc:last-child { break-after:auto; page-break-after:auto; }
     .mpi-doc .zzal-print-brand--footer { position:static!important; margin-top:auto!important; }
     .mpi-content { min-height:0!important; flex:1 1 auto!important; display:flex!important; flex-direction:column!important; }
     .mpi-continuation:not(.is-active) { display:none!important; }
@@ -256,7 +258,7 @@ html.pi-preview .mpi-ctrl {
         <div class="mpi-words">TOTAL AMOUNT : US DOLLER: <span id="mpiWords">-</span></div>
 
         <!-- Terms & Conditions -->
-        <div>
+        <div id="mpiTermsBlock">
             <div class="mpi-terms-title">Terms &amp; Conditions:</div>
             <ol class="mpi-terms-list" id="mpiTerms"></ol>
         </div>
@@ -284,6 +286,30 @@ html.pi-preview .mpi-ctrl {
         <div><strong>PROFOMA INVOICE NO :</strong> <span id="mpiContNum">-</span></div>
         <div><strong>Date :</strong> <span id="mpiContDate">-</span></div>
     </div>
+    <!-- Overflow item rows (continued from page 1) -->
+    <table class="mpi-tbl" id="mpiContTblWrap" style="display:none;">
+        <thead>
+            <tr>
+                <th style="width:40px;">SL NO</th>
+                <th>Description of goods</th>
+                <th style="width:50px;">PLY</th>
+                <th style="width:100px;">Quantity/<br>Pcs/con</th>
+                <th style="width:90px;">Unit Price</th>
+                <th style="width:115px;">Total Amount<br>(USD)</th>
+            </tr>
+        </thead>
+        <tbody id="mpiContBody"></tbody>
+        <tbody id="mpiContTotFoot" style="display:none;">
+            <tr class="total-row">
+                <td colspan="2"></td>
+                <td></td>
+                <td class="tc" id="mpiContTotalQty"><strong>-</strong></td>
+                <td></td>
+                <td class="tr" id="mpiContTotalVal"><strong>-</strong></td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="mpi-words" id="mpiContWordsWrap" style="display:none;">TOTAL AMOUNT : US DOLLER: <span id="mpiContWords">-</span></div>
     <div>
         <div class="mpi-terms-title">Terms &amp; Conditions:</div>
         <ol class="mpi-terms-list" id="mpiTermsCont" start="12"></ol>
@@ -356,27 +382,81 @@ function mpiFormatDate(d) {
     return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
 }
 function mpiRenderTerms(terms) {
-    const firstTermsEl = document.getElementById('mpiTerms');
-    const contTermsEl = document.getElementById('mpiTermsCont');
+    const firstTermsEl   = document.getElementById('mpiTerms');
+    const contTermsEl    = document.getElementById('mpiTermsCont');
     const continuationEl = document.getElementById('mpiContinuation');
-    const sigAreaEl = document.getElementById('mpiSigArea');
-    const docEl = document.getElementById('mpiDocument');
+    const sigAreaEl      = document.getElementById('mpiSigArea');
+    const docEl          = document.getElementById('mpiDocument');
 
-    function splitAt(firstCount) {
+    // Page-1 blocks that move to the continuation page when the items overflow.
+    const body          = document.getElementById('mpiBody');
+    const contBody       = document.getElementById('mpiContBody');
+    const contTblWrap    = document.getElementById('mpiContTblWrap');
+    const totFoot        = document.getElementById('mpiTotFoot');
+    const contTotFoot    = document.getElementById('mpiContTotFoot');
+    const wordsWrap      = document.getElementById('mpiWords')?.closest('.mpi-words');
+    const contWordsWrap  = document.getElementById('mpiContWordsWrap');
+    const contTotalQty   = document.getElementById('mpiContTotalQty');
+    const contTotalVal   = document.getElementById('mpiContTotalVal');
+    const contWords      = document.getElementById('mpiContWords');
+
+    const overflows = () => docEl.scrollHeight > docEl.clientHeight + 2;
+
+    // Reset continuation item area
+    contBody.innerHTML = '';
+    contTblWrap.style.display = 'none';
+    contTotFoot.style.display = 'none';
+    contWordsWrap.style.display = 'none';
+    // Totals + words + terms start on page 1
+    totFoot.style.display = '';
+    if (wordsWrap) wordsWrap.style.display = '';
+    const termsBlock = document.getElementById('mpiTermsBlock');
+    if (termsBlock) termsBlock.style.display = '';
+
+    function splitTerms(firstCount) {
         const firstPageTerms = terms.slice(0, firstCount);
         const continuedTerms = terms.slice(firstCount);
         firstTermsEl.innerHTML = firstPageTerms.map(t => `<li>${t}</li>`).join('');
-        contTermsEl.innerHTML = continuedTerms.map(t => `<li>${t}</li>`).join('');
+        contTermsEl.innerHTML  = continuedTerms.map(t => `<li>${t}</li>`).join('');
         contTermsEl.start = firstPageTerms.length + 1;
-        continuationEl.classList.toggle('is-active', continuedTerms.length > 0);
-        sigAreaEl.style.display = continuedTerms.length ? 'none' : 'block';
+        return continuedTerms.length;
     }
 
-    let firstCount = terms.length;
-    splitAt(firstCount);
-    while (firstCount > 1 && docEl.scrollHeight > docEl.clientHeight + 2) {
-        firstCount -= 1;
-        splitAt(firstCount);
+    // Start with everything on page 1.
+    splitTerms(terms.length);
+    continuationEl.classList.remove('is-active');
+    sigAreaEl.style.display = 'block';
+
+    if (!overflows()) return; // fits on one page
+
+    // Page 1 overflows. Activate continuation and move overflow item rows there,
+    // carrying the totals + words + terms + signature onto the continuation page.
+    continuationEl.classList.add('is-active');
+    contTblWrap.style.display = '';
+    // Move totals/words off page 1 onto the continuation page.
+    totFoot.style.display = 'none';
+    if (wordsWrap) wordsWrap.style.display = 'none';
+    contTotFoot.style.display = '';
+    contWordsWrap.style.display = '';
+    if (contTotalQty) contTotalQty.innerHTML = document.getElementById('mpiTotalQty').innerHTML;
+    if (contTotalVal) contTotalVal.innerHTML = document.getElementById('mpiTotalVal').innerHTML;
+    if (contWords)    contWords.textContent  = document.getElementById('mpiWords').textContent;
+    // All terms live on the continuation page now — hide the page-1 terms block
+    // entirely so the "Terms & Conditions:" heading never appears between items.
+    firstTermsEl.innerHTML = '';
+    if (termsBlock) termsBlock.style.display = 'none';
+    contTermsEl.innerHTML  = terms.map(t => `<li>${t}</li>`).join('');
+    contTermsEl.start = 1;
+    sigAreaEl.style.display = 'none';
+
+    // Move item rows from the end of page 1 to the top of the continuation page
+    // until page 1 no longer overflows OR page 1 holds at most 33 item rows.
+    const MAX_FIRST_PAGE_ROWS = 33;
+    let guard = 0;
+    while ((overflows() || body.rows.length > MAX_FIRST_PAGE_ROWS)
+           && body.rows.length > 1 && guard++ < 500) {
+        const last = body.rows[body.rows.length - 1];
+        contBody.insertBefore(last, contBody.firstChild);
     }
 }
 
@@ -448,7 +528,7 @@ function renderMasterPi() {
     const masterPiNum = firstPi.pi_number || order.order_id + '-MPI';
     const masterPiDate = mpiFormatDate(firstPi.pi_date || salesPg.piDate || order.created_at?.slice(0,10) || '');
     document.getElementById('mpiNum').textContent  = masterPiNum;
-    document.title = mpiFileName(masterPiNum); // Save-as-PDF / print default file name
+    document.title = mpiFileName(masterPiNum, salesPg.customer || intake.customer || order.customer_name || ''); // Save-as-PDF / print default file name = Customer-PINumber
     document.getElementById('mpiDate').textContent = masterPiDate;
     document.getElementById('mpiContNum').textContent  = masterPiNum;
     document.getElementById('mpiContDate').textContent = masterPiDate;
@@ -551,7 +631,7 @@ function renderMasterPiFromCustom(groups, res) {
     const customPiNum = firstGrp.piNumber || firstPi.pi_number || order.order_id + '-MPI';
     const customPiDate = mpiFormatDate(firstPi.pi_date || salesPg.piDate || '');
     document.getElementById('mpiNum').textContent  = customPiNum;
-    document.title = mpiFileName(customPiNum); // Save-as-PDF / print default file name
+    document.title = mpiFileName(customPiNum, salesPg.customer || intake.customer || order.customer_name || ''); // Save-as-PDF / print default file name = Customer-PINumber
     document.getElementById('mpiDate').textContent = customPiDate;
     document.getElementById('mpiContNum').textContent  = customPiNum;
     document.getElementById('mpiContDate').textContent = customPiDate;
@@ -619,7 +699,8 @@ function renderMasterPiFromCustom(groups, res) {
 }
 
 // PI number → safe file name, e.g. "ZZAL/PI/26/2" → "ZZAL-PI-26-2"
-function mpiFileName(piNum){ return String(piNum || 'PI').replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'PI'; }
+function mpiSanitizeName(s){ return String(s || '').replace(/[\/\\:*?"<>|]+/g, '-').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, ''); }
+function mpiFileName(piNum, customer){ const c = mpiSanitizeName(customer); const p = mpiSanitizeName(piNum) || 'PI'; return (c ? c + '-' : '') + p; }
 function downloadMasterPiExcel() {
     atsDownloadExcelFromElement({
         elementId:'mpiDocument',

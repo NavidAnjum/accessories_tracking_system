@@ -595,6 +595,30 @@ select.field-input { appearance:auto; }
 .scorecard-result-card b { display:block; color:#4f46e5; margin-bottom:4px; }
 .scorecard-result-card span { font-size:22px; font-weight:900; color:#111827; }
 .scorecard-action-text { margin-top:12px; padding:12px; border-radius:10px; background:#ecfeff; color:#155e75; font-weight:700; }
+
+@media screen and (max-width: 760px) {
+    .scorecard-top,
+    .scorecard-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .scorecard-score {
+        min-width: 0;
+    }
+    .scorecard-options {
+        grid-template-columns: 1fr;
+    }
+    .scorecard-options label {
+        align-items: flex-start;
+    }
+    .scorecard-options em {
+        margin-left: 0;
+    }
+    .scorecard-actions > *,
+    #customerProfileForm > div[style*="justify-content:flex-end"] > * {
+        width: 100%;
+    }
+}
 </style>
 
 <script>
