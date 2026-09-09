@@ -1,5 +1,7 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
 
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/db.php';
@@ -58,24 +60,18 @@ function fetchErpOrderPage(string $order, int $offset): array
 
 try {
     $items = [];
-    $source = 'local_cache';
+    $source = 'live_order_api';
     $offset = 0;
     $pageCount = 0;
 
-    // Exact local lookup first. raw_json preserves fields (addresses, UOM,
-    // currency, etc.) that are not promoted to dedicated cache columns.
     $db = getDB();
     ensureErpSaleOrdersCacheTable($db);
-    $localStmt = $db->prepare('SELECT * FROM erp_sale_orders_cache WHERE sale_order_no = ? ORDER BY line_id ASC, id ASC');
-    $localStmt->execute([$order]);
-    foreach ($localStmt->fetchAll() as $cachedRow) {
-        $raw = json_decode((string)($cachedRow['raw_json'] ?? ''), true);
-        $items[] = is_array($raw) ? array_merge($raw, $cachedRow) : $cachedRow;
-    }
 
-    // Only wait for the remote ERP when the exact sales order is absent locally.
-    if (!$items) {
-        $source = 'live_order_api';
+    // LIVE-FIRST: the ERP API is the source of truth. Always fetch fresh so a
+    // stale/duplicated local cache can never inflate the line count (the "1 item
+    // shows as 3" bug). We refresh the cache from the live result, and only fall
+    // back to the cache if the ERP server is unreachable.
+    try {
         do {
             $pageCount++;
             $response = fetchErpOrderPage($order, $offset);
@@ -96,6 +92,21 @@ try {
 
         if ($items) {
             erpSaleOrdersUpsertItems($db, $items, 0, ERP_ORDER_LIMIT);
+        }
+    } catch (Throwable $liveError) {
+        // Live ERP unreachable — fall back to whatever is cached locally so the
+        // user isn't fully blocked. (De-duplicated by line_id below.)
+        $source = 'local_cache_fallback';
+        $localStmt = $db->prepare('SELECT * FROM erp_sale_orders_cache WHERE sale_order_no = ? ORDER BY line_id ASC, id ASC');
+        $localStmt->execute([$order]);
+        $seenLines = [];
+        foreach ($localStmt->fetchAll() as $cachedRow) {
+            // Guard against duplicate cache rows for the same line.
+            $lineKey = (string)($cachedRow['line_id'] ?? '') . '|' . (string)($cachedRow['shipment_number'] ?? '');
+            if ($lineKey !== '|' && isset($seenLines[$lineKey])) continue;
+            $seenLines[$lineKey] = true;
+            $raw = json_decode((string)($cachedRow['raw_json'] ?? ''), true);
+            $items[] = is_array($raw) ? array_merge($raw, $cachedRow) : $cachedRow;
         }
     }
 
@@ -155,6 +166,7 @@ try {
             'customerPo' => $customerPo,
             'customerName' => (string) ($first['customer_name'] ?? ''),
             'buyer' => (string) ($first['buyer'] ?? ''),
+            'salesPerson' => (string) ($first['csm'] ?? ''),
             'operatingUnit' => (string) ($first['operating_unit'] ?? ''),
             'orderType' => (string) ($first['order_type'] ?? ''),
             'currency' => (string) ($first['currency_code'] ?? 'USD'),

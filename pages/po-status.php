@@ -21,6 +21,15 @@ include __DIR__ . '/../includes/header.php';
     }
     @page { size: A4 landscape; margin: 8mm; }
 }
+.challan-epz-reference {
+    display:none; grid-template-columns:repeat(4,1fr); gap:8px; margin:10px 0;
+    padding:8px 10px; border:1px solid #94a3b8; background:#f8fafc; font-size:11px;
+}
+.challan-epz-reference span { display:block; color:#64748b; font-size:9px; text-transform:uppercase; font-weight:700; }
+.challan-epz-reference strong { display:block; margin-top:2px; color:#0f172a; }
+.challan-pi-summary { display:grid; grid-template-columns:2fr 1fr; gap:12px; margin:10px 0; padding:8px 10px; border:1px solid #a5b4fc; background:#eef2ff; font-size:11px; }
+.challan-pi-summary span { display:block; color:#6366f1; font-size:9px; text-transform:uppercase; font-weight:700; }
+.challan-pi-summary strong { display:block; margin-top:2px; color:#312e81; }
 </style>
 
                 <section class="form-card" data-page="po-status">
@@ -85,6 +94,16 @@ include __DIR__ . '/../includes/header.php';
                                     </tr>
                                 </tfoot>
                             </table>
+                        </div>
+                        <div class="challan-pi-summary" id="challanPiSummary" style="display:none;">
+                            <div><span>PI Numbers Included</span><strong id="challanPiNumbers">-</strong></div>
+                            <div><span>Total PI Value (USD)</span><strong id="challanPiTotal">$ 0.00</strong></div>
+                        </div>
+                        <div class="challan-epz-reference" id="challanEpzReference">
+                            <div><span>EXP No.</span><strong id="challanExpNo">-</strong></div>
+                            <div><span>EXP Date</span><strong id="challanExpDate">-</strong></div>
+                            <div><span>IP No.</span><strong id="challanIpNo">-</strong></div>
+                            <div><span>IP Date</span><strong id="challanIpDate">-</strong></div>
                         </div>
                         <div class="challan-qa-grid">
                             <div class="challan-qa-card">
@@ -261,6 +280,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
 window.onOrderLoad = function (res) {
     const sales = res.pages?.sales || {};
+    const lc = res.pages?.lc || {};
+    const piSummary = window.atsResolveOrderPiSummary
+        ? window.atsResolveOrderPiSummary(res)
+        : {numbers:[], total:0, count:0};
+    const piSummaryEl = document.getElementById('challanPiSummary');
+    if (piSummaryEl) piSummaryEl.style.display = (piSummary.count || piSummary.total) ? 'grid' : 'none';
+    const piNumbersEl = document.getElementById('challanPiNumbers');
+    if (piNumbersEl) piNumbersEl.textContent = (piSummary.numbers || []).join(' / ') || '-';
+    const piTotalEl = document.getElementById('challanPiTotal');
+    if (piTotalEl) piTotalEl.textContent = '$ ' + Number(piSummary.total || 0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const epzReference = document.getElementById('challanEpzReference');
+    if (epzReference) epzReference.style.display = lc.lcZoneType === 'epz' ? 'grid' : 'none';
+    const setEpz = (id, value, isDate = false) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = isDate ? challanFormatDate(value) : (value || '-');
+    };
+    setEpz('challanExpNo', lc.lcExpNo);
+    setEpz('challanExpDate', lc.lcExpDate, true);
+    setEpz('challanIpNo', lc.lcIpNo);
+    setEpz('challanIpDate', lc.lcIpDate, true);
     const piNum = sales.piNum || '';
     const input = document.getElementById('challanPiSearch');
     if (input && piNum) {

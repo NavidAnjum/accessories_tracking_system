@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 $pageTitle   = 'PI';
 $activePage  = 'sales';
 $navSection  = 'order';
@@ -497,6 +497,24 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- Edit-PI banner (shown for an already Marketing-approved PI) -->
+<div id="editPiBanner" style="display:none;background:#fffbeb;border:1.5px solid #fde68a;border-radius:12px;padding:12px 18px;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div>
+            <div style="font-size:13px;font-weight:800;color:#92400e;">This PI is Marketing-approved</div>
+            <div style="font-size:12px;color:#a16207;">Need to update ERP items/data? Click Edit to re-fetch live ERP for the saved orders. Re-submitting sends it back to Marketing for approval. The PI number stays the same.</div>
+        </div>
+        <button type="button" id="editPiBtn" class="primary-btn" onclick="startEditApprovedPi()"
+                style="background:linear-gradient(135deg,#d97706,#b45309);white-space:nowrap;">Edit PI</button>
+    </div>
+    <div id="editNoteWrap" style="display:none;margin-top:12px;">
+        <label style="display:block;font-size:11px;font-weight:700;color:#92400e;margin-bottom:4px;">Edit note (optional)</label>
+        <textarea id="editNoteInput" rows="2" placeholder="Reason for the change (optional)…"
+                  style="width:100%;box-sizing:border-box;border:1.5px solid #fcd34d;border-radius:8px;padding:8px 10px;font-size:13px;"></textarea>
+        <div style="font-size:11px;color:#a16207;margin-top:4px;">Editing: fields are now editable and ERP items were refreshed live. Submit to send back to Marketing.</div>
+    </div>
+</div>
+
 <!-- Order PI Overview -->
 <div class="order-pi-overview" id="orderPiOverview" style="display:none;">
     <div class="opo-title">
@@ -552,6 +570,11 @@ include __DIR__ . '/../includes/header.php';
                 disabled title="Submit PI first to unlock Excel download">
             Download Excel
         </button>
+        <button type="button" id="emailPiBtn" class="ghost-btn" onclick="emailPiFromSales()"
+                style="white-space:nowrap;padding:9px 22px;background:#0f6cbd;color:#fff;border-color:#0f6cbd;"
+                disabled title="Submit PI and get Marketing approval before emailing">
+            📧 Email PI
+        </button>
     </div>
 </div>
 <style>
@@ -561,6 +584,20 @@ include __DIR__ . '/../includes/header.php';
 <script>
 let _currentPiStep = 'sales';
 let _marketingApproved = false;
+let _editingApprovedPi = false; // true after Commercial clicks "Edit PI"
+
+// Commercial may revise an approved PI even after the order has advanced beyond
+// Sales. Re-submitting the revision returns it to Marketing for approval.
+function refreshEditPiBanner() {
+    const banner = document.getElementById('editPiBanner');
+    if (!banner) return;
+    const canEdit = hasMarketingApproval();
+    banner.style.display = canEdit ? 'block' : 'none';
+    const btn = document.getElementById('editPiBtn');
+    if (btn) btn.style.display = _editingApprovedPi ? 'none' : '';
+    const noteWrap = document.getElementById('editNoteWrap');
+    if (noteWrap) noteWrap.style.display = _editingApprovedPi ? 'block' : 'none';
+}
 
 function isWaitingForMarketingApproval() {
     return _currentPiStep === 'marketing';
@@ -583,11 +620,19 @@ function resetSubmitBtn() {
     // The PI only needs saving while it's still an editable draft. Once it's
     // submitted (waiting), Marketing-approved, or already moved to LC, hide
     // "Save PI" — it's ready.
+    // Save PI is permanently hidden — the order is created only on Submit to
+    // Marketing, so there is no pre-submit draft save.
     const saveBtn = document.getElementById('savePiBtn');
-    if (saveBtn) saveBtn.style.display = (advanced || hasMarketingApproval() || isWaitingForMarketingApproval()) ? 'none' : '';
+    if (saveBtn) saveBtn.style.display = 'none';
+    refreshEditPiBanner();
     if (!btn) return;
     btn.style.background = '';
-    if (advanced) {
+    if (_editingApprovedPi) {
+        // Editing an approved PI → re-submit resets approval and returns to Marketing.
+        btn.textContent = 'Submit Revision to Marketing';
+        btn.disabled = false;
+        btn.onclick = submitEditedPiToMarketing;
+    } else if (advanced) {
         // Already sent to LC (or beyond) — don't re-submit; just open LC.
         btn.textContent = 'Open LC';
         btn.disabled = false;
@@ -680,7 +725,7 @@ function goToPiPrint(excelMode = false) {
     if (val === 'single' || val === 'master' || val === 'summary') {
         const days = document.getElementById('termLcDays')?.value || '90';
         const tol  = document.getElementById('termTolerance')?.value || '5';
-        const hs   = document.getElementById('termHsCode')?.value || '4819.10.00';
+        const hs   = document.getElementById('termHsCode')?.value || '';
         const docMust = document.getElementById('termDocMust')?.value || 'UD';
         const bnk  = document.getElementById('termBank')?.value || 'ncc';
         const sep = url.includes('?') ? '&' : '?';
@@ -689,6 +734,8 @@ function goToPiPrint(excelMode = false) {
             + '&hs=' + encodeURIComponent(hs)
             + '&doc=' + encodeURIComponent(docMust)
             + '&bank=' + encodeURIComponent(bnk);
+        const orderId = window.getCurrentOrderId ? window.getCurrentOrderId() : (sessionStorage.getItem('ats_current_order_id') || '');
+        if (orderId) url += '&order_id=' + encodeURIComponent(orderId);
     }
     if (excelMode) {
         url += (url.includes('?') ? '&' : '?') + 'excel=1';
@@ -697,6 +744,88 @@ function goToPiPrint(excelMode = false) {
         url += (url.includes('?') ? '&' : '?') + 'preview=1&embed=1';
     }
     window.location.href = url;
+}
+
+// Email the currently-selected PI via desktop Outlook (helper renders it to PDF).
+// Builds the same print URL as goToPiPrint but ABSOLUTE + embed, and hands it to
+// the atsmail:// helper. Requires the approved PI + the per-PC helper installed.
+async function emailPiFromSales() {
+    const approved = hasMarketingApproval();
+    if (!approved) { alert('Submit the PI and get Marketing approval before emailing it.'); return; }
+    const val = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
+    const pages = { single:'single-pi.php', summary:'summary-pi.php', master:'master-pi.php' };
+    let url = APP_BASE + '/pages/' + (pages[val] || 'single-pi.php');
+
+    if (val === 'master') {
+        const selection = getSelectedMasterGroups();
+        if (selection.length) sessionStorage.setItem('mpi_custom_items', JSON.stringify(selection));
+    }
+    if (val === 'summary') {
+        if (!_summarySelectedPis.length) { alert('Add at least one PI to the Summary before emailing.'); return; }
+        sessionStorage.setItem('summary_selected_pis', JSON.stringify(_summarySelectedPis));
+        url += '?summary=1';
+    }
+    const days = document.getElementById('termLcDays')?.value || '90';
+    const tol  = document.getElementById('termTolerance')?.value || '5';
+    const hs   = document.getElementById('termHsCode')?.value || '';
+    const docMust = document.getElementById('termDocMust')?.value || 'UD';
+    const bnk  = document.getElementById('termBank')?.value || 'ncc';
+    const sep = url.includes('?') ? '&' : '?';
+    url += sep + 'days=' + encodeURIComponent(days)
+        + '&lctype=Sight&tol=' + encodeURIComponent(tol)
+        + '&hs=' + encodeURIComponent(hs)
+        + '&doc=' + encodeURIComponent(docMust)
+        + '&bank=' + encodeURIComponent(bnk)
+        + '&embed=1&email_render=1';
+    const orderId = window.getCurrentOrderId ? window.getCurrentOrderId() : (sessionStorage.getItem('ats_current_order_id') || '');
+    if (!orderId) {
+        alert('Load an order before emailing the PI.');
+        return;
+    }
+    url += '&order_id=' + encodeURIComponent(orderId);
+
+    // The helper renders in a clean headless browser that does not share this
+    // tab's login cookie. Give it a short-lived, single-use authenticated URL.
+    let absUrl;
+    try {
+        const tokenResponse = await fetch(APP_BASE + '/api/pi_render_token.php', {method:'POST'});
+        const tokenData = await tokenResponse.json();
+        if (!tokenResponse.ok || !tokenData.token) throw new Error(tokenData.error || 'Could not create render token.');
+        const renderUrl = new URL(url, window.location.origin);
+        renderUrl.searchParams.set('render_token', tokenData.token);
+        absUrl = renderUrl.toString();
+    } catch (error) {
+        alert('Could not prepare the PI for email. Please try again.');
+        return;
+    }
+
+    const piNum   = (document.getElementById('piNumber')?.value || document.getElementById('piNumDisplay')?.textContent || 'PI').trim();
+    const customer= (document.getElementById('piCustomer')?.value || '').trim();
+    const safe = s => String(s || 'PI').replace(/[\/\\:*?"<>|]+/g,'-').replace(/\s+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'') || 'PI';
+    const fileNm  = safe((customer ? customer + '-' : '') + piNum);
+    const subject = 'Proforma Invoice ' + piNum + (customer ? ' — ' + customer : '');
+    const body    = 'Dear Sir/Madam,\r\n\r\nPlease find attached our Proforma Invoice ' + piNum +
+                    '.\r\n\r\nBest regards,\r\nZaber & Zubair Accessories Ltd.';
+
+    const link = 'atsmail://open?url=' + encodeURIComponent(absUrl)
+        + '&subject=' + encodeURIComponent(subject)
+        + '&body='    + encodeURIComponent(body)
+        + '&file='    + encodeURIComponent(fileNm) + '&to=';
+    // Friendly toast (Chrome shows its own "Open?" prompt for the atsmail:// link).
+    (function(){
+        let t = document.getElementById('atsEmailHint');
+        if (!t) { t = document.createElement('div'); t.id = 'atsEmailHint';
+            t.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:100000;background:#0f6cbd;color:#fff;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.25);max-width:520px;text-align:center;line-height:1.4;';
+            document.body.appendChild(t); }
+        t.innerHTML = '📧 Opening Outlook with the PI attached…<br><span style="font-weight:400;font-size:12.5px;">If a Windows prompt appears, click <b>Open</b> — it is needed to attach the PI and open your email.</span>';
+        t.style.display = 'block'; clearTimeout(t._hideTimer); t._hideTimer = setTimeout(() => { t.style.display = 'none'; }, 6000);
+    })();
+    let launched = false;
+    window.addEventListener('blur', () => { launched = true; }, { once: true });
+    try { window.location.href = link; } catch (_) {}
+    setTimeout(() => {
+        if (!launched) alert('Could not open Outlook.\n\nThe "Email PI" helper may not be installed on this PC.\nAsk IT to run the setup in /outlook-helper (README.txt), or use Print / Save PDF and attach manually.');
+    }, 1500);
 }
 </script>
 
@@ -818,7 +947,7 @@ function goToPiPrint(excelMode = false) {
         const days = document.getElementById('termLcDays')?.value || '90';
         const lct  = document.getElementById('termLcType')?.value || 'Sight';
         const tol  = document.getElementById('termTolerance')?.value || '5';
-        const hs   = document.getElementById('termHsCode')?.value || '4819.10.00';
+        const hs   = document.getElementById('termHsCode')?.value || '';
         const docMust = document.getElementById('termDocMust')?.value || 'UD';
 
         const BANKS = {
@@ -860,7 +989,8 @@ function goToPiPrint(excelMode = false) {
             `Quality complaint, if any, should be notified to us prior before sewing.`,
             `The above mention terms &amp; condition will be the integral part of the BTB L/C &amp; it must be mention in the BTB L/C.`,
             `Beneficiary Bin No : <strong>000230256-0103</strong>`,
-            `H.S. Code : <input id="termHsCode" class="term-sel" style="min-width:150px;font-weight:700;" value="${hs}" oninput="buildSalesTerms()">`,
+            `H.S. Code : <input id="termHsCode" type="text" value="${hs}" placeholder="Type H.S. Code…"
+                style="min-width:220px;padding:4px 10px;border:1.5px solid #6366f1;border-radius:6px;font-size:10pt;font-weight:700;color:#1e40af;background:#fff;outline:none;">`,
             `${(() => {
                 const opts = ['UD','IP','UP'].map(v => `<option value="${v}"${v===docMust?' selected':''}>${v}</option>`).join('');
                 return `<select id="termDocMust" class="term-sel" onchange="buildSalesTerms()">${opts}</select> Mustbe`;
@@ -879,7 +1009,9 @@ function goToPiPrint(excelMode = false) {
 <div class="page-actions" style="margin-top:16px;">
     <div class="page-actions-left">
         <button type="button" class="ghost-btn js-prev-page" data-prev-page="production">Previous</button>
-        <button type="button" id="savePiBtn" class="ghost-btn" onclick="savePi()">Save PI</button>
+        <!-- Save PI removed: the work order is created only on Submit to Marketing.
+             No DB row / no draft is created before submit. -->
+        <button type="button" id="savePiBtn" class="ghost-btn" onclick="savePi()" style="display:none;">Save PI</button>
         <button type="button" class="ghost-btn" onclick="clearPiForm()">Clear</button>
         <button type="button" class="primary-btn" id="universalSaveBtn" onclick="submitToMarketing()">Submit</button>
     </div>
@@ -966,10 +1098,16 @@ function addPoBlock() {
         <!-- PI Number for this PO -->
         <div class="form-grid" style="margin-bottom:10px;padding-bottom:12px;border-bottom:1px solid #e2e8f0;">
             <div class="field span-4">
-                <label>PI Number <span style="font-size:10px;font-weight:400;color:#94a3b8;">(auto-generated)</span></label>
-                <input id="piNum_${pid}" placeholder="Generating..." readonly
-                       style="background:#f8fafc;color:#374151;"
-                       oninput="(function(v){const b=document.querySelectorAll('.po-block');if(b[0]&&b[0].id==='block_${pid}'){document.getElementById('piNumDisplay').textContent=v||'-';document.getElementById('piNumber').value=v;}})(this.value)">
+                <label>PI Number <span id="piNumMode_${pid}" style="font-size:10px;font-weight:400;color:#94a3b8;">(auto-generated)</span></label>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input id="piNum_${pid}" placeholder="Generating..." readonly
+                           style="background:#f8fafc;color:#374151;flex:1;"
+                           oninput="(function(v){const b=document.querySelectorAll('.po-block');if(b[0]&&b[0].id==='block_${pid}'){document.getElementById('piNumDisplay').textContent=v||'-';document.getElementById('piNumber').value=v;}})(this.value)"
+                           onblur="if(!document.getElementById('piNum_${pid}').readOnly) checkPiNumDuplicate('${pid}')">
+                    <button type="button" id="piNumManualBtn_${pid}" class="ghost-btn" style="white-space:nowrap;padding:6px 14px;font-size:12px;"
+                            onclick="togglePiNumManual('${pid}')">Manual</button>
+                </div>
+                <div id="piNumMsg_${pid}" style="font-size:11px;margin-top:4px;min-height:14px;"></div>
             </div>
         </div>
 
@@ -1054,36 +1192,128 @@ function addPoBlock() {
     autoFillPiNum(pid);
 }
 
+// Toggle the PI number field between auto-generated (readonly) and manual entry.
+function togglePiNumManual(pid) {
+    const inp    = document.getElementById('piNum_' + pid);
+    const btn    = document.getElementById('piNumManualBtn_' + pid);
+    const label  = document.getElementById('piNumMode_' + pid);
+    const msg    = document.getElementById('piNumMsg_' + pid);
+    if (!inp) return;
+    const goingManual = inp.readOnly; // currently auto → switch to manual
+    if (goingManual) {
+        releasePiReservation(pid); // free the auto number; manual doesn't reserve
+        inp.readOnly = false;
+        inp.style.background = '#fff';
+        inp.style.color = '#111827';
+        inp.focus();
+        inp.select();
+        if (btn)   btn.textContent = 'Use Auto';
+        if (label) { label.textContent = '(manual — type your own, no duplicates)'; label.style.color = '#d97706'; }
+        if (msg)   msg.textContent = '';
+    } else {
+        // Back to auto: clear + regenerate.
+        inp.readOnly = true;
+        inp.style.background = '#f8fafc';
+        inp.style.color = '#374151';
+        inp.value = '';
+        if (btn)   btn.textContent = 'Manual';
+        if (label) { label.textContent = '(auto-generated)'; label.style.color = '#94a3b8'; }
+        if (msg)   { msg.textContent = ''; msg.style.color = ''; }
+        autoFillPiNum(pid);
+    }
+}
+
+// Check the manually-entered PI number isn't already used (server + other open blocks).
+async function checkPiNumDuplicate(pid) {
+    const inp = document.getElementById('piNum_' + pid);
+    const msg = document.getElementById('piNumMsg_' + pid);
+    const val = (inp?.value || '').trim();
+    if (!val) { if (msg) msg.textContent = ''; inp?.setCustomValidity?.(''); return true; }
+
+    // Same number typed in another block on this page?
+    let localDup = false;
+    document.querySelectorAll('[id^="piNum_"]').forEach(el => {
+        if (el.id !== 'piNum_' + pid && (el.value || '').trim() === val) localDup = true;
+    });
+    if (localDup) {
+        if (msg) { msg.textContent = 'This PI number is already used in another block above.'; msg.style.color = '#dc2626'; }
+        inp?.setCustomValidity?.('Duplicate PI number');
+        return false;
+    }
+
+    if (msg) { msg.textContent = 'Checking…'; msg.style.color = '#94a3b8'; }
+    try {
+        const resp = await fetch(APP_BASE + '/api/pis.php?q=' + encodeURIComponent(val));
+        const res  = await resp.json();
+        const exists = res && res.match === 'pi' && res.pi
+            && String(res.pi.pi_number || '').trim().toLowerCase() === val.toLowerCase();
+        if (exists) {
+            if (msg) { msg.textContent = 'PI number ' + val + ' already exists. Choose another.'; msg.style.color = '#dc2626'; }
+            inp?.setCustomValidity?.('Duplicate PI number');
+            return false;
+        }
+        if (msg) { msg.textContent = 'Available.'; msg.style.color = '#16a34a'; }
+        inp?.setCustomValidity?.('');
+        return true;
+    } catch (_) {
+        if (msg) { msg.textContent = 'Could not verify — check your connection.'; msg.style.color = '#d97706'; }
+        return true; // don't hard-block on a network error
+    }
+}
+
+// Per-block reservation tokens so two+ people can create PIs at once without
+// collisions. The server hands out the lowest FREE number and reserves it;
+// we heartbeat to keep it, and release it on Clear/New Order.
+window._piReserveTokens = window._piReserveTokens || {};
+
 async function autoFillPiNum(pid) {
     try {
+        // Release any previous reservation this block held (e.g. re-generating).
+        releasePiReservation(pid);
         const r = await fetch(APP_BASE + '/api/pis.php?next_num=1');
         const d = await r.json();
         if (!d.pi_number) return;
-        const parts   = d.pi_number.split('/');          // ['ZZAL','PI','26','N']
-        const prefix  = parts.slice(0, 3).join('/') + '/'; // 'ZZAL/PI/26/'
-        let nextSeq   = parseInt(parts[3]) || 0;
-
-        // Bump past any ZZAL-format numbers already open in other blocks
-        document.querySelectorAll('[id^="piNum_"]').forEach(el => {
-            if (el.id === 'piNum_' + pid || !el.value) return;
-            const p = el.value.split('/');
-            if (p[0] === 'ZZAL' && p.length >= 4) {
-                const n = parseInt(p[3]);
-                if (!isNaN(n) && n >= nextSeq) nextSeq = n + 1;
-            }
-        });
 
         const el = document.getElementById('piNum_' + pid);
         if (el && !el.value) {
-            el.value = prefix + nextSeq;
+            el.value = d.pi_number;
+            if (d.reserve_token) window._piReserveTokens[pid] = { token: d.reserve_token, num: d.pi_number };
             const firstBlock = document.querySelectorAll('.po-block')[0];
             if (firstBlock && firstBlock.id === 'block_' + pid) {
-                document.getElementById('piNumDisplay').textContent = prefix + nextSeq;
-                document.getElementById('piNumber').value           = prefix + nextSeq;
+                document.getElementById('piNumDisplay').textContent = d.pi_number;
+                document.getElementById('piNumber').value           = d.pi_number;
             }
         }
     } catch(e) { /* silent - user can type manually */ }
 }
+
+// Free a block's reserved number immediately (Clear / New Order / regenerate).
+function releasePiReservation(pid) {
+    const res = window._piReserveTokens && window._piReserveTokens[pid];
+    if (!res || !res.token) return;
+    try {
+        const url = APP_BASE + '/api/pis.php?release_num=1&token=' + encodeURIComponent(res.token)
+                  + '&pi_number=' + encodeURIComponent(res.num || '');
+        // keepalive so it still fires if the page is unloading.
+        fetch(url, { keepalive: true }).catch(() => {});
+    } catch (_) {}
+    delete window._piReserveTokens[pid];
+}
+
+// Heartbeat: keep all held reservations alive while the PI page is open.
+function piReservationHeartbeat() {
+    const tokens = window._piReserveTokens || {};
+    Object.values(tokens).forEach(res => {
+        if (res && res.token) {
+            fetch(APP_BASE + '/api/pis.php?reserve_heartbeat=1&token=' + encodeURIComponent(res.token)).catch(() => {});
+        }
+    });
+}
+setInterval(piReservationHeartbeat, 5 * 60 * 1000); // every 5 min (TTL is 15 min)
+// Release everything when the page is being left.
+window.addEventListener('pagehide', function () {
+    Object.keys(window._piReserveTokens || {}).forEach(pid => releasePiReservation(pid));
+});
 
 /* Toggle collapse */
 function togglePo(pid) {
@@ -1097,6 +1327,7 @@ function togglePo(pid) {
 /* Remove PO block */
 function removePo(pid) {
     if (!confirm('Remove this PI block?')) return;
+    releasePiReservation(pid); // free its reserved number
     document.getElementById('block_' + pid)?.remove();
     updateSummary();
 }
@@ -1178,7 +1409,11 @@ function getFieldListValue(el) {
         } catch (_) {}
     }
     const value = String(el.value || '').trim();
-    return value ? [value] : [];
+    if (!value) return [];
+    const separator = String(el.id || '').startsWith('salesOrder_')
+        ? /\s*[,;\n]+\s*/
+        : /\s*\/\s*/;
+    return value.split(separator).map(v => v.trim()).filter(Boolean);
 }
 
 function setFieldListValue(el, values, separator) {
@@ -1254,7 +1489,8 @@ function applyErpSelection(pid, erpData, chosenPo) {
     });
 
     setPiCustomerIfEmpty(firstGrp.customerName || '');
-
+    setPiAddressFromErpIfEmpty(firstGrp);
+    setPiMarketingUserByName(firstGrp.salesPerson || '');
     const total = allLines.length;
     const msg = document.getElementById('erpMsg_' + pid);
     if (msg) {
@@ -1288,13 +1524,19 @@ function appendPoToBlock(pid, po, extra) {
 
     const existingSalesOrders = getFieldListValue(salesOrderEl);
     const existingCustomerPos = getFieldListValue(customerPoEl);
+    const addedSalesOrders = Array.isArray(po?.salesOrders)
+        ? po.salesOrders
+        : [po?.salesOrder || po?.salesOrderNo || extra?.salesOrder || ''];
+    const addedCustomerPos = Array.isArray(po?.poNums)
+        ? po.poNums
+        : [po?.poNum || ''];
     const mergedSalesOrders = setFieldListValue(salesOrderEl, [
         ...existingSalesOrders,
-        po?.salesOrder || po?.salesOrderNo || extra?.salesOrder || ''
+        ...addedSalesOrders
     ], ', ');
     const mergedCustomerPos = setFieldListValue(customerPoEl, [
         ...existingCustomerPos,
-        po?.poNum || ''
+        ...addedCustomerPos
     ], ' / ');
 
     if (poLabelEl) {
@@ -1335,6 +1577,86 @@ function appendPoToBlock(pid, po, extra) {
     }, extra);
 }
 
+async function searchMultipleErpOrders(pid, orderNumbers, appendMode) {
+    const msg = document.getElementById('erpMsg_' + pid);
+    if (msg) {
+        msg.innerHTML = `<span style="color:#2563eb;font-weight:700;">Loading ${orderNumbers.length} ERP sales orders...</span>`;
+    }
+
+    try {
+        // Fetch everything before changing the form, so one failed ERP order never
+        // leaves an edited PI half-replaced with incomplete data.
+        const results = await Promise.all(orderNumbers.map(async orderNo => {
+            const response = await fetch(
+                APP_BASE + '/api/erp_order_proxy.php?order=' + encodeURIComponent(orderNo) + '&refresh=' + Date.now(),
+                {cache:'no-store'}
+            );
+            let erp = {};
+            try { erp = await response.json(); }
+            catch (_) { throw new Error(`Sales order ${orderNo}: ERP returned an invalid response.`); }
+            if (!response.ok || erp.error) {
+                throw new Error(`Sales order ${orderNo}: ${erp.detail || erp.error || 'Could not search ERP.'}`);
+            }
+            if (!erp.found || !Array.isArray(erp.groups) || !erp.groups.length) {
+                throw new Error(`Sales order ${orderNo} was not found in ERP.`);
+            }
+            return { orderNo, erp };
+        }));
+
+        const allGroups = results.flatMap(result => result.erp.groups || []);
+        const firstGroup = allGroups[0] || {};
+        const salesOrders = [...new Set(results.flatMap(result => {
+            const found = (result.erp.groups || []).map(group => String(group.salesOrderNo || '').trim()).filter(Boolean);
+            return found.length ? found : [result.orderNo];
+        }))];
+        const customerPos = [...new Set(results.flatMap(result => {
+            const found = (result.erp.groups || []).map(group => String(group.customerPo || '').trim()).filter(Boolean);
+            return found.length ? found : [String(result.erp.po || '').trim()].filter(Boolean);
+        }))];
+        const items = buildErpLinesForGroupData({groups: allGroups});
+        const poData = {
+            poNum: customerPos.join(' / '),
+            poNums: customerPos,
+            buyer: firstGroup.buyer || '',
+            items,
+            salesOrder: salesOrders.join(', '),
+            salesOrders,
+            reqDate: firstGroup.requestDate || firstGroup.shipDate || '',
+            status: firstGroup.status || ''
+        };
+        const extra = {
+            salesOrder: salesOrders.join(', '),
+            reqDate: poData.reqDate,
+            status: poData.status
+        };
+
+        if (appendMode) {
+            appendPoToBlock(pid, poData, extra);
+        } else {
+            fillPoBlock(pid, poData, extra);
+            setFieldListValue(document.getElementById('salesOrder_' + pid), salesOrders, ', ');
+            setFieldListValue(document.getElementById('customerPo_' + pid), customerPos, ' / ');
+        }
+
+        setPiCustomerIfEmpty(firstGroup.customerName || '');
+        setPiAddressFromErpIfEmpty(firstGroup);
+        setPiMarketingUserByName(firstGroup.salesPerson || '');
+        if (msg) {
+            msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Loaded ${salesOrders.length} ERP sales orders</span> - ${customerPos.length} PO number(s) - ${items.length} merged line(s).`;
+        }
+        window.erpChoiceAction[pid] = 'replace';
+        const input = document.getElementById('erpInput_' + pid);
+        if (input) {
+            input.value = '';
+            input.placeholder = 'Enter ERP sales order number...';
+        }
+        return {success:true, orderCount:salesOrders.length};
+    } catch (error) {
+        if (msg) msg.innerHTML = `<span style="color:#f87171;">ERP error: ${escapeErpOptionHtml(error.message || 'Server unreachable.')}</span>`;
+        return {success:false, error:error.message || 'Server unreachable.'};
+    }
+}
+
 function chooseErpOption(pid, optionIndex) {
     const options = window.erpChoiceOptions[pid] || [];
     const option = options[optionIndex];
@@ -1354,6 +1676,8 @@ function chooseErpOption(pid, optionIndex) {
             status: firstGrp.status || ''
         });
         setPiCustomerIfEmpty(firstGrp.customerName || '');
+    setPiAddressFromErpIfEmpty(firstGrp);
+    setPiMarketingUserByName(firstGrp.salesPerson || '');
         const msg = document.getElementById('erpMsg_' + pid);
         if (msg) {
             msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">Added PO ${option.po || option.data.po || ''}</span> to this PI block.`;
@@ -1547,6 +1871,16 @@ function searchErp(pid, appendMode = false) {
     window.erpChoiceAction[pid] = appendMode ? 'append' : 'replace';
 
     const msg = document.getElementById('erpMsg_' + pid);
+    const orderNumbers = [...new Set(query.split(/[\s,;]+/).map(value => value.trim()).filter(Boolean))];
+    const invalidOrder = orderNumbers.find(value => !/^\d+$/.test(value));
+    if (invalidOrder) {
+        if (msg) msg.innerHTML = `<span style="color:#f87171;">ERP error: ${escapeErpOptionHtml(invalidOrder)} is not a valid numeric sales order number.</span>`;
+        return;
+    }
+    if (orderNumbers.length > 1) {
+        searchMultipleErpOrders(pid, orderNumbers, appendMode);
+        return;
+    }
     if (msg) msg.innerHTML = '<span style="color:#94a3b8;">Searching live ERP by sales order...</span>';
 
     fetch(APP_BASE + '/api/erp_order_proxy.php?order=' + encodeURIComponent(query))
@@ -1563,19 +1897,13 @@ function searchErp(pid, appendMode = false) {
                 return;
             }
 
+            // Do NOT claim the ERP order here. Searching is exploratory — claiming on
+            // every search created empty "ghost" work orders that permanently locked
+            // ERP orders when the user walked away without saving a PI. The ERP order
+            // is claimed only when the PI is actually saved / submitted to Marketing
+            // (linkErpOrdersToPiWorkOrder / server-side linkSalesErpOrders). We still
+            // warn if this ERP order already belongs to a *different* work order.
             const currentWorkOrderId = sessionStorage.getItem('ats_current_order_id') || '';
-            if (currentWorkOrderId) {
-                const claimResponse = await fetch(APP_BASE + '/api/erp_order_import.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sale_order_no: query, work_order_id: currentWorkOrderId })
-                });
-                const claim = await claimResponse.json();
-                if (!claimResponse.ok || claim.error) {
-                    throw new Error(claim.error || 'This ERP order is already used by another work order.');
-                }
-            }
-
             const firstGrp = erp.groups[0] || {};
             const poNumber = firstGrp.customerPo || erp.po || '';
             const items = buildErpLinesForGroupData(erp);
@@ -1600,6 +1928,8 @@ function searchErp(pid, appendMode = false) {
             }
 
             setPiCustomerIfEmpty(firstGrp.customerName || '');
+    setPiAddressFromErpIfEmpty(firstGrp);
+    setPiMarketingUserByName(firstGrp.salesPerson || '');
             if (msg) {
                 const action = appendMode ? 'Added' : 'Loaded';
                 msg.innerHTML = `<span style="color:#16a34a;font-weight:700;">${action} sales order ${escapeErpOptionHtml(firstGrp.salesOrderNo || query)}</span> - PO ${escapeErpOptionHtml(poNumber || '-')} - ${items.length} merged line(s).`;
@@ -1894,7 +2224,7 @@ function collectSalesPageData() {
             buyerAddress: document.getElementById('piBuyerAddress').value.trim(),
             marketingUserId: document.getElementById('piMarketingUser')?.value || '',
             marketingUserName: (document.getElementById('piMarketingUser')?.selectedOptions?.[0]?.textContent || '').trim(),
-            hsCode: document.getElementById('termHsCode')?.value || '4819.10.00',
+            hsCode: document.getElementById('termHsCode')?.value,
             consigneeBank: '',
             advisingBank: '',
             pos,
@@ -1940,6 +2270,7 @@ function collectSalesPageData() {
 
         pos.push({
             piNum: document.getElementById('piNum_' + pid)?.value?.trim() || '',
+            piNumManual: !!(document.getElementById('piNum_' + pid) && !document.getElementById('piNum_' + pid).readOnly),
             poNum,
             qty,
             val,
@@ -1963,7 +2294,7 @@ function collectSalesPageData() {
         buyerAddress,
         marketingUserId: document.getElementById('piMarketingUser')?.value || '',
         marketingUserName: (document.getElementById('piMarketingUser')?.selectedOptions?.[0]?.textContent || '').trim(),
-        hsCode: document.getElementById('termHsCode')?.value || '4819.10.00',
+        hsCode: document.getElementById('termHsCode')?.value || '',
         consigneeBank,
         advisingBank,
         pos,
@@ -2050,6 +2381,30 @@ async function ensurePiOrder() {
     } catch (e) { alert('Server error creating order.'); return ''; }
 }
 
+// Associate every ERP sales order included in this PI with the same internal
+// work order. This is required for a PI started with "+ New Order", because the
+// ERP orders are selected before the internal order is created.
+async function linkErpOrdersToPiWorkOrder(data, orderId) {
+    const erpOrderNumbers = [...new Set((data.pos || []).flatMap(po => {
+        if (Array.isArray(po.salesOrders) && po.salesOrders.length) {
+            return po.salesOrders;
+        }
+        return String(po.salesOrder || '').split(/\s*,\s*/);
+    }).map(value => String(value || '').trim()).filter(value => /^\d+$/.test(value)))];
+
+    for (const erpOrderNo of erpOrderNumbers) {
+        const response = await fetch(APP_BASE + '/api/erp_order_import.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sale_order_no: erpOrderNo, work_order_id: orderId })
+        });
+        const result = await response.json();
+        if (!response.ok || result.error) {
+            throw new Error(result.error || ('Could not link ERP order ' + erpOrderNo + ' to this PI.'));
+        }
+    }
+}
+
 // â”€â”€ Save PI to database â€” one PI record per PO block â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 savePi = async function() {
     let data;
@@ -2094,6 +2449,7 @@ savePi = async function() {
             };
             const perPi = {
                 piNum:       po.piNum,
+                piNumberManual: !!po.piNumManual,
                 customer:    data.customer,
                 buyer:       data.buyer,
                 piDate:      data.piDate,
@@ -2150,6 +2506,16 @@ async function submitToMarketing() {
     if (piType !== 'master') {
         const missingNum = data.pos.findIndex(po => !po.piNum);
         if (missingNum !== -1) { alert('Please enter a PI Number for PI ' + (missingNum + 1) + '.'); return; }
+        // Any manually-typed PI number in an editable block must be unique.
+        const manualBlocks = document.querySelectorAll('.po-block');
+        for (const b of manualBlocks) {
+            const bpid = b.id.replace('block_', '');
+            const inp  = document.getElementById('piNum_' + bpid);
+            if (inp && !inp.readOnly) {
+                const ok = await checkPiNumDuplicate(bpid);
+                if (!ok) { alert('Duplicate PI number "' + inp.value.trim() + '". Please choose a unique PI number before submitting.'); inp.focus(); return; }
+            }
+        }
     }
 
     // A marketing approver must be chosen so the approval goes to the right person.
@@ -2169,12 +2535,18 @@ async function submitToMarketing() {
     }
 
     try {
+        // Link all ERP orders before the handoff. They remain in Commercial's
+        // notifications while this work order is at Sales, then clear together
+        // after the successful move to Marketing below.
+        await linkErpOrdersToPiWorkOrder(data, orderId);
+
         let savedCount = 0, totalQty = 0, totalVal = 0;
         if (piType !== 'master') {
             // Save each PI block as its own PI record
             for (const po of data.pos) {
                 const perPi = {
-                    piNum: po.piNum, customer: data.customer, buyer: data.buyer,
+                    piNum: po.piNum, piNumberManual: !!po.piNumManual,
+                    customer: data.customer, buyer: data.buyer,
                     piDate: data.piDate, buyerAddress: data.buyerAddress,
                     consigneeBank: data.consigneeBank, advisingBank: data.advisingBank,
                     pos: [po], grandQty: po.qty,
@@ -2212,6 +2584,7 @@ async function submitToMarketing() {
             if (data.customer) orderParams.set('customer', data.customer);
             if (data.buyer)    orderParams.set('buyer', data.buyer);
             if (firstPo.poNum) orderParams.set('po', firstPo.poNum);
+            // Sales person → shown on the dashboard's Sales Person column.
             // Route the approval notification to the selected marketing person.
             if (data.marketingUserId) orderParams.set('marketing_user', data.marketingUserId);
             const orderRes = await fetch(APP_BASE + '/api/orders.php?' + orderParams.toString(), { method: 'PUT' });
@@ -2310,16 +2683,145 @@ async function submitApprovedPiToLc() {
     }
 }
 
+// ── Edit an already Marketing-approved PI ────────────────────────────────────
+// Re-fetch LIVE ERP for every ERP sales order already saved on this PI, refresh
+// the item rows, and put the form into edit mode. Re-submitting resets approval.
+async function startEditApprovedPi() {
+    if (!hasMarketingApproval()) { alert('Only a Marketing-approved PI can be edited here.'); return; }
+    const btn = document.getElementById('editPiBtn');
+    if (btn) { btn.textContent = 'Refreshing from ERP…'; btn.disabled = true; }
+
+    // Every PO block that carries saved ERP sales orders is refreshed as one
+    // atomic group. Each number calls the live-first ERP endpoint; the form is
+    // changed only after every linked ERP order has returned successfully.
+    const blocks = Array.from(document.querySelectorAll('.po-block'));
+    let refreshed = 0;
+    const failures = [];
+    for (const b of blocks) {
+        const pid = b.id.replace('block_', '');
+        const soEl = document.getElementById('salesOrder_' + pid);
+        const nums = getFieldListValue(soEl); // handles comma / multi lists
+        if (!nums.length) continue;
+        const result = await searchMultipleErpOrders(pid, nums, false);
+        if (result?.success) refreshed += result.orderCount || nums.length;
+        else failures.push(...nums);
+    }
+
+    if (!refreshed) {
+        if (btn) { btn.textContent = 'Edit PI'; btn.disabled = false; }
+        alert(failures.length
+            ? 'Could not refresh the linked ERP order(s): ' + failures.join(', ')
+            : 'No linked ERP sales order was found on this PI.');
+        return;
+    }
+
+    _editingApprovedPi = true;
+    document.getElementById('piStatus').textContent = 'Editing (ERP refreshed)';
+    resetSubmitBtn();
+    if (btn) { btn.textContent = 'Edit PI'; btn.disabled = false; }
+    alert('Latest ERP data loaded for ' + refreshed + ' order(s)' + (failures.length ? ' (' + failures.length + ' failed)' : '') +
+          '.\nReview the items, add an optional note, then Submit Revision to Marketing.');
+}
+
+// Submit an edited (previously approved) PI: save with history + note, reset the
+// Marketing approval, and hand back to Marketing. PI number is unchanged.
+async function submitEditedPiToMarketing() {
+    const orderId = sessionStorage.getItem('ats_current_order_id') || '';
+    if (!orderId) { alert('No order loaded.'); return; }
+
+    let data;
+    try { data = collectPiData(); } catch (e) { alert('Form read error: ' + e.message); return; }
+    if (!data.marketingUserId) {
+        alert('Please select the Marketing Person (Approver) before submitting.');
+        document.getElementById('piMarketingUser')?.focus();
+        return;
+    }
+    const editNote = (document.getElementById('editNoteInput')?.value || '').trim();
+
+    const btn = document.getElementById('universalSaveBtn');
+    if (btn) { btn.textContent = 'Submitting revision…'; btn.disabled = true; }
+
+    try {
+        // Re-save each PI record with isEdit=true so the API snapshots the prior
+        // version into history_json and keeps the SAME pi number.
+        for (const po of (data.pos || [])) {
+            if (!po.piNum) continue;
+            const perPi = {
+                piNum: po.piNum, customer: data.customer, buyer: data.buyer,
+                piDate: data.piDate, buyerAddress: data.buyerAddress,
+                pos: [{ ...po, sharedBuyer: data.buyer, sharedBuyerAddress: data.buyerAddress }],
+                grandQty: po.qty, grandVal: parseFloat(po.val || 0).toFixed(2),
+                orderId, isEdit: true, editNote
+            };
+            const r = await fetch(APP_BASE + '/api/pis.php', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(perPi)
+            });
+            const j = await r.json();
+            if (j.error) throw new Error(j.error + ' (PI: ' + po.piNum + ')');
+        }
+
+        // Refresh the sales snapshot.
+        await fetch(APP_BASE + '/api/save_page.php', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_id: orderId, page_name: 'sales', ...data })
+        });
+
+        // Reset the Marketing approval so it must be re-approved.
+        await fetch(APP_BASE + '/api/save_page.php', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                order_id: orderId, page_name: 'marketing',
+                marketingApproved: false, piApprovalStatus: 'pending', editNote
+            })
+        });
+
+        // Hand back to Marketing for approval.
+        const params = new URLSearchParams({ id: orderId, step: 'marketing' });
+        if (data.marketingUserId) params.set('marketing_user', data.marketingUserId);
+        const orderRes = await fetch(APP_BASE + '/api/orders.php?' + params.toString(), { method: 'PUT' });
+        const orderJson = await orderRes.json().catch(() => ({}));
+        if (!orderRes.ok || orderJson.error) throw new Error(orderJson.error || 'Could not resubmit to Marketing.');
+
+        _editingApprovedPi = false;
+        _marketingApproved = false;
+        _currentPiStep = 'marketing';
+        document.getElementById('piStatus').textContent = 'Resubmitted';
+        window.location.href = APP_BASE + '/pages/notifications.php';
+    } catch (e) {
+        console.error('submitEditedPiToMarketing error:', e);
+        alert('Resubmit failed: ' + (e.message || 'Could not reach server.'));
+        if (btn) { btn.disabled = false; }
+        resetSubmitBtn();
+    }
+}
+
 function clearPiForm() {
     if (!confirm('Clear the current PI form?')) return;
     resetPiFormFields();
 }
 // Reset the PI form without prompting (used by the New Order flow, which already confirmed).
 function resetPiFormFields() {
+    // Free any PI numbers this session was holding so they're reusable.
+    Object.keys(window._piReserveTokens || {}).forEach(pid => releasePiReservation(pid));
     document.getElementById('poBlocksContainer').innerHTML = '';
     document.getElementById('piNumber').value = '';
     document.getElementById('piNumDisplay').textContent = '-';
     document.getElementById('piCustomer').value = '';
+    // Clear ALL shared header fields too — otherwise the previous order's buyer,
+    // date, address and marketing person (and its saved snapshot) bleed into the
+    // new order, which also re-attached its ERP orders on save.
+    const buyerEl = document.getElementById('piBuyer');          if (buyerEl) buyerEl.value = '';
+    const addrEl  = document.getElementById('piBuyerAddress');   if (addrEl)  addrEl.value  = '';
+    const mkEl    = document.getElementById('piMarketingUser');  if (mkEl)    mkEl.value    = '';
+    const dateEl  = document.getElementById('piDate');           if (dateEl)  dateEl.value  = new Date().toISOString().split('T')[0];
+    // Drop stale cross-order state carried from the previously loaded order.
+    window._salesSnapshot = null;
+    window._pendingPiCustomer = '';
+    _summarySelectedPis = [];
+    _savedPisCache = [];
+    _savedPisOverviewCache = [];
+    _savedPisModalCache = [];
     document.getElementById('piStatus').textContent = 'Draft';
     poCount = 0; rowCounters = {};
     addPoBlock();
@@ -2514,7 +3016,7 @@ function collectMasterDataFromSelection() {
         buyer: (document.getElementById('piBuyer').value || '').trim() || firstGroup.sharedBuyer || firstGroup.buyer || '',
         piDate: document.getElementById('piDate').value || '',
         buyerAddress: (document.getElementById('piBuyerAddress').value || '').trim() || firstGroup.sharedBuyerAddress || '',
-        hsCode: document.getElementById('termHsCode')?.value || '4819.10.00',
+        hsCode: document.getElementById('termHsCode')?.value || '',
         consigneeBank: '', advisingBank: '',
         pos, masterPiSelection: masterGroups, selectedPiNumbers,
         grandQty, grandVal: grandVal.toFixed(2)
@@ -2566,7 +3068,7 @@ async function createMasterFromSelection() {
 function printMasterPi() {
     const days = document.getElementById('termLcDays')?.value || '90';
     const tol  = document.getElementById('termTolerance')?.value || '5';
-    const hs   = document.getElementById('termHsCode')?.value || '4819.10.00';
+    const hs   = document.getElementById('termHsCode')?.value || '';
     const docMust = document.getElementById('termDocMust')?.value || 'UD';
     const bnk  = document.getElementById('termBank')?.value || 'ncc';
     window.location.href = APP_BASE + '/pages/master-pi.php?days=' + encodeURIComponent(days)
@@ -2904,7 +3406,7 @@ function generateMasterPi() {
     sessionStorage.setItem('mpi_custom_items', JSON.stringify(selection));
     const days = document.getElementById('termLcDays')?.value || '90';
     const tol  = document.getElementById('termTolerance')?.value || '5';
-    const hs   = document.getElementById('termHsCode')?.value || '4819.10.00';
+    const hs   = document.getElementById('termHsCode')?.value || '';
     const docMust = document.getElementById('termDocMust')?.value || 'UD';
     const bnk  = document.getElementById('termBank')?.value || 'ncc';
     window.location.href = APP_BASE + '/pages/master-pi.php?days=' + encodeURIComponent(days)
@@ -2970,7 +3472,7 @@ async function generateMasterPi() {
         renderOrderPiOverview(saved.orderId);
         const days = document.getElementById('termLcDays')?.value || '90';
         const tol  = document.getElementById('termTolerance')?.value || '5';
-        const hs   = document.getElementById('termHsCode')?.value || '4819.10.00';
+        const hs   = document.getElementById('termHsCode')?.value || '';
         const docMust = document.getElementById('termDocMust')?.value || 'UD';
         const bnk  = document.getElementById('termBank')?.value || 'ncc';
         window.location.href = APP_BASE + '/pages/master-pi.php?days=' + encodeURIComponent(days)
@@ -3098,6 +3600,14 @@ function setPiCustomerIfEmpty(name) {
     inp.value = val;
     onPiCustomerChange();
 }
+// Fall back to the ERP ship-to / bill-to address when the customer profile has
+// none saved, so the Customer Address isn't left blank.
+function setPiAddressFromErpIfEmpty(erpGroup) {
+    const addrEl = document.getElementById('piBuyerAddress');
+    if (!addrEl || addrEl.value.trim()) return; // keep an already-filled address
+    const erpAddr = (erpGroup?.shipToAddress || erpGroup?.billToAddress || '').trim();
+    if (erpAddr) addrEl.value = erpAddr;
+}
 loadPiCustomers();
 
 // ── Marketing person (approver) dropdown ──────────────────────────────────
@@ -3116,12 +3626,30 @@ function loadMarketingUsers() {
                     return `<option value="${u.id}">${(u.name || '').replace(/</g,'&lt;')}${team}</option>`;
                 }).join('');
             if (cur) sel.value = cur;
+            // Apply an ERP name that arrived before the list finished loading.
+            if (window._pendingMarketingUserName) {
+                setPiMarketingUserByName(window._pendingMarketingUserName);
+                window._pendingMarketingUserName = '';
+            }
         })
         .catch(() => {});
 }
 function setPiMarketingUser(id) {
     const sel = document.getElementById('piMarketingUser');
     if (sel && id != null) sel.value = String(id);
+}
+// Match an ERP person NAME to a Marketing user in the dropdown; select it if
+// found. Only fills when still empty so it never overrides a manual choice.
+function setPiMarketingUserByName(name) {
+    const val = (name || '').trim();
+    if (!val) return;
+    const sel = document.getElementById('piMarketingUser');
+    if (!sel || sel.value) return; // keep a manual selection
+    if (!_piMarketingUsers.length) { window._pendingMarketingUserName = val; return; }
+    const norm = s => String(s || '').trim().toLowerCase();
+    const match = _piMarketingUsers.find(u => norm(u.name) === norm(val))
+        || _piMarketingUsers.find(u => norm(u.name).includes(norm(val)) || norm(val).includes(norm(u.name)));
+    if (match) sel.value = String(match.id);
 }
 loadMarketingUsers();
 
@@ -3159,6 +3687,12 @@ function updatePrintLock(step, forceUnlock = false) {
         excelBtn.title = canPrint ? '' : (waitingForMarketing ? 'Waiting for Marketing approval before Excel download' : 'Submit PI and get Marketing approval before Excel download');
         excelBtn.style.opacity = canPrint ? '' : '0.5';
     }
+    const emailBtn = document.getElementById('emailPiBtn');
+    if (emailBtn) {
+        emailBtn.disabled = !canPrint;
+        emailBtn.title = canPrint ? 'Open Outlook with this PI attached' : 'Submit PI and get Marketing approval before emailing';
+        emailBtn.style.opacity = canPrint ? '' : '0.5';
+    }
     onPiTypeChange();
 }
 
@@ -3181,7 +3715,10 @@ window.onOrderLoad = async function(res) {
             (Array.isArray(salesSnapshot.pis) && salesSnapshot.pis.length)
         )
     );
+    _currentPiStep = currentStep;
+    _editingApprovedPi = false; // fresh load is never mid-edit
     updatePrintLock(currentStep, hasSavedPiData);
+    refreshEditPiBanner(); // ensure the Edit banner reflects approval on load
     const marketingIntake = res.pages?.['marketing-intake'] || null;
     const fallbackCustomer = salesSnapshot?.customer || marketingIntake?.customer || res.order?.customer_name || '';
     if (salesSnapshot?.piType) {
@@ -3276,16 +3813,7 @@ window.onOrderLoad = async function(res) {
         onPiCustomerChange();
     }
 
-    const erpOrderFromUrl = new URLSearchParams(window.location.search).get('erp_order') || '';
-    if (erpOrderFromUrl && !window._erpOrderAutoLoaded) {
-        window._erpOrderAutoLoaded = true;
-        const firstPid = document.querySelector('.po-block')?.id.replace('block_', '') || '';
-        const erpInput = document.getElementById('erpInput_' + firstPid);
-        if (erpInput) {
-            erpInput.value = erpOrderFromUrl;
-            searchErp(firstPid, false);
-        }
-    }
+    maybeAutoSearchErpFromUrl();
 
     // New order: auto-fill is handled by addPoBlock â†’ autoFillPiNum
 
@@ -3314,7 +3842,24 @@ window.onNewOrder = function(orderId) {
         const disp = document.getElementById('piNumDisplay');
         if (disp) disp.textContent = '-';
     }
+    // Coming from a Commercial notification: sales.php?erp_order=NNN — auto-search
+    // that ERP order into the first PO block. This used to live only in
+    // onOrderLoad, which no longer runs on the clean-draft entry path.
+    maybeAutoSearchErpFromUrl();
 };
+
+// Auto-search the ERP order passed as ?erp_order=… (from a notification click).
+function maybeAutoSearchErpFromUrl() {
+    const erpOrderFromUrl = new URLSearchParams(window.location.search).get('erp_order') || '';
+    if (!erpOrderFromUrl || window._erpOrderAutoLoaded) return;
+    window._erpOrderAutoLoaded = true;
+    const firstPid = document.querySelector('.po-block')?.id.replace('block_', '') || '';
+    const erpInput = document.getElementById('erpInput_' + firstPid);
+    if (erpInput) {
+        erpInput.value = erpOrderFromUrl;
+        searchErp(firstPid, false);
+    }
+}
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

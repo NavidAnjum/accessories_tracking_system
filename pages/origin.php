@@ -119,8 +119,12 @@ window.onOrderLoad = function(res) {
     }
 
     const irc = exch.applicantIrc || ''; const tin = exch.applicantTin || '';
-    if (irc || tin) {
+    const applicantName = lc.lcApplicantName || '';
+    const applicantAddress = lc.lcApplicantAddress || '';
+    if (applicantName || applicantAddress || irc || tin) {
         const p = [];
+        if (applicantName) p.push(applicantName);
+        if (applicantAddress) p.push(applicantAddress);
         if (irc) p.push('IRC No. '+irc); if (tin) p.push('TIN No. '+tin);
         if (exch.applicantVatBin)   p.push('Vat/bin No. '+exch.applicantVatBin);
         if (exch.applicantBankBin)  p.push('Bank Bin No. '+exch.applicantBankBin);
@@ -130,8 +134,8 @@ window.onOrderLoad = function(res) {
         set('originApplicantsText', 'Applicants ' + p.join(', ') + '.');
     }
 
-    const contract = exch.exportSalesContractNo   || '';
-    const contDate = exch.exportSalesContractDate || '';
+    const contract = lc.lcExportSalesContractNo || exch.exportSalesContractNo || lc.lcNumber || '';
+    const contDate = lc.lcExportSalesContractDate || exch.exportSalesContractDate || lc.lcDate || '';
     set('originContractText', contract ? 'Sales Contract No : ' + contract + (contDate ? ' Dated ' + contDate : '') + '.' : '—');
 };
 </script>

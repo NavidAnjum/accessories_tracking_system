@@ -2,7 +2,8 @@
 /**
  * api/users.php — minimal user lookup for assignment dropdowns.
  *
- * GET ?role=marketing → active users with that role: [{id, name, team}]
+ * GET ?role=marketing → active marketing users and marketing team leaders:
+ *                        [{id, name, team}]
  */
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
@@ -18,7 +19,15 @@ try {
     $db = getDB();
     $role = trim((string)($_GET['role'] ?? ''));
 
-    if ($role !== '') {
+    if ($role === 'marketing') {
+        // Team leaders also perform marketing work and must remain selectable
+        // as the PI marketing person (for example, Tanvir).
+        $stmt = $db->query("SELECT id, name, team
+                            FROM users
+                            WHERE role IN ('marketing', 'team_leader')
+                              AND COALESCE(is_active, 1) = 1
+                            ORDER BY name ASC");
+    } elseif ($role !== '') {
         $stmt = $db->prepare("SELECT id, name, team FROM users WHERE role = ? AND COALESCE(is_active, 1) = 1 ORDER BY name ASC");
         $stmt->execute([$role]);
     } else {

@@ -234,15 +234,17 @@ function erpSaleOrdersDecodeResponse(array $response): array
 
 function erpSaleOrdersCacheKey(array $row): string
 {
+    // Key on the STABLE identity of an ERP order line only. Previously the key
+    // also hashed customer_po_no / ordered_item / line_number — mutable fields —
+    // so any text edit to those between syncs produced a NEW cache_key and thus a
+    // DUPLICATE row for the same physical line (the "1 item shows as 3" bug).
+    // A line is uniquely identified by its sales order + line + shipment.
     $parts = [
         (string) ($row['org_id'] ?? ''),
         (string) ($row['header_id'] ?? ''),
-        (string) ($row['line_id'] ?? ''),
-        (string) ($row['line_number'] ?? ''),
-        (string) ($row['shipment_number'] ?? ''),
         (string) ($row['sale_order_no'] ?? ''),
-        (string) ($row['customer_po_no'] ?? ''),
-        (string) ($row['ordered_item'] ?? ''),
+        (string) ($row['line_id'] ?? ''),
+        (string) ($row['shipment_number'] ?? ''),
     ];
     return sha1(implode('|', $parts));
 }

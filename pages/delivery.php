@@ -187,20 +187,21 @@ window.onOrderLoad = function(res) {
     set('deliveryBeneficiaryAddress', comm.commercialBeneficiaryAddress || '—');
     set('deliveryFactoryAddress',     comm.commercialFactoryAddress     || '—');
     set('deliveryFooterCompany',      comm.commercialBeneficiaryName    || '—');
-    set('deliveryConsigneeName',      order.customer_name || comm.commercialConsigneeName || '—');
+    set('deliveryConsigneeName',      lc.lcApplicantName || order.customer_name || comm.commercialConsigneeName || '—');
+    set('deliveryConsigneeAddress',   lc.lcApplicantAddress || comm.commercialConsigneeAddress || '—');
     set('deliveryInvoiceNo',          comm.invoiceNo   || comm.proformaNo || '—');
     set('deliveryAdvisingBank', pick(
+        lc.reimbursementBank,
         comm.commercialAdvisingBank,
         exch.payToBankAddress,
-        exch.payToBankName,
-        lc.reimbursementBank
+        exch.payToBankName
     ));
     set('deliveryConsigneeBank', pick(
+        lc.negotiatingBeneficiaryBank,
         comm.commercialConsigneeBankAddress,
         sales.consigneeBank,
         exch.negotiatingBankAddress,
-        exch.beneficiaryBankAddress,
-        lc.negotiatingBeneficiaryBank
+        exch.beneficiaryBankAddress
     ));
     set('deliveryCarrierText',        exch.carrierNameMaster || comm.commercialCarrier || '—');
     set('deliveryPackingText',        'Standard Poly Packing Rolls');
@@ -210,8 +211,8 @@ window.onOrderLoad = function(res) {
     const lcDate = exch.masterLcDate || lc.lcDate   || '';
     set('deliveryLcText', lcNo ? lcNo + (lcDate ? ' Dated ' + lcDate : '') : '—');
 
-    const contract = exch.exportSalesContractNo   || '';
-    const contDate = exch.exportSalesContractDate || '';
+    const contract = lc.lcExportSalesContractNo || exch.exportSalesContractNo || lc.lcNumber || '';
+    const contDate = lc.lcExportSalesContractDate || exch.exportSalesContractDate || lc.lcDate || '';
     set('deliveryContractText', contract ? contract + (contDate ? ' Dated ' + contDate : '') : '—');
 
     const proforma     = comm.proformaNo   || '';
@@ -219,8 +220,12 @@ window.onOrderLoad = function(res) {
     set('deliveryProformaText', proforma ? proforma + (proformaDate ? ' Dated ' + proformaDate : '') : '—');
 
     const irc = exch.applicantIrc || ''; const tin = exch.applicantTin || '';
-    if (irc || tin) {
+    const applicantName = lc.lcApplicantName || '';
+    const applicantAddress = lc.lcApplicantAddress || '';
+    if (applicantName || applicantAddress || irc || tin) {
         const p = [];
+        if (applicantName) p.push(applicantName);
+        if (applicantAddress) p.push(applicantAddress);
         if (irc) p.push('IRC No. '+irc); if (tin) p.push('TIN No. '+tin);
         if (exch.applicantVatBin)  p.push('Vat/bin No. '+exch.applicantVatBin);
         if (exch.applicantBankBin) p.push('Bank Bin No. '+exch.applicantBankBin);

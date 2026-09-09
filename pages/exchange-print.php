@@ -202,6 +202,9 @@ require_once __DIR__ . '/../includes/print-brand.php';
     padding-top:10px;
 }
 .boe-to { font-size:10.5px; white-space:pre-line; }
+.boe-epz-ref { border:1px solid #94a3b8; padding:7px 9px; font-size:9.5px; display:grid; grid-template-columns:1fr 1fr; gap:4px 14px; }
+.boe-epz-ref div { display:flex; justify-content:space-between; gap:8px; }
+.boe-epz-ref strong { white-space:nowrap; }
 .boe-sign { text-align:center; }
 .boe-sign-line { border-top:1.5px solid #000; margin-bottom:6px; }
 .boe-sign-label { font-size:10px; }
@@ -316,6 +319,27 @@ function boePlainText(val) {
 
 function boeMultiline(val) {
     return boeSplitText(val).join('\n');
+}
+
+function boeEpzReferences(lc) {
+    if (lc?.lcZoneType !== 'epz') return '';
+    return `<div class="boe-epz-ref">
+        <div><strong>EXP No.</strong><span>${boeEsc(lc.lcExpNo || '-')}</span></div>
+        <div><strong>EXP Date</strong><span>${boeEsc(boeFmtDate(lc.lcExpDate || ''))}</span></div>
+        <div><strong>IP No.</strong><span>${boeEsc(lc.lcIpNo || '-')}</span></div>
+        <div><strong>IP Date</strong><span>${boeEsc(boeFmtDate(lc.lcIpDate || ''))}</span></div>
+    </div>`;
+}
+
+function boePiReferences(res) {
+    const summary = window.atsResolveOrderPiSummary
+        ? window.atsResolveOrderPiSummary(res)
+        : {numbers:[], total:0, count:0};
+    if (!summary.count && !summary.total) return '';
+    return `<div class="boe-epz-ref">
+        <div style="grid-column:1/-1;"><strong>PI Numbers Included</strong><span>${boeEsc((summary.numbers || []).join(' / ') || '-')}</span></div>
+        <div style="grid-column:1/-1;"><strong>Total PI Value (USD)</strong><span>$ ${boeEsc(boeFmtMoney(summary.total || 0))}</span></div>
+    </div>`;
 }
 
 const BOE_BANKS = {
@@ -534,6 +558,8 @@ function renderBoePages() {
                             <div>To</div>
                             <div>${boeEsc(toBankText || '-').replace(/\n/g,'<br>')}</div>
                         </div>
+                        ${boeEpzReferences(lc)}
+                        ${boePiReferences(res)}
                     </div>
                     <div class="boe-sign">
                         <img src="<?= BASE_PATH ?>/AKM.png" alt="For Zaber & Zubair Accessories Ltd. — Authorised Signature" style="height:100px;max-width:300px;object-fit:contain;display:block;margin-left:auto;">

@@ -236,17 +236,21 @@ try {
         $limit = max(1, min(200, (int)($_GET['limit'] ?? 8)));
         $full  = !empty($_GET['full']);
 
-        // ERP inbox orders are the only bell/worklist notifications. Opening an
-        // item or creating its work order must not clear it. It remains visible
-        // while Commercial is working in Sales and clears after PI submission
-        // moves the linked work order to Marketing.
+        // ERP inbox orders remain in the Commercial worklist while their linked
+        // work order is being prepared at Sales. They clear only after the PI is
+        // submitted and the shared work order moves beyond Sales.
         $items = [];
         if (canManageErpOrderInbox($userRole)) {
+            // Show only ERP orders that are NOT yet attached to a work order.
+            // Linking happens when the PI is submitted to Marketing approval
+            // (server-side linkSalesErpOrders) — so submitting clears the
+            // notification, and when a PI includes multiple ERP orders, all of
+            // their notifications clear together (each gets a work_order_id).
             $erpStmt = $db->prepare("SELECT e.sale_order_no, e.customer_po_no, e.customer_name, e.buyer, e.sales_person,
                                               e.header_status, e.line_count, e.snapshot_json, e.header_creation_date, e.first_seen_at, e.read_at
                                        FROM erp_order_inbox e
-                                       WHERE e.work_order_id IS NULL
-                                          OR e.work_order_id = ''
+                                       WHERE COALESCE(e.is_hidden, 0) = 0
+                                         AND (e.work_order_id IS NULL OR e.work_order_id = '')
                                        ORDER BY COALESCE(NULLIF(e.header_creation_date, ''), e.first_seen_at) DESC, e.sale_order_no DESC");
             $erpStmt->execute();
 
@@ -393,6 +397,7 @@ try {
             LEFT JOIN orders erp_work_order ON BINARY erp_work_order.order_id = BINARY e.work_order_id
             WHERE $where
               AND n.is_read = 0
+              AND COALESCE(e.is_hidden, 0) = 0
                AND (e.work_order_id IS NULL
                     OR e.work_order_id = ''
                     OR LOWER(COALESCE(erp_work_order.current_step, 'sales')) = 'sales')
@@ -415,6 +420,7 @@ try {
                 LEFT JOIN erp_order_inbox e ON $erpJoin
                 LEFT JOIN orders erp_work_order ON BINARY erp_work_order.order_id = BINARY e.work_order_id
                 WHERE $where
+                   AND COALESCE(e.is_hidden, 0) = 0
                    AND (e.work_order_id IS NULL
                         OR e.work_order_id = ''
                         OR LOWER(COALESCE(erp_work_order.current_step, 'sales')) = 'sales')
@@ -477,6 +483,7 @@ try {
                                      FROM erp_order_inbox e
                                      WHERE (e.work_order_id IS NULL
                                             OR e.work_order_id = '')
+                                         AND COALESCE(e.is_hidden, 0) = 0
                                          AND " . erpNotificationDateExpr() . " >= ?
                                       ORDER BY COALESCE(NULLIF(header_creation_date, ''), first_seen_at) DESC, sale_order_no DESC");
             $erpStmt->execute([$erpFloorDate]);

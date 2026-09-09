@@ -89,6 +89,12 @@ try {
         $id = trim($_GET['id'] ?? '');
         if (!$id) { http_response_code(400); echo json_encode(['error' => 'id required']); exit; }
 
+        // New PI records link directly to their Work Order. The legacy Sales
+        // snapshot fallback below keeps older PI numbers searchable as well.
+        $hasMigCols = false;
+        try { $db->query('SELECT order_id FROM pis LIMIT 0'); $hasMigCols = true; } catch (PDOException $_) {}
+        $matchedBy = 'work_order';
+
         // Search by full match first, then partial
         $stmt = $db->prepare("SELECT * FROM orders WHERE order_id = ? LIMIT 1");
         $stmt->execute([$id]);
@@ -98,6 +104,32 @@ try {
             $stmt = $db->prepare("SELECT * FROM orders WHERE order_id LIKE ? LIMIT 1");
             $stmt->execute(['%' . $id . '%']);
             $order = $stmt->fetch();
+        }
+
+        // Not a Work Order ID: resolve the value as a PI number. Exact match is
+        // preferred; partial PI numbers are accepted for convenient searching.
+        if (!$order && $hasMigCols) {
+            $stmt = $db->prepare("SELECT order_id FROM pis WHERE pi_number = ? AND order_id IS NOT NULL AND order_id <> '' ORDER BY created_at DESC LIMIT 1");
+            $stmt->execute([$id]);
+            $piOrderId = trim((string)($stmt->fetchColumn() ?: ''));
+            if ($piOrderId === '') {
+                $stmt = $db->prepare("SELECT order_id FROM pis WHERE pi_number LIKE ? AND order_id IS NOT NULL AND order_id <> '' ORDER BY created_at DESC LIMIT 1");
+                $stmt->execute(['%' . $id . '%']);
+                $piOrderId = trim((string)($stmt->fetchColumn() ?: ''));
+            }
+            if ($piOrderId !== '') {
+                $stmt = $db->prepare("SELECT * FROM orders WHERE order_id = ? LIMIT 1");
+                $stmt->execute([$piOrderId]);
+                $order = $stmt->fetch();
+                if ($order) $matchedBy = 'pi_number';
+            }
+        }
+
+        if (!$order) {
+            $stmt = $db->prepare("SELECT o.* FROM orders o JOIN page_data p ON p.order_id = o.order_id WHERE p.page_name = 'sales' AND p.data LIKE ? ORDER BY o.updated_at DESC LIMIT 1");
+            $stmt->execute(['%' . $id . '%']);
+            $order = $stmt->fetch();
+            if ($order) $matchedBy = 'pi_number';
         }
 
         if (!$order) {
@@ -113,10 +145,6 @@ try {
             $pages[$row['page_name']] = json_decode($row['data'], true) ?? [];
         }
 
-        // Detect migration columns
-        $hasMigCols = false;
-        try { $db->query('SELECT order_id FROM pis LIMIT 0'); $hasMigCols = true; } catch (PDOException $_) {}
-
         // Fetch linked PIs
         $pis = [];
         if ($hasMigCols) {
@@ -129,6 +157,88 @@ try {
             $stmt->execute(['%' . $order['order_id'] . '%']);
             $pis = $stmt->fetchAll();
         }
+
+        // Commercial can attach already-created PIs from other Work Orders to
+        // this LC. Keep the PI's original order_id intact; the LC snapshot only
+        // stores lightweight references and this response merges those records.
+        foreach ($pis as &$ownedPi) {
+            $ownedPi['linked_via_lc'] = 0;
+        }
+        unset($ownedPi);
+
+        $lcIncludedRaw = $pages['lc']['lcIncludedPis'] ?? [];
+        if (is_string($lcIncludedRaw)) {
+            $lcIncludedRaw = json_decode($lcIncludedRaw, true) ?: [];
+        }
+        if (is_array($lcIncludedRaw) && $lcIncludedRaw) {
+            $extraIds = [];
+            $extraNumbers = [];
+            foreach ($lcIncludedRaw as $ref) {
+                if (is_array($ref)) {
+                    $refId = (int)($ref['id'] ?? 0);
+                    $refNumber = trim((string)($ref['pi_number'] ?? ''));
+                } else {
+                    $refId = is_numeric($ref) ? (int)$ref : 0;
+                    $refNumber = $refId ? '' : trim((string)$ref);
+                }
+                if ($refId > 0) $extraIds[$refId] = $refId;
+                if ($refNumber !== '') $extraNumbers[strtolower($refNumber)] = $refNumber;
+            }
+
+            $where = [];
+            $params = [];
+            if ($extraIds) {
+                $where[] = 'id IN (' . implode(',', array_fill(0, count($extraIds), '?')) . ')';
+                array_push($params, ...array_values($extraIds));
+            }
+            if ($extraNumbers) {
+                $where[] = 'pi_number IN (' . implode(',', array_fill(0, count($extraNumbers), '?')) . ')';
+                array_push($params, ...array_values($extraNumbers));
+            }
+
+            if ($where) {
+                $stmt = $db->prepare('SELECT * FROM pis WHERE (' . implode(' OR ', $where) . ') ORDER BY created_at DESC');
+                $stmt->execute($params);
+                $extraRows = $stmt->fetchAll();
+
+                // Selecting any individual PI means selecting the individual PI
+                // set belonging to that PI's original Work Order. This ensures
+                // that a Work Order with PI-1 and PI-2 always shows both in LC.
+                if ($hasMigCols && $extraRows) {
+                    $relatedOrderIds = [];
+                    foreach ($extraRows as $extraRow) {
+                        $relatedOrderId = trim((string)($extraRow['order_id'] ?? ''));
+                        if ($relatedOrderId !== '') $relatedOrderIds[$relatedOrderId] = $relatedOrderId;
+                    }
+                    if ($relatedOrderIds) {
+                        $relatedStmt = $db->prepare(
+                            'SELECT * FROM pis WHERE order_id IN (' .
+                            implode(',', array_fill(0, count($relatedOrderIds), '?')) .
+                            ') ORDER BY created_at ASC'
+                        );
+                        $relatedStmt->execute(array_values($relatedOrderIds));
+                        $extraRows = $relatedStmt->fetchAll();
+                    }
+                }
+                $existingPiIds = [];
+                $existingPiNumbers = [];
+                foreach ($pis as $pi) {
+                    $existingPiIds[(int)($pi['id'] ?? 0)] = true;
+                    $existingPiNumbers[strtolower(trim((string)($pi['pi_number'] ?? '')))] = true;
+                }
+                foreach ($extraRows as $extraPi) {
+                    $extraId = (int)($extraPi['id'] ?? 0);
+                    $extraNumberKey = strtolower(trim((string)($extraPi['pi_number'] ?? '')));
+                    if (isset($existingPiIds[$extraId]) || ($extraNumberKey !== '' && isset($existingPiNumbers[$extraNumberKey]))) {
+                        continue;
+                    }
+                    $extraPi['linked_via_lc'] = 1;
+                    $pis[] = $extraPi;
+                    $existingPiIds[$extraId] = true;
+                    if ($extraNumberKey !== '') $existingPiNumbers[$extraNumberKey] = true;
+                }
+            }
+        }
         foreach ($pis as &$pi) {
             $pi['pos']          = json_decode($pi['pos'],          true) ?? [];
             $pi['included_pis'] = json_decode($pi['included_pis'] ?? 'null', true) ?? [];
@@ -139,6 +249,8 @@ try {
             'order'   => $order,
             'pages'   => $pages,
             'pis'     => $pis,
+            'matched_by' => $matchedBy,
+            'lookup_value' => $id,
         ]);
         exit;
     }

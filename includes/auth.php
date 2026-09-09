@@ -6,8 +6,30 @@ function currentUser(): ?array {
     return $_SESSION['ed_user'] ?? null;
 }
 
+function tryPiRenderTokenLogin(): bool {
+    $token = trim((string)($_GET['render_token'] ?? ''));
+    if ($token === '') return false;
+    try {
+        require_once __DIR__ . '/db.php';
+        require_once __DIR__ . '/pi_render_tokens.php';
+        $user = consumePiRenderToken(getDB(), $token);
+        if (!$user) return false;
+        session_regenerate_id(true);
+        $_SESSION['ed_user'] = [
+            'id'    => $user['id'],
+            'name'  => $user['name'],
+            'email' => $user['email'],
+            'role'  => $user['role'],
+            'team'  => $user['team'] ?? null,
+        ];
+        return true;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
 function requireLogin(): void {
-    if (!currentUser()) {
+    if (!currentUser() && !tryPiRenderTokenLogin()) {
         header('Location: ' . BASE_PATH . '/pages/login.php');
         exit;
     }
@@ -57,8 +79,8 @@ function allowedTabs(): array {
         'finance'         => ['customer-profile'],
         'costing'         => ['costing-review'],
         'production'      => ['production'],
-        'commercial_dept' => ['customer-profile','sales','single-pi','summary-pi','master-pi','erp-orders-report','lc','exchange','commercial','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding','po-status'],
-        'commercial'      => ['customer-profile','sales','single-pi','summary-pi','master-pi','erp-orders-report','lc','exchange','commercial','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding','po-status'],
+        'commercial_dept' => ['customer-profile','sales','single-pi','summary-pi','master-pi','erp-orders-report','lc','sales-contract','exchange','commercial','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding','po-status'],
+        'commercial'      => ['customer-profile','sales','single-pi','summary-pi','master-pi','erp-orders-report','lc','sales-contract','exchange','commercial','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding','po-status'],
     ];
     // admin and legacy roles see everything
     return $map[$role] ?? [];

@@ -65,6 +65,7 @@ const STEP_LABELS = {
     'sales':            'PI',
     'marketing':        'Marketing',
     'lc':               'LC',
+    'sales-contract':   'Sales Contract',
     'po-overview':      'PO Status',
     'exchange':         'Bill of Exchange',
     'commercial':       'Commercial Invoice',
@@ -79,7 +80,7 @@ const STEP_LABELS = {
 
 const STEP_ORDER = [
     'marketing-intake', 'costing-review', 'sales', 'marketing',
-    'commercial', 'packing', 'delivery', 'truck', 'origin',
+    'sales-contract', 'commercial', 'packing', 'delivery', 'truck', 'origin',
     'beneficiary', 'lc', 'forwarding',
 ];
 
@@ -197,6 +198,9 @@ function restoreIntakeFromState(state) {
 }
 
 async function renderDashboard() {
+    // The PHP dashboard page renders itself (DB-backed, with the ERP Order column
+    // and working Delete). Don't fight it.
+    if (window.__ATS_PHP_DASHBOARD) return;
     const body = document.getElementById('dashOrdersBody');
     if (!body) return;
 
@@ -292,6 +296,7 @@ const STEP_PAGES = {
 function loadOrderFromDashboard(orderId, knownStep) {
     // Set sessionStorage — target page will load order data directly from DB
     sessionStorage.setItem('ats_current_order_id', orderId);
+    sessionStorage.setItem('ats_open_order', '1'); // deliberate open → restore on the entry page
 
     const targetStep = knownStep || 'marketing-intake';
     const page = STEP_PAGES[targetStep] || 'marketing-intake.php';
@@ -299,12 +304,24 @@ function loadOrderFromDashboard(orderId, knownStep) {
 }
 
 function deleteOrderFromDashboard(orderId) {
-    const orders = getOrdersList().filter(o => o.id !== orderId);
-    saveOrdersList(orders);
-    // Also clear active if it's the same
-    const active = loadIntakeState();
-    if (active?.id === orderId) localStorage.removeItem(ED_INTAKE_KEY);
-    renderDashboard();
+    if (!confirm('Delete the whole order ' + orderId + '? This cannot be undone.')) return;
+    // Delete from the DATABASE (orders live in MySQL, not localStorage). Also clears
+    // the order's ERP inbox claims server-side so they free up for reuse.
+    fetch(APP_BASE + '/api/orders.php?order_id=' + encodeURIComponent(orderId), { method: 'DELETE' })
+        .then(r => r.json())
+        .then(res => { if (res && res.error) alert('Delete failed: ' + res.error); })
+        .catch(() => alert('Could not reach server.'))
+        .finally(() => {
+            // Keep the legacy localStorage list in sync too, then re-render.
+            try {
+                const orders = getOrdersList().filter(o => o.id !== orderId);
+                saveOrdersList(orders);
+                const active = loadIntakeState();
+                if (active?.id === orderId) localStorage.removeItem(ED_INTAKE_KEY);
+            } catch (_) {}
+            if (typeof renderDash === 'function') renderDash();
+            else if (typeof renderDashboard === 'function') renderDashboard();
+        });
 }
 
 function startNewOrder() {

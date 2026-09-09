@@ -20,6 +20,7 @@ function ensureErpOrderInboxTable(PDO $db): void
             header_creation_date DATETIME NULL,
             line_count INT UNSIGNED NOT NULL DEFAULT 0,
             snapshot_json LONGTEXT NULL,
+            is_hidden TINYINT(1) NOT NULL DEFAULT 0,
             work_order_id VARCHAR(30) NULL,
             converted_by_id INT NULL,
             converted_at DATETIME NULL,
@@ -50,6 +51,7 @@ function ensureErpOrderInboxTable(PDO $db): void
         'header_creation_date' => 'DATETIME NULL',
         'line_count' => 'INT UNSIGNED NOT NULL DEFAULT 0',
         'snapshot_json' => 'LONGTEXT NULL',
+        'is_hidden' => 'TINYINT(1) NOT NULL DEFAULT 0',
         'work_order_id' => 'VARCHAR(30) NULL',
         'converted_by_id' => 'INT NULL',
         'converted_at' => 'DATETIME NULL',
@@ -100,6 +102,52 @@ function ensureErpOrderInboxTable(PDO $db): void
 function canManageErpOrderInbox(string $role): bool
 {
     return in_array(strtolower(trim($role)), ['admin', 'commercial', 'commercial_dept'], true);
+}
+
+function erpOrderNumbersFromSalesData(array $sales): array
+{
+    $numbers = [];
+    foreach (($sales['pos'] ?? []) as $po) {
+        if (!is_array($po)) continue;
+        $values = !empty($po['salesOrders']) && is_array($po['salesOrders'])
+            ? $po['salesOrders']
+            : preg_split('/\s*,\s*/', (string)($po['salesOrder'] ?? ''), -1, PREG_SPLIT_NO_EMPTY);
+        foreach ($values ?: [] as $value) {
+            $value = trim((string)$value);
+            if ($value !== '' && preg_match('/^\d+$/', $value)) {
+                $numbers[$value] = true;
+            }
+        }
+    }
+    return array_keys($numbers);
+}
+
+function linkSalesErpOrdersToWorkOrder(PDO $db, string $orderId, array $sales, ?int $userId = null): array
+{
+    ensureErpOrderInboxTable($db);
+    $numbers = erpOrderNumbersFromSalesData($sales);
+    if (!$numbers) return [];
+
+    $insert = $db->prepare('INSERT IGNORE INTO erp_order_inbox (sale_order_no) VALUES (?)');
+    $owner = $db->prepare('SELECT work_order_id FROM erp_order_inbox WHERE sale_order_no = ? LIMIT 1');
+    $link = $db->prepare("UPDATE erp_order_inbox
+                          SET work_order_id = ?,
+                              converted_by_id = COALESCE(converted_by_id, ?),
+                              converted_at = COALESCE(converted_at, NOW())
+                          WHERE sale_order_no = ?
+                            AND (work_order_id IS NULL OR work_order_id = '' OR work_order_id = ?)");
+
+    foreach ($numbers as $erpOrderNo) {
+        $insert->execute([$erpOrderNo]);
+        $owner->execute([$erpOrderNo]);
+        $existingOwner = trim((string)($owner->fetchColumn() ?: ''));
+        if ($existingOwner !== '' && $existingOwner !== $orderId) {
+            throw new RuntimeException("ERP sales order {$erpOrderNo} already belongs to {$existingOwner}.");
+        }
+        $link->execute([$orderId, $userId, $erpOrderNo, $orderId]);
+    }
+
+    return $numbers;
 }
 
 function erpInboxSqlDate(string $value): ?string

@@ -1,0 +1,17 @@
+Windows Registry Editor Version 5.00
+
+; Registers the custom protocol  atsmail://  for the current user.
+; IMPORTANT: edit the path below to where you copied ats-mail-launch.cmd on THIS PC.
+; The path uses double backslashes. Example assumes: C:\ats-outlook-helper\
+; The "%1" passes the full atsmail://... string to the launcher.
+
+[HKEY_CURRENT_USER\Software\Classes\atsmail]
+@="URL:ATS Email PI Protocol"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\atsmail\shell]
+
+[HKEY_CURRENT_USER\Software\Classes\atsmail\shell\open]
+
+[HKEY_CURRENT_USER\Software\Classes\atsmail\shell\open\command]
+@="cmd.exe /c \"C:\\ats-outlook-helper\\ats-mail-launch.cmd\" \"%1\""

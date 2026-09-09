@@ -54,7 +54,10 @@ require_once __DIR__ . '/../includes/print-brand.php';
     flex-direction:column;
 }
 .spi-continuation { display:none; }
-.spi-continuation.is-active { display:flex; }
+/* On screen the continuation grows to show every overflow item (66+); print
+   splits it across sheets. Auto height so nothing is hidden in the preview. */
+.spi-continuation.is-active { display:flex; height:auto; min-height:297mm; overflow:visible; }
+html.ats-print-layout #spiDocument { height:281mm!important; min-height:281mm!important; overflow:hidden!important; }
 
 /* Header */
 .spi-hd {
@@ -111,9 +114,28 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .spi-tbl tr.ref-row td { border:none; padding:3px 8px 1px; }
 .spi-tbl tr.total-row td { font-weight:700; border-top:2px solid #1a3a6e; }
 .spi-ref-bold { font-weight:700; font-size:7.5pt; }
-.spi-addr-row { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
-.spi-addr-left { flex:1 1 auto; }
-.spi-orderref { font-size:7.5pt; font-weight:700; margin:0; line-height:1.5; text-align:right; white-space:nowrap; flex:0 0 auto; }
+.spi-addr-row {
+    display:flex;
+    flex-wrap:wrap;
+    align-items:flex-start;
+    gap:2px 16px;
+}
+.spi-addr-left { flex:1 1 100%; min-width:0; }
+.spi-orderref {
+    flex:1 1 100%;
+    min-width:0;
+    max-width:100%;
+    margin:2px 0 3px;
+    padding-top:3px;
+    border-top:1px dotted #7a7a7a;
+    font-size:7.5pt;
+    font-weight:700;
+    line-height:1.4;
+    text-align:left;
+    white-space:normal;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+}
 
 /* Total words */
 .spi-words {
@@ -152,17 +174,35 @@ require_once __DIR__ . '/../includes/print-brand.php';
 /* Empty state */
 .spi-empty { text-align:center; padding:60px 20px; color:#94a3b8; font-family:sans-serif; }
 
-@page { size:A4 portrait; margin:0; }
+@page { size:A4 portrait; margin:0 0 16mm; }
 @media print {
     .spi-ctrl, nav.page-nav, .order-id-bar { display:none !important; }
-    #spiWrap { background:none !important; padding:0 !important; }
-    .spi-doc  { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:4mm 14mm 12mm!important; overflow:hidden!important; display:flex!important; flex-direction:column!important; }
+    html, body { width:210mm!important; min-height:0!important; margin:0!important; padding:0!important; background:#fff!important; overflow:visible!important; }
+    .app-shell, .form-stack { display:block!important; margin:0!important; padding:0!important; background:#fff!important; }
+    .form-stack > *:not(#spiWrap) { display:none!important; }
+    #spiWrap { display:block!important; background:none!important; padding:0!important; margin:0!important; width:210mm!important; min-height:0!important; }
+    .spi-doc  { box-sizing:border-box; box-shadow:none; margin:0; width:210mm!important; height:auto!important; min-height:281mm!important; max-width:210mm; padding:4mm 14mm 8mm!important; overflow:visible!important; display:flex!important; flex-direction:column!important; }
+    #spiDocument { height:281mm!important; min-height:281mm!important; overflow:hidden!important; }
+    /* Page 1 always starts a fresh sheet; the continuation grows and lets the
+       browser split its long item table across as many printed pages as needed
+       (66+ items). Its height is auto so nothing is clipped. */
+    .spi-continuation.is-active {
+        height:auto!important; min-height:0!important; overflow:visible!important;
+        display:block!important; break-before:page; page-break-before:always;
+    }
+    .spi-continuation .spi-tbl tr { page-break-inside:avoid!important; break-inside:avoid-page!important; }
     .spi-continuation:not(.is-active) { display:none!important; }
-    .spi-doc .zzal-print-brand--footer { position:static!important; margin-top:auto!important; page-break-inside:avoid!important; break-inside:avoid-page!important; }
+    /* Page 1 footer pins to the bottom (fixed-height flex column). */
+    #spiDocument .zzal-print-brand--footer { position:fixed!important; left:14mm!important; right:14mm!important; bottom:2mm!important; width:auto!important; margin:0!important; padding:0!important; z-index:20; background:#fff; page-break-inside:avoid!important; break-inside:avoid-page!important; }
+    /* Continuation is auto-height and may span several sheets, so its footer must
+       flow right after the signature (NOT margin-top:auto, which would push it to
+       a blank extra page). */
+    .spi-continuation .zzal-print-brand--footer { display:none!important; }
+    .spi-tbl thead { display:table-header-group!important; }
+    .spi-tbl tbody { break-inside:auto!important; page-break-inside:auto!important; }
+    .spi-tbl tr { break-inside:avoid-page!important; page-break-inside:avoid!important; }
     #spiContent { min-height:0!important; flex:1 1 auto!important; display:flex!important; flex-direction:column!important; }
     .spi-hd { display:none !important; }
-    body, html, .app-shell { width:210mm!important; min-height:297mm!important; margin:0!important; padding:0!important; background:#fff !important; overflow:visible!important; }
-    .form-stack { padding:0 !important; }
     .no-print { display:none !important; }
 }
 html.spi-embed .page-nav,
@@ -197,7 +237,10 @@ html.pi-preview .spi-ctrl {
     <select id="spiLcType"    style="display:none;"><option value="Sight">Sight</option><option value="Usance">Usance</option><option value="Deferred Payment">Deferred Payment</option><option value="Acceptance">Acceptance</option></select>
     <select id="spiTolerance" style="display:none;"><option value="5">5</option><option value="3">3</option><option value="10">10</option></select>
     <button class="spi-excel-btn" onclick="downloadSinglePiExcel()">Download Excel</button>
-    <button class="spi-print-btn" onclick="window.print()">Print / Save PDF</button>
+    <?php if (($__user['role'] ?? '') !== 'marketing'): ?>
+    <button class="spi-excel-btn" style="background:#0f6cbd;" onclick="emailThisPi()">📧 Email PI (Outlook)</button>
+    <?php endif; ?>
+    <button class="spi-print-btn" onclick="atsPrintPi()">Print / Save PDF</button>
 </div>
 <script>
 (function(){
@@ -215,6 +258,7 @@ html.pi-preview .spi-ctrl {
     window._spiHsCode = p.get('hs') || '4819.10.00';
     window._spiDocMust = p.get('doc') || 'UD';
     window._spiBank = p.get('bank') || 'ncc';
+    window._spiRequestedSelection = p.get('pi_sel') || '';
 })();
 </script>
 
@@ -313,6 +357,30 @@ html.pi-preview .spi-ctrl {
         <div><strong>PROFOMA INVOICE NO :</strong> <span id="spiContNum">-</span></div>
         <div><strong>Date :</strong> <span id="spiContDate">-</span></div>
     </div>
+    <!-- Overflow item rows (continued from page 1) -->
+    <table class="spi-tbl" id="spiContTblWrap" style="display:none;">
+        <thead>
+            <tr>
+                <th style="width:40px;">SL NO</th>
+                <th>Description of goods</th>
+                <th style="width:50px;">PLY</th>
+                <th style="width:100px;">Quantity/<br>Pcs/con</th>
+                <th style="width:90px;">Unit Price</th>
+                <th style="width:115px;">Total Amount<br>(USD)</th>
+            </tr>
+        </thead>
+        <tbody id="spiContBody"></tbody>
+        <tbody id="spiContTotFoot" style="display:none;">
+            <tr class="total-row">
+                <td colspan="2"></td>
+                <td></td>
+                <td class="tc" id="spiContTotalQty"><strong>-</strong></td>
+                <td></td>
+                <td class="tr" id="spiContTotalVal"><strong>-</strong></td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="spi-words" id="spiContWordsWrap" style="display:none;">TOTAL AMOUNT : US DOLLER: <span id="spiContWords">-</span></div>
     <div id="spiTermsContBlock">
         <div class="spi-terms-title">Terms &amp; Conditions:</div>
         <ol class="spi-terms-list" id="spiTermsCont" start="16"></ol>
@@ -410,6 +478,9 @@ function spiPopulateSel(res) {
             sel.appendChild(opt);
         });
     });
+    if (window._spiRequestedSelection && Array.from(sel.options).some(opt => opt.value === window._spiRequestedSelection)) {
+        sel.value = window._spiRequestedSelection;
+    }
 }
 
 /* ── Render the PI ────────────────────────────────────────────── */
@@ -534,50 +605,66 @@ function renderSinglePi() {
     terms[11] = `Beneficiary Bin No : <strong>000230256-0103</strong>`;
     terms[12] = `H.S. Code : <strong>${hsCode}</strong>`;
     terms[15] = `${docMust} Mustbe`;
-    const firstTermsEl = document.getElementById('spiTerms');
-    const contTermsEl = document.getElementById('spiTermsCont');
+    const firstTermsEl   = document.getElementById('spiTerms');
+    const contTermsEl    = document.getElementById('spiTermsCont');
     const continuationEl = document.getElementById('spiContinuation');
-    const sigAreaEl = document.getElementById('spiSigArea');
-    const docEl = document.getElementById('spiDocument');
-    const footerEl = docEl.querySelector('.zzal-print-brand--footer');
-    const termsBlockEl = document.getElementById('spiTermsBlock');
+    const sigAreaEl      = document.getElementById('spiSigArea');
+    const docEl          = document.getElementById('spiDocument');
+    const termsBlockEl   = document.getElementById('spiTermsBlock');
 
-    function renderTermSplit(firstCount) {
-        const firstPageTerms = terms.slice(0, firstCount);
-        const continuedTerms = terms.slice(firstCount);
-        firstTermsEl.innerHTML = firstPageTerms.map(t => `<li>${t}</li>`).join('');
-        contTermsEl.innerHTML = continuedTerms.map(t => `<li>${t}</li>`).join('');
-        contTermsEl.start = firstPageTerms.length + 1;
-        continuationEl.classList.toggle('is-active', continuedTerms.length > 0);
-        sigAreaEl.style.display = continuedTerms.length ? 'none' : 'block';
-        return continuedTerms.length;
-    }
+    // Page-1 blocks that move to the continuation page when the items overflow.
+    const body          = document.getElementById('spiBody');
+    const contBody      = document.getElementById('spiContBody');
+    const contTblWrap   = document.getElementById('spiContTblWrap');
+    const totFoot       = document.getElementById('spiTotFoot');
+    const contTotFoot   = document.getElementById('spiContTotFoot');
+    const wordsWrap     = document.getElementById('spiWords')?.closest('.spi-words');
+    const contWordsWrap = document.getElementById('spiContWordsWrap');
+    const contTotalQty  = document.getElementById('spiContTotalQty');
+    const contTotalVal  = document.getElementById('spiContTotalVal');
+    const contWords     = document.getElementById('spiContWords');
 
-    let firstCount = terms.length;
-    renderTermSplit(firstCount);
+    const overflows = () => docEl.scrollHeight > docEl.clientHeight + 2;
 
-    function pageBottom(el) {
-        return el.offsetTop + el.offsetHeight;
-    }
+    // Reset continuation item area + put totals/words/terms on page 1.
+    contBody.innerHTML = '';
+    contTblWrap.style.display = 'none';
+    contTotFoot.style.display = 'none';
+    contWordsWrap.style.display = 'none';
+    totFoot.style.display = '';
+    if (wordsWrap) wordsWrap.style.display = '';
+    if (termsBlockEl) termsBlockEl.style.display = '';
 
-    // Only move terms to page 2 when page 1 genuinely overflows. The doc is a
-    // fixed-height A4 with overflow:hidden, so scrollHeight > clientHeight means
-    // the content (terms + signature + footer) no longer fits on one page.
-    while (firstCount > 1 && docEl.scrollHeight > docEl.clientHeight + 2) {
-        firstCount -= 1;
-        renderTermSplit(firstCount);
-    }
+    // All terms on page 1 first.
+    firstTermsEl.innerHTML = terms.map(t => `<li>${t}</li>`).join('');
+    contTermsEl.innerHTML = '';
+    continuationEl.classList.remove('is-active');
+    sigAreaEl.style.display = 'block';
 
-    // Moving the first term also hides the signature block, which may make the
-    // complete PI fit again. Re-test the full one-page layout before keeping a
-    // continuation page.
-    if (firstCount < terms.length) {
-        renderTermSplit(terms.length);
-        if (docEl.scrollHeight <= docEl.clientHeight + 2) {
-            firstCount = terms.length;
-        } else {
-            renderTermSplit(firstCount);
-        }
+    if (!overflows()) return; // fits on one page
+
+    // Page 1 overflows → activate continuation and move the totals, amount-in-words,
+    // ALL terms and the signature onto page 2 (nothing lost), then spill overflow
+    // item rows there until page 1 fits.
+    continuationEl.classList.add('is-active');
+    contTblWrap.style.display = '';
+    totFoot.style.display = 'none';
+    if (wordsWrap) wordsWrap.style.display = 'none';
+    contTotFoot.style.display = '';
+    contWordsWrap.style.display = '';
+    if (contTotalQty) contTotalQty.innerHTML = document.getElementById('spiTotalQty').innerHTML;
+    if (contTotalVal) contTotalVal.innerHTML = document.getElementById('spiTotalVal').innerHTML;
+    if (contWords)    contWords.textContent  = document.getElementById('spiWords').textContent;
+    firstTermsEl.innerHTML = '';
+    if (termsBlockEl) termsBlockEl.style.display = 'none';   // no "Terms:" heading between items on page 1
+    contTermsEl.innerHTML = terms.map(t => `<li>${t}</li>`).join('');
+    contTermsEl.start = 1;
+    sigAreaEl.style.display = 'none';
+
+    let guard = 0;
+    while (overflows() && body.rows.length > 1 && guard++ < 1000) {
+        const last = body.rows[body.rows.length - 1];
+        contBody.insertBefore(last, contBody.firstChild);
     }
 }
 async function downloadSinglePiExcel() {
@@ -644,6 +731,7 @@ window.onOrderLoad = (function(_prev){
     return function(res) {
         if (typeof _prev === 'function') _prev(res);
         _spiOrderData = res;
+        window.atsRerenderPiForLayout = () => renderSinglePi();
         spiPopulateSel(res);
         renderSinglePi();
         if (atsShouldAutoExcel() && !_spiExcelDone) {
@@ -654,4 +742,5 @@ window.onOrderLoad = (function(_prev){
 })(window.onOrderLoad);
 </script>
 
+<script src="<?= BASE_PATH ?>/assets/ats-email-pi.js"></script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

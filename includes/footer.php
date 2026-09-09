@@ -228,7 +228,7 @@
                     if (display) display.textContent = 'No order loaded';
                     const statusRow = document.getElementById('oidStatusRow');
                     if (statusRow) statusRow.style.display = 'none';
-                    if (isManual) alert('Order not found: ' + id);
+                    if (isManual) alert('Work Order or PI not found: ' + id);
                     return;
                 }
                 setOrderDisplay(res.order.order_id, res.order);
@@ -339,6 +339,31 @@
     // Apply on page load from cached session (before order re-fetches)
     window.addEventListener('DOMContentLoaded', applyPiBindings);
 
+    function applyTradeDocumentRoute(response) {
+        const isSalesContract = response?.pages?.lc?.documentRoute === 'sales_contract';
+        const pageName = document.body.dataset.page || '';
+        const setButton = (selector, target, label) => {
+            const button = document.querySelector(selector);
+            if (!button) return;
+            if (button.classList.contains('js-next-page')) button.dataset.nextPage = target;
+            if (button.classList.contains('js-prev-page')) button.dataset.prevPage = target;
+            button.textContent = label;
+        };
+
+        if (pageName === 'commercial') {
+            setButton('.js-prev-page', isSalesContract ? 'sales-contract' : 'exchange',
+                isSalesContract ? 'Previous: Sales Contract' : 'Previous');
+        }
+        if (pageName === 'truck') {
+            setButton('.js-next-page', isSalesContract ? 'forwarding' : 'origin',
+                isSalesContract ? 'Next: Forwarding →' : 'Next: Certificate of Origin →');
+        }
+        if (pageName === 'forwarding') {
+            setButton('.js-prev-page', isSalesContract ? 'truck' : 'beneficiary',
+                isSalesContract ? 'Previous: Truck Challan' : 'Previous');
+        }
+    }
+
     // ── Auto-restore page data after order load ──────────────────────────────
     const _origOnOrderLoad = window.onOrderLoad;
     window.onOrderLoad = function(res) {
@@ -351,6 +376,8 @@
 
         if (typeof _origOnOrderLoad === 'function') _origOnOrderLoad(res);
 
+        applyTradeDocumentRoute(res);
+
         document.dispatchEvent(new CustomEvent('ats:orderloaded'));
 
         const pageName = document.body.dataset.page;
@@ -360,6 +387,8 @@
 
         // Inject shared order-items panel on doc pages that don't have their own
         const _sipSkip = ['marketing-intake','costing-review','sales','marketing','dashboard','login','po-overview','po-status'];
+        const _piSummarySkip = ['marketing-intake','costing-review','sales','marketing','dashboard','login','po-overview'];
+        if (!_piSummarySkip.includes(pageName)) _renderSharedPiSummary(res);
         if (!_sipSkip.includes(pageName)) _renderSharedItemsPanel(res);
     };
 })();
@@ -369,11 +398,29 @@ function atsResolveDisplayPos(res) {
     const sales  = res.pages?.sales || {};
     const mkt    = res.pages?.['marketing-intake'] || {};
     const allPis = res.pis || [];
-    const individuals = allPis.filter(p => !p.is_master);
-    const masters = allPis.filter(p => p.is_master);
+    const individuals = allPis.filter(p => Number(p?.is_master || 0) !== 1);
+    const masters = allPis.filter(p => Number(p?.is_master || 0) === 1);
     const piType = sales.piType || '';
     const selectedNums = new Set((sales.selectedPiNumbers || []).filter(Boolean));
     const labelMap = { single: 'Single PI', summary: 'Summary PI', master: 'Master PI' };
+
+    // Combine every regular PI currently linked to this Work Order. Master PI
+    // rows aggregate these records, so exclude them to prevent double-counting.
+    if (individuals.length) {
+        const pos = individuals.flatMap(pi => (pi.pos || []).map(po => ({
+            ...po,
+            piNum: po.piNum || pi.pi_number || ''
+        })));
+        if (pos.length) {
+            return {
+                pos,
+                label: individuals.length > 1 ? 'Order PIs' : 'PI',
+                customer: individuals[0]?.customer || sales.customer || '',
+                piNum: individuals.map(pi => pi.pi_number).filter(Boolean).join(' / '),
+                piDate: individuals[0]?.pi_date || sales.piDate || ''
+            };
+        }
+    }
 
     if (Array.isArray(sales.pos) && sales.pos.length) {
         return {
@@ -452,6 +499,61 @@ function atsResolveDisplayPos(res) {
 }
 window.atsResolveDisplayPos = atsResolveDisplayPos;
 
+function atsResolveOrderPiSummary(res) {
+    const sales = res?.pages?.sales || {};
+    const allPis = Array.isArray(res?.pis) ? res.pis : [];
+    const individuals = allPis.filter(pi => Number(pi?.is_master || 0) !== 1);
+    const sources = individuals.length ? individuals : allPis.slice(0, 1);
+    const displayedNumbers = [...new Set(allPis.map(pi => String(pi?.pi_number || '').trim()).filter(Boolean))];
+    const valueFromPos = pos => (pos || []).reduce((poSum, po) => {
+        const savedPoValue = parseFloat(String(po?.val ?? '').replace(/[^\d.-]/g, ''));
+        if (Number.isFinite(savedPoValue)) return poSum + savedPoValue;
+        return poSum + (po?.items || []).reduce((itemSum, item) => {
+            const savedTotal = parseFloat(item?.total);
+            if (Number.isFinite(savedTotal)) return itemSum + savedTotal;
+            return itemSum + ((parseFloat(item?.qty) || 0) * (parseFloat(item?.price ?? item?.unitPrc) || 0));
+        }, 0);
+    }, 0);
+
+    if (sources.length) {
+        // Display every PI number belonging to the selected Work Order(s),
+        // including Summary/Master PI references. Value remains based only on
+        // individual PIs so Master rows never double-count the same goods.
+        const numbers = displayedNumbers.length
+            ? displayedNumbers
+            : [...new Set(sources.map(pi => String(pi?.pi_number || '').trim()).filter(Boolean))];
+        const total = sources.reduce((sum, pi) => {
+            const saved = parseFloat(String(pi?.grand_val ?? '').replace(/[^\d.-]/g, ''));
+            return sum + (Number.isFinite(saved) ? saved : valueFromPos(pi?.pos));
+        }, 0);
+        return {numbers, total, count:numbers.length || sources.length};
+    }
+
+    const number = String(sales.piNum || '').trim();
+    const direct = parseFloat(String(sales.grandVal ?? '').replace(/[^\d.-]/g, ''));
+    return {
+        numbers:number ? [number] : [],
+        total:Number.isFinite(direct) ? direct : valueFromPos(sales.pos),
+        count:number ? 1 : 0
+    };
+}
+window.atsResolveOrderPiSummary = atsResolveOrderPiSummary;
+
+function _renderSharedPiSummary(res) {
+    document.getElementById('sharedOrderPiSummary')?.remove();
+    const summary = atsResolveOrderPiSummary(res);
+    if (!summary.count && !summary.total) return;
+    const anchor = document.querySelector('section.form-card, .form-card');
+    if (!anchor) return;
+    const esc = value => String(value || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const panel = document.createElement('div');
+    panel.id = 'sharedOrderPiSummary';
+    panel.className = 'no-print';
+    panel.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:#eef2ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:12px 16px;margin-bottom:16px;color:#312e81;';
+    panel.innerHTML = `<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#6366f1;">PIs Included for this LC / Work Order</div><div style="font-size:13px;font-weight:700;margin-top:3px;">${summary.numbers.length ? summary.numbers.map(esc).join(' / ') : summary.count + ' PI(s)'}</div></div><div style="text-align:right;"><div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#6366f1;">Total PI Value (USD)</div><div style="font-size:18px;font-weight:900;margin-top:2px;">$ ${summary.total.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>`;
+    anchor.parentNode.insertBefore(panel, anchor);
+}
+
 function _renderSharedItemsPanel(res) {
     document.getElementById('sharedOrderItemsPanel')?.remove();
 
@@ -460,25 +562,13 @@ function _renderSharedItemsPanel(res) {
     const allPis = res.pis || [];
 
     // Priority: Master PI → any saved PI → sales data → marketing intake
-    const masterPi     = allPis.find(p => p.is_master);
-    const standalonePi = allPis.find(p => !p.is_master);
-    const bestPi       = masterPi || standalonePi;
+    const resolved = atsResolveDisplayPos(res);
+    let displayPos = resolved.pos || [];
+    let label      = resolved.label || '';
+    let customer   = resolved.customer || '';
+    let piNum      = resolved.piNum || '';
 
-    let displayPos = [];
-    let label      = '';
-    let customer   = '';
-    let piNum      = '';
-
-    if (bestPi?.pos?.length) {
-        displayPos = bestPi.pos;
-        label      = bestPi.is_master ? 'Master PI' : 'PI';
-        piNum      = bestPi.pi_number || '';
-        customer   = bestPi.customer  || '';
-    } else if (sales?.pos?.length) {
-        displayPos = sales.pos;
-        label      = 'Sales Items';
-        customer   = sales.customer || '';
-    } else if (mkt?.pos?.length) {
+    if (!displayPos.length && mkt?.pos?.length) {
         displayPos = mkt.pos;
         label      = 'Marketing Intake Items';
         customer   = mkt.customer || '';
@@ -556,6 +646,8 @@ function _renderSharedItemsPanel(res) {
 
     anchor.parentNode.insertBefore(panel, anchor);
 }
+window._renderSharedPiSummary = _renderSharedPiSummary;
+window._renderSharedItemsPanel = _renderSharedItemsPanel;
 
 // ── Universal page save / restore ───────────────────────────────────────────
 function collectPageFields() {

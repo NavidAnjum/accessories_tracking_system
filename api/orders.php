@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/notifications.php';
+require_once __DIR__ . '/../includes/erp_order_inbox.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -40,6 +41,21 @@ try {
         return $approved === true
             || $approved === 'true'
             || ($data['piApprovalStatus'] ?? '') === 'approved';
+    };
+
+    // Link every ERP sales order saved inside a Single PI to its shared work
+    // order. Doing this at the server-side Marketing handoff also covers new PI
+    // drafts where ERP orders were selected before an internal order ID existed.
+    $linkSalesErpOrders = static function (PDO $db, string $orderId): array {
+        $stmt = $db->prepare("SELECT data FROM page_data WHERE order_id = ? AND page_name = 'sales' LIMIT 1");
+        $stmt->execute([$orderId]);
+        $sales = json_decode((string)($stmt->fetchColumn() ?: ''), true);
+        if (!is_array($sales)) return [];
+        // Guard so a stale includes/erp_order_inbox.php on the server never
+        // hard-fails the submit with "undefined function" — just skip linking.
+        if (!function_exists('linkSalesErpOrdersToWorkOrder')) return [];
+        $userId = (int)(currentUser()['id'] ?? 0) ?: null;
+        return linkSalesErpOrdersToWorkOrder($db, $orderId, $sales, $userId);
     };
 
     // ── GET ───────────────────────────────────────────────────────────────────
@@ -96,6 +112,40 @@ try {
                 if ($val !== '' && strtolower($val) !== 'null') $lcByOrder[$lc['order_id']] = $val;
             }
 
+            // ERP sales order number(s) linked to each work order (from erp_order_inbox).
+            $erpByOrder = [];
+            try {
+                ensureErpOrderInboxTable($db);
+                $erpRows = $db->query("SELECT work_order_id, sale_order_no FROM erp_order_inbox WHERE work_order_id IS NOT NULL AND work_order_id <> ''")->fetchAll();
+                foreach ($erpRows as $er) {
+                    $woid = trim((string)($er['work_order_id'] ?? ''));
+                    $son  = trim((string)($er['sale_order_no'] ?? ''));
+                    if ($woid === '' || $son === '') continue;
+                    $erpByOrder[$woid][] = $son;
+                }
+            } catch (Throwable $e) { /* inbox optional — leave column blank */ }
+
+            // Fallback: an order still at the PI/Sales step has not been linked in the
+            // inbox yet (that happens on submit-to-Marketing). Pull the ERP sales order
+            // straight from the saved `sales` page_data so it shows immediately.
+            $erpFromSales = [];
+            $salesPrintByOrder = [];
+            try {
+                $salesRows = $db->query("SELECT order_id, data FROM page_data WHERE page_name = 'sales'")->fetchAll();
+                foreach ($salesRows as $sr) {
+                    $sales = json_decode((string)($sr['data'] ?? ''), true);
+                    if (!is_array($sales)) continue;
+                    $nums = erpOrderNumbersFromSalesData($sales);
+                    if ($nums) $erpFromSales[$sr['order_id']] = $nums;
+                    $piType = strtolower(trim((string)($sales['piType'] ?? 'single')));
+                    if (!in_array($piType, ['single', 'summary', 'master'], true)) $piType = 'single';
+                    $salesPrintByOrder[$sr['order_id']] = [
+                        'pi_type' => $piType,
+                        'hs_code' => trim((string)($sales['hsCode'] ?? '')),
+                    ];
+                }
+            } catch (Throwable $e) { /* optional */ }
+
             // Assigned marketing person lives in the `sales` page_data (key: marketingUserId/Name).
             $mkByOrder = [];
             $mkRows = $db->query("SELECT order_id, JSON_UNQUOTE(JSON_EXTRACT(data, '$.marketingUserId')) AS mid, JSON_UNQUOTE(JSON_EXTRACT(data, '$.marketingUserName')) AS mname FROM page_data WHERE page_name = 'sales'")->fetchAll();
@@ -106,6 +156,28 @@ try {
                 }
             }
 
+            // Marketing approval and Commercial PI-PDF creation timestamps.
+            $piStatusByOrder = [];
+            try {
+                $statusRows = $db->query("SELECT order_id, page_name, data FROM page_data WHERE page_name IN ('marketing', 'pi-pdf-log')")->fetchAll();
+                foreach ($statusRows as $statusRow) {
+                    $statusData = json_decode((string)($statusRow['data'] ?? ''), true);
+                    if (!is_array($statusData)) continue;
+                    $oid = (string)$statusRow['order_id'];
+                    if (!isset($piStatusByOrder[$oid])) $piStatusByOrder[$oid] = [];
+                    if ($statusRow['page_name'] === 'marketing') {
+                        $approved = $statusData['marketingApproved'] ?? false;
+                        $piStatusByOrder[$oid]['approved'] = $approved === true
+                            || $approved === 'true'
+                            || ($statusData['piApprovalStatus'] ?? '') === 'approved';
+                        $piStatusByOrder[$oid]['approved_at'] = trim((string)($statusData['approvedAt'] ?? ''));
+                    } else {
+                        $piStatusByOrder[$oid]['pdf_created_at'] = trim((string)($statusData['commercialPdfCreatedAt'] ?? ''));
+                        $piStatusByOrder[$oid]['pdf_created_by'] = trim((string)($statusData['commercialPdfCreatedBy'] ?? ''));
+                    }
+                }
+            } catch (Throwable $e) { /* optional dashboard metadata */ }
+
             foreach ($orders as &$o) {
                 $a = $agg[$o['order_id']] ?? null;
                 if ($a) {
@@ -115,8 +187,16 @@ try {
                 }
                 $o['pi_number']  = $a && $a['pis'] ? implode(', ', array_keys($a['pis'])) : '';
                 $o['lc_number']  = $lcByOrder[$o['order_id']] ?? '';
+                $erpNums = $erpByOrder[$o['order_id']] ?? ($erpFromSales[$o['order_id']] ?? []);
+                $o['erp_order_no'] = $erpNums ? implode(', ', array_unique($erpNums)) : '';
                 $o['marketing_user_id']   = $mkByOrder[$o['order_id']]['id']   ?? '';
                 $o['marketing_user_name'] = $mkByOrder[$o['order_id']]['name'] ?? '';
+                $o['pi_type']     = $salesPrintByOrder[$o['order_id']]['pi_type'] ?? 'single';
+                $o['hs_code']     = $salesPrintByOrder[$o['order_id']]['hs_code'] ?? '';
+                $o['marketing_approved'] = !empty($piStatusByOrder[$o['order_id']]['approved']);
+                $o['marketing_approved_at'] = $piStatusByOrder[$o['order_id']]['approved_at'] ?? '';
+                $o['commercial_pdf_created_at'] = $piStatusByOrder[$o['order_id']]['pdf_created_at'] ?? '';
+                $o['commercial_pdf_created_by'] = $piStatusByOrder[$o['order_id']]['pdf_created_by'] ?? '';
                 $o['total_qty']  = $a['qty']   ?? 0;
                 $o['total_val']  = $a['val']   ?? 0;
                 $o['item_count'] = $a['items'] ?? 0;
@@ -157,6 +237,11 @@ try {
 
         // Optional order fields — only overwrite when a non-empty value is supplied,
         // so a plain step change never blanks out existing details.
+        // A submitted Single PI can contain multiple ERP sales orders. Associate
+        // all of them before moving the shared work order away from Sales so all
+        // corresponding Commercial notifications clear together.
+        $linkedErpOrders = $step === 'marketing' ? $linkSalesErpOrders($db, $id) : [];
+
         $sets   = ['current_step = ?', 'updated_at = CURRENT_TIMESTAMP'];
         $params = [$step];
         foreach (['customer' => 'customer_name', 'buyer' => 'to_buyer', 'po' => 'po_number', 'salesperson' => 'salesperson'] as $qkey => $col) {
@@ -183,7 +268,12 @@ try {
                 createCommercialPiNotifications($db, $id, (int)(currentUser()['id'] ?? 0) ?: null);
             }
         }
-        echo json_encode(['ok' => true, 'order_id' => $id, 'current_step' => $step]);
+        echo json_encode([
+            'ok' => true,
+            'order_id' => $id,
+            'current_step' => $step,
+            'linked_erp_orders' => $linkedErpOrders,
+        ]);
         exit;
     }
 
@@ -212,6 +302,11 @@ try {
             $db->prepare('DELETE FROM pis WHERE order_id = ?')->execute([$id]);
             $db->prepare('DELETE FROM order_items WHERE order_id = ?')->execute([$id]);
             $db->prepare('DELETE FROM orders WHERE order_id = ?')->execute([$id]);
+            // Free any ERP sales orders this work order claimed, so deleting the
+            // order doesn't leave orphaned "already belongs to" claims in the inbox.
+            try {
+                $db->prepare('UPDATE erp_order_inbox SET work_order_id = NULL, converted_by_id = NULL, converted_at = NULL WHERE work_order_id = ?')->execute([$id]);
+            } catch (Throwable $e) { /* inbox optional */ }
             $db->commit();
         } catch (Throwable $e) {
             if ($db->inTransaction()) {

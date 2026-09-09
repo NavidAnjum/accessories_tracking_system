@@ -329,7 +329,8 @@ function ciResolveDocs(res) {
     const isCombinedPi = sales.piType === 'summary'
         || sales.piType === 'master'
         || resolved.label === 'Summary PI'
-        || resolved.label === 'Master PI';
+        || resolved.label === 'Master PI'
+        || resolved.label === 'Order PIs';
     if (isCombinedPi && pos.length) {
         const poNumbers = [...new Set(pos.map(po => po.poNum || po.customerPo || '').filter(Boolean))];
         const buyers = [...new Set(pos.map(po => po.buyer || '').filter(Boolean))];
@@ -382,9 +383,9 @@ function ciBuildPages() {
         return;
     }
 
-    const beneficiaryName = comm.commercialBeneficiaryName || CI_COMPANY_NAME;
-    const beneficiaryAddress = comm.commercialBeneficiaryAddress || '';
-    const factoryAddress = comm.commercialFactoryAddress || '';
+    const beneficiaryName = lc.lcBeneficiaryName || comm.commercialBeneficiaryName || CI_COMPANY_NAME;
+    const beneficiaryAddress = lc.lcBeneficiaryAddress || comm.commercialBeneficiaryAddress || '';
+    const factoryAddress = lc.lcFactoryAddress || comm.commercialFactoryAddress || '';
     const advisingBank = ciResolveBank(comm.commercialAdvisingBank || exch.payToBankName || lc.reimbursementBank || '', 'ncc');
     const consigneeName = comm.commercialConsigneeName || order.customer_name || sales.customer || '';
     const consigneeAddress = comm.commercialConsigneeAddress || sales.buyerAddress || '';
@@ -395,13 +396,28 @@ function ciBuildPages() {
     const invoiceDate = ciDate(comm.invoiceDate || sales.piDate || order.created_at?.slice(0,10) || '');
     const lcNo = comm.commercialLcNo || exch.masterLcNo || lc.lcNumber || '-';
     const lcDate = ciDate(comm.commercialLcDate || exch.masterLcDate || lc.lcDate || '');
-    const proformaNo = comm.proformaNo || sales.piNum || '-';
+    const isEpz = lc.lcZoneType === 'epz';
+    const epzMetaRows = isEpz ? `
+        <div class="ci-meta-row"><span class="ci-meta-label">EXP No</span><span>${ciEsc(lc.lcExpNo || '-')}</span></div>
+        <div class="ci-meta-row"><span class="ci-meta-label">EXP Date</span><span>${ciEsc(ciDate(lc.lcExpDate || ''))}</span></div>` : '';
+    const piSummary = window.atsResolveOrderPiSummary
+        ? window.atsResolveOrderPiSummary(res)
+        : {numbers:[], total:0, count:0};
+    const proformaNo = (piSummary.numbers || []).join(' / ') || comm.proformaNo || sales.piNum || '-';
     const proformaDate = ciDate(comm.proformaDate || sales.piDate || '');
     // §4 — these three are fixed/static, never taken from saved data.
     const placeLoading = "Supplier's Factory";
     const placeDelivery = "Opener's Factory";
     const carrier = 'Bangladesh, By Truck';
-    const applicantsText = comm.commercialApplicantsText || '';
+    const exportScNo = lc.lcExportSalesContractNo || exch.exportSalesContractNo || lc.lcNumber || '';
+    const exportScDate = lc.lcExportSalesContractDate || exch.exportSalesContractDate || lc.lcDate || '';
+    let applicantsText = comm.commercialApplicantsText || '';
+    if (exportScNo) {
+        const exportScText = `Export Sales Contract No. ${exportScNo} Dated ${exportScDate}`;
+        applicantsText = /^Export Sales Contract No\.[^,]*/i.test(applicantsText)
+            ? applicantsText.replace(/^Export Sales Contract No\.[^,]*/i, exportScText)
+            : exportScText + (applicantsText ? ', ' + applicantsText : '');
+    }
 
     let html = '';
     chosen.forEach(doc => {
@@ -441,6 +457,7 @@ function ciBuildPages() {
                     <td>
                         <div class="ci-topgrid">
                             <div><strong>Beneficiary</strong></div>
+                            <div>${ciEsc(beneficiaryName)}</div>
                             <div>${ciLines(beneficiaryAddress)}</div>
                             <div>${ciLines(factoryAddress)}</div>
                             <div style="margin-top:4px;"><strong>Advising Bank</strong></div>
@@ -458,8 +475,10 @@ function ciBuildPages() {
                             <div class="ci-meta-row"><span class="ci-meta-label">Date</span><span>${ciEsc(invoiceDate)}</span></div>
                             <div class="ci-meta-row"><span class="ci-meta-label">L/C No</span><span>${ciEsc(lcNo)}</span></div>
                             <div class="ci-meta-row"><span class="ci-meta-label">Dated</span><span>${ciEsc(lcDate)}</span></div>
+                            ${epzMetaRows}
                             <div class="ci-meta-row"><span class="ci-meta-label">PI No</span><span>${ciEsc(proformaNo)}</span></div>
                             <div class="ci-meta-row"><span class="ci-meta-label">Dated</span><span>${ciEsc(proformaDate)}</span></div>
+                            <div class="ci-meta-row"><span class="ci-meta-label">Total PI Value</span><span>USD ${ciEsc(ciMoney(piSummary.total || 0, 2))}</span></div>
                             <div class="ci-meta-row"><span class="ci-meta-label">L/C Bank</span><span>${ciEsc(issuingBankName)}</span></div>
                             <div style="margin-left:88px;">${ciLines(issuingBankAddress)}</div>
                             <div class="ci-meta-row"><span class="ci-meta-label">Place of Loading</span><span>${ciEsc(placeLoading)}</span></div>

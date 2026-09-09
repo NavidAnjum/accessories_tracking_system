@@ -157,12 +157,16 @@ window.onOrderLoad = function(res) {
     const lc    = res.pages?.lc         || {};
 
     const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.textContent = val; };
+    const pick = (...values) => values.find(value => String(value || '').trim()) || '';
 
     set('truckBeneficiaryName',    comm.commercialBeneficiaryName    || '—');
     set('truckBeneficiaryAddress', comm.commercialBeneficiaryAddress || '—');
     set('truckFactoryAddress',     comm.commercialFactoryAddress     || '—');
     set('truckFooterCompany',      comm.commercialBeneficiaryName    || '—');
-    set('truckConsigneeName',      order.customer_name || comm.commercialConsigneeName || '—');
+    set('truckConsigneeName',      lc.lcApplicantName || order.customer_name || comm.commercialConsigneeName || '—');
+    set('truckConsigneeAddress',   lc.lcApplicantAddress || comm.commercialConsigneeAddress || '—');
+    set('truckAdvisingBank', pick(lc.reimbursementBank, comm.commercialAdvisingBank, exch.payToBankAddress, exch.payToBankName));
+    set('truckConsigneeBank', pick(lc.negotiatingBeneficiaryBank, comm.commercialConsigneeBankAddress, exch.beneficiaryBankAddress));
     set('truckCarrierText',        exch.carrierNameMaster || comm.commercialCarrier || '—');
     set('truckPackingText',        exch.packingDetailsMaster || '—');
 
@@ -170,8 +174,8 @@ window.onOrderLoad = function(res) {
     const lcDate = exch.masterLcDate || lc.lcDate   || '';
     set('truckLcText', lcNo ? lcNo + (lcDate ? ' Dated ' + lcDate : '') : '—');
 
-    const contract = exch.exportSalesContractNo   || '';
-    const contDate = exch.exportSalesContractDate || '';
+    const contract = lc.lcExportSalesContractNo || exch.exportSalesContractNo || lc.lcNumber || '';
+    const contDate = lc.lcExportSalesContractDate || exch.exportSalesContractDate || lc.lcDate || '';
     set('truckContractText', contract ? contract + (contDate ? ' Dated ' + contDate : '') : '—');
 
     const proforma     = comm.proformaNo   || '';
@@ -179,8 +183,12 @@ window.onOrderLoad = function(res) {
     set('truckProformaText', proforma ? proforma + (proformaDate ? ' Dated ' + proformaDate : '') : '—');
 
     const irc = exch.applicantIrc || ''; const tin = exch.applicantTin || '';
-    if (irc || tin) {
+    const applicantName = lc.lcApplicantName || '';
+    const applicantAddress = lc.lcApplicantAddress || '';
+    if (applicantName || applicantAddress || irc || tin) {
         const p = [];
+        if (applicantName) p.push(applicantName);
+        if (applicantAddress) p.push(applicantAddress);
         if (irc) p.push('IRC No. '+irc); if (tin) p.push('TIN No. '+tin);
         if (exch.applicantVatBin)   p.push('Vat/bin No. '+exch.applicantVatBin);
         if (exch.applicantBankBin)  p.push('Bank Bin No. '+exch.applicantBankBin);

@@ -12,12 +12,16 @@ $__user = currentUser();
 // them the tab (keeps their normal nav unchanged; direct access stays blocked).
 $__embed = isset($_GET['embed']) && $_GET['embed'] !== '0';
 $__embedViewablePages = ['single-pi', 'summary-pi', 'master-pi'];
+$__dashboardPi = isset($_GET['dashboard_pi'])
+    && $_GET['dashboard_pi'] !== '0'
+    && in_array(strtolower((string)($__user['role'] ?? '')), ['marketing', 'team_leader'], true)
+    && in_array($activePage ?? '', $__embedViewablePages, true);
 
 // Enforce page-level tab access for restricted roles
 if (!empty($activePage) && !in_array($activePage, ['dashboard', 'notifications'], true)) {
     $__allowed = allowedTabs();
     $__embedAllowed = $__embed && in_array($activePage, $__embedViewablePages, true);
-    if (!empty($__allowed) && !in_array($activePage, $__allowed, true) && !$__embedAllowed) {
+    if (!empty($__allowed) && !in_array($activePage, $__allowed, true) && !$__embedAllowed && !$__dashboardPi) {
         // Redirect to first allowed page for this role
         $__first = $__allowed[0] ?? 'dashboard';
         $__map = [
@@ -29,6 +33,7 @@ if (!empty($activePage) && !in_array($activePage, ['dashboard', 'notifications']
             'commercial-pi'    => 'sales.php',
             'erp-orders-report'=> 'erp-orders-report.php',
             'lc'               => 'lc.php',
+            'sales-contract'   => 'sales-contract.php',
             'exchange'         => 'exchange.php',
             'commercial'       => 'commercial.php',
             'packing'          => 'packing.php',
@@ -108,6 +113,14 @@ body.embed-view .form-stack { padding: 0 !important; margin: 0 !important; }
 body.embed-view { background: #fff !important; }
 </style>
 <?php endif; ?>
+<?php if (in_array(strtolower((string)($__user['role'] ?? '')), ['marketing', 'team_leader'], true)
+    && in_array($activePage ?? '', $__embedViewablePages, true)): ?>
+<style>
+/* Marketing can review, print and download PDF or save the PI as PDF, but cannot email it. */
+button[onclick*="emailThisPi"],
+a[onclick*="emailThisPi"] { display: none !important; }
+</style>
+<?php endif; ?>
 </head>
 <body data-page="<?= htmlspecialchars($activePage ?? '') ?>"<?= !empty($__embed) ? ' class="embed-view"' : '' ?>>
 <div class="app-shell">
@@ -135,14 +148,15 @@ body.embed-view { background: #fff !important; }
                     ['id' => 'production',       'href' => 'production.php',            'label' => 'Production'],
                     ['id' => 'sales',            'href' => 'sales.php',                 'label' => 'PI'],
                     ['id' => 'marketing',        'href' => 'marketing.php',            'label' => 'Marketing'],
-                    ['id' => 'lc',               'href' => 'lc.php',                    'label' => 'LC'],
-                    ['id' => 'exchange',         'href' => 'exchange.php',              'label' => 'Bill of Exchange'],
+                    ['id' => 'lc',               'href' => 'lc.php',                    'label' => 'LC / Sales Contract'],
+                    ['id' => 'sales-contract',   'href' => 'sales-contract.php',        'label' => 'Sales Contract', 'route' => 'sales_contract'],
+                    ['id' => 'exchange',         'href' => 'exchange.php',              'label' => 'Bill of Exchange', 'route' => 'lc'],
                     ['id' => 'commercial',       'href' => 'commercial.php',            'label' => 'Commercial Invoice'],
                     ['id' => 'packing',          'href' => 'packing.php',               'label' => 'Packing List'],
                     ['id' => 'delivery',         'href' => 'delivery.php',              'label' => 'Delivery Challan'],
                     ['id' => 'truck',            'href' => 'truck.php',                 'label' => 'Truck Challan'],
-                    ['id' => 'origin',           'href' => 'origin.php',                'label' => 'Certificate of Origin'],
-                    ['id' => 'beneficiary',      'href' => 'beneficiary.php',           'label' => "Beneficiary's Certificate"],
+                    ['id' => 'origin',           'href' => 'origin.php',                'label' => 'Certificate of Origin', 'route' => 'lc'],
+                    ['id' => 'beneficiary',      'href' => 'beneficiary.php',           'label' => "Beneficiary's Certificate", 'route' => 'lc'],
                     ['id' => 'forwarding',       'href' => 'forwarding.php',            'label' => 'Forwarding'],
                     ['id' => 'bank-forwarding',  'href' => 'bank-forwarding.php',       'label' => 'Bank Forwarding'],
                     ['id' => 'po-status',        'href' => 'po-status.php',             'label' => 'Challan Sheet'],
@@ -152,6 +166,8 @@ body.embed-view { background: #fff !important; }
                 ?>
                 <a class="mobile-nav-link<?= $activePage === $mobileLink['id'] ? ' active' : '' ?>"
                    data-workflow-step="<?= htmlspecialchars($mobileLink['id']) ?>"
+                   <?= isset($mobileLink['route']) ? 'data-document-route="' . htmlspecialchars($mobileLink['route']) . '"' : '' ?>
+                   <?= ($mobileLink['route'] ?? '') === 'sales_contract' ? 'style="display:none;"' : '' ?>
                    href="<?= BASE_PATH ?>/pages/<?= $mobileLink['href'] ?>"><?= htmlspecialchars($mobileLink['label']) ?></a>
                 <?php endforeach; ?>
                 <div class="mobile-nav-user">
@@ -211,14 +227,15 @@ body.embed-view { background: #fff !important; }
             ['id' => 'production',       'href' => 'production.php',            'label' => 'Production'],
             ['id' => 'sales',            'href' => 'sales.php',                 'label' => 'PI'],
             ['id' => 'marketing',        'href' => 'marketing.php',            'label' => 'Marketing'],
-            ['id' => 'lc',               'href' => 'lc.php',                    'label' => 'LC'],
-            ['id' => 'exchange',         'href' => 'exchange.php',              'label' => 'Bill of Exchange'],
+            ['id' => 'lc',               'href' => 'lc.php',                    'label' => 'LC / Sales Contract'],
+            ['id' => 'sales-contract',   'href' => 'sales-contract.php',        'label' => 'Sales Contract', 'route' => 'sales_contract'],
+            ['id' => 'exchange',         'href' => 'exchange.php',              'label' => 'Bill of Exchange', 'route' => 'lc'],
             ['id' => 'commercial',       'href' => 'commercial.php',            'label' => 'Commercial Invoice'],
             ['id' => 'packing',          'href' => 'packing.php',               'label' => 'Packing List'],
             ['id' => 'delivery',         'href' => 'delivery.php',              'label' => 'Delivery Challan'],
             ['id' => 'truck',            'href' => 'truck.php',                 'label' => 'Truck Challan'],
-            ['id' => 'origin',           'href' => 'origin.php',                'label' => 'Certificate of Origin'],
-            ['id' => 'beneficiary',      'href' => 'beneficiary.php',           'label' => "Beneficiary's Certificate"],
+            ['id' => 'origin',           'href' => 'origin.php',                'label' => 'Certificate of Origin', 'route' => 'lc'],
+            ['id' => 'beneficiary',      'href' => 'beneficiary.php',           'label' => "Beneficiary's Certificate", 'route' => 'lc'],
             ['id' => 'forwarding',       'href' => 'forwarding.php',            'label' => 'Forwarding'],
             ['id' => 'bank-forwarding',  'href' => 'bank-forwarding.php',       'label' => 'Bank Forwarding'],
             ['id' => 'po-status',        'href' => 'po-status.php',             'label' => 'Challan Sheet'],
@@ -236,6 +253,8 @@ body.embed-view { background: #fff !important; }
                 <?php if ($i > 0): ?><span class="tab-flow-arrow">&#8594;</span><?php endif; ?>
                 <a class="page-tab<?= $activePage === $tab['id'] ? ' active' : '' ?>"
                    data-workflow-step="<?= htmlspecialchars($tab['id']) ?>"
+                   <?= isset($tab['route']) ? 'data-document-route="' . htmlspecialchars($tab['route']) . '"' : '' ?>
+                   <?= ($tab['route'] ?? '') === 'sales_contract' ? 'style="display:none;"' : '' ?>
                    href="<?= BASE_PATH ?>/pages/<?= $tab['href'] ?>"><?= htmlspecialchars($tab['label']) ?></a>
             <?php endforeach; ?>
         </div>
@@ -266,7 +285,7 @@ body.embed-view { background: #fff !important; }
         <div class="oid-search-row">
             <input class="oid-input" id="oidInput" placeholder="Enter Order ID (e.g. ORD-2026-0001) or PI number…"
                    onkeydown="if(event.key==='Enter')oidSearch()">
-            <button class="oid-btn-search" onclick="oidSearch()">🔍 Load Order</button>
+            <button class="oid-btn-search" onclick="oidSearch()">🔍 Load Work Order / PI</button>
             <button class="oid-btn-new" onclick="oidNewOrder()">+ New Order</button>
         </div>
         <div class="oid-status-row" id="oidStatusRow" style="display:none;">
@@ -290,6 +309,9 @@ body.embed-view { background: #fff !important; }
         function setOrderDisplay(orderId, order) {
             const display = document.getElementById('oidDisplay');
             const statusRow = document.getElementById('oidStatusRow');
+            // Embedded PDF pages hide the order bar but still need the active
+            // order available to their render scripts.
+            sessionStorage.setItem(OID_KEY, orderId);
             if (!display) return;
             display.textContent = orderId;
             if (order && statusRow) {
@@ -301,15 +323,15 @@ body.embed-view { background: #fff !important; }
                 if (date) date.textContent = order.created_at ? new Date(order.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '';
                 statusRow.style.display = 'flex';
             }
-            sessionStorage.setItem(OID_KEY, orderId);
         }
 
         const marketingApprovalProtectedSteps = [
-            'lc', 'exchange', 'commercial', 'packing', 'delivery', 'truck',
+            'lc', 'sales-contract', 'exchange', 'commercial', 'packing', 'delivery', 'truck',
             'origin', 'beneficiary', 'forwarding', 'bank-forwarding', 'po-status'
         ];
         const marketingApprovalProtectedPages = {
             'lc.php': 'lc',
+            'sales-contract.php': 'sales-contract',
             'exchange.php': 'exchange',
             'commercial.php': 'commercial',
             'packing.php': 'packing',
@@ -346,6 +368,30 @@ body.embed-view { background: #fff !important; }
             }
         }
 
+        function applyTradeDocumentRoute(response) {
+            const route = response?.pages?.lc?.documentRoute === 'sales_contract'
+                ? 'sales_contract'
+                : 'lc';
+            document.body.dataset.documentRoute = route;
+            document.querySelectorAll('[data-document-route]').forEach(function (link) {
+                link.style.display = link.dataset.documentRoute === route ? '' : 'none';
+            });
+
+            // Hide separator arrows that belonged to a route-specific hidden tab.
+            document.querySelectorAll('.nav-tab-group').forEach(function (group) {
+                group.querySelectorAll('.tab-flow-arrow').forEach(a => a.style.display = 'none');
+                let hasVisibleTab = false;
+                Array.from(group.children).forEach(function (child) {
+                    if (!child.classList.contains('page-tab') || child.style.display === 'none') return;
+                    if (hasVisibleTab) {
+                        const arrow = child.previousElementSibling;
+                        if (arrow?.classList.contains('tab-flow-arrow')) arrow.style.display = '';
+                    }
+                    hasVisibleTab = true;
+                });
+            });
+        }
+
         function loadOrderById(id, isManual) {
             fetch(BASE + '/api/order_lookup.php?id=' + encodeURIComponent(id))
                 .then(r => r.json())
@@ -356,7 +402,7 @@ body.embed-view { background: #fff !important; }
                         if (d) d.textContent = 'No order loaded';
                         const sr = document.getElementById('oidStatusRow');
                         if (sr) sr.style.display = 'none';
-                        if (isManual) alert('Order not found: ' + id);
+                    if (isManual) alert('Work Order or PI not found: ' + id);
                         return;
                     }
                     const displayOrder = {
@@ -368,6 +414,7 @@ body.embed-view { background: #fff !important; }
                     };
                     setOrderDisplay(res.order.order_id, displayOrder);
                     applyMarketingApprovalGate(res);
+                    applyTradeDocumentRoute(res);
                     const inp = document.getElementById('oidInput');
                     if (inp) inp.value = '';
                     if (typeof window.onOrderLoad === 'function') window.onOrderLoad(res);
@@ -377,6 +424,23 @@ body.embed-view { background: #fff !important; }
 
         window.getCurrentOrderId = () => sessionStorage.getItem(OID_KEY) || '';
         window.loadOrderById = loadOrderById;
+
+        // Outlook's headless Chrome print command may print as soon as the page
+        // load event fires. In dedicated email-render mode, load the order during
+        // HTML parsing so DOMContentLoaded receives complete invoice data first.
+        const bootParams = new URLSearchParams(window.location.search);
+        const bootOrderId = bootParams.get('order_id') || '';
+        if (bootParams.get('email_render') === '1' && bootOrderId) {
+            try {
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', BASE + '/api/order_lookup.php?id=' + encodeURIComponent(bootOrderId), false);
+                xhr.send(null);
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    const response = JSON.parse(xhr.responseText || '{}');
+                    if (response.found) window.__atsEmailRenderOrder = response;
+                }
+            } catch (_) { /* the normal asynchronous loader remains the fallback */ }
+        }
 
         window.oidSearch = function () {
             const q = (document.getElementById('oidInput')?.value || '').trim();
@@ -418,21 +482,54 @@ body.embed-view { background: #fff !important; }
 
         // Auto-restore the current/most-recent order on page load
         document.addEventListener('DOMContentLoaded', function () {
-            if (!document.getElementById('oidDisplay')) return;
+            const queryParams = new URLSearchParams(window.location.search);
+            const urlOrderId = queryParams.get('id') || queryParams.get('order_id') || '';
+            const preloaded = window.__atsEmailRenderOrder;
+            if (preloaded?.found && preloaded.order?.order_id) {
+                const displayOrder = {
+                    ...preloaded.order,
+                    customer_name: preloaded.order.customer_name
+                        || preloaded.pages?.sales?.customer
+                        || preloaded.pages?.['marketing-intake']?.customer
+                        || ''
+                };
+                setOrderDisplay(preloaded.order.order_id, displayOrder);
+                applyMarketingApprovalGate(preloaded);
+                applyTradeDocumentRoute(preloaded);
+                if (typeof window.onOrderLoad === 'function') window.onOrderLoad(preloaded);
+                return;
+            }
+            // Normal pages load through the visible order bar. Embedded print
+            // pages have no bar, so permit loading only when the URL explicitly
+            // names an order.
+            if (!document.getElementById('oidDisplay') && !urlOrderId) return;
             // New-order mode: show a blank draft, don't auto-load an existing order
             if (sessionStorage.getItem('ats_new_order') === '1') {
                 sessionStorage.removeItem('ats_new_order');
                 showNewOrderDraft();
                 return;
             }
-            const stored = sessionStorage.getItem(OID_KEY);
+            // The PI/intake entry pages always open CLEAN unless the order was
+            // opened DELIBERATELY (Dashboard "Open" / "Load Order" set a one-shot
+            // ats_open_order flag). This stops a stale ats_current_order_id from
+            // re-surfacing the last PI every time the page is opened/reloaded.
+            const isEntryPage = /(sales|marketing-intake)\.php/.test(window.location.pathname);
+            // Dashboard/editor links use `id`, while PI render/email links use
+            // `order_id`. Read both so a fresh headless browser can load the
+            // requested order without relying on another tab's sessionStorage.
+            const explicitOpen = sessionStorage.getItem('ats_open_order') === '1';
+            sessionStorage.removeItem('ats_open_order'); // one-shot
+
+            if (isEntryPage && !urlOrderId && !explicitOpen) {
+                if (typeof window.showNewOrderDraft === 'function') showNewOrderDraft();
+                return;
+            }
+
+            const stored = urlOrderId || sessionStorage.getItem(OID_KEY);
             if (stored) {
                 loadOrderById(stored, false);
-            } else {
-                fetch(BASE + '/api/orders.php?last=1')
-                    .then(r => r.json())
-                    .then(row => { if (row?.order_id) loadOrderById(row.order_id, false); })
-                    .catch(() => {});
+            } else if (typeof window.showNewOrderDraft === 'function') {
+                showNewOrderDraft();
             }
         });
     })();
@@ -528,23 +625,12 @@ body.embed-view { background: #fff !important; }
                     const orderId = decodeURIComponent(this.dataset.orderId || '');
                     const step = this.dataset.step || '';
                     if (type === 'erp_order' && erpOrder) {
-                        this.style.pointerEvents = 'none';
-                        this.style.opacity = '0.65';
-                        try {
-                            const response = await fetch(APP_BASE + '/api/erp_create_work_order.php', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ erp_order_no: erpOrder })
-                            });
-                            const result = await notifyReadJson(response);
-                            if (!response.ok || result.error) throw new Error(result.error || 'Could not create work order.');
-                            sessionStorage.setItem('ats_current_order_id', result.order_id);
-                            window.location.href = APP_BASE + '/pages/sales.php?erp_order=' + encodeURIComponent(erpOrder);
-                        } catch (error) {
-                            alert(error.message || 'Could not create work order.');
-                            this.style.pointerEvents = '';
-                            this.style.opacity = '';
-                        }
+                        // Do NOT create a work order or claim the ERP order here.
+                        // The work order is created only when the PI is submitted to
+                        // Marketing — so the notification stays until then. Just open a
+                        // clean PI page with this ERP order pre-searched.
+                        sessionStorage.removeItem('ats_current_order_id');
+                        window.location.href = APP_BASE + '/pages/sales.php?erp_order=' + encodeURIComponent(erpOrder);
                         return;
                     }
                     // Do NOT mark the item read just because it was opened. A pending

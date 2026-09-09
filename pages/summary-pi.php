@@ -42,6 +42,24 @@ require_once __DIR__ . '/../includes/print-brand.php';
 }
 .mspi-doc .zzal-print-brand--footer { position:static; margin-top:auto!important; padding-top:6px!important; }
 .mspi-content { min-height:0; flex:1 1 auto; display:flex; flex-direction:column; }
+#mspiPrintPages { display:none; }
+#mspiWrap.mspi-paginated > .mspi-doc { display:none; }
+#mspiWrap.mspi-paginated #mspiPrintPages { display:block; }
+.mspi-print-page {
+    box-sizing:border-box; position:relative; width:210mm; height:297mm; max-width:900px;
+    margin:0 auto 12px; padding:4mm 14mm 8mm; overflow:hidden; background:#fff;
+    display:flex; flex-direction:column; font-family:'Times New Roman',Times,serif;
+    font-size:8.25pt; color:#000; box-shadow:0 4px 24px rgba(0,0,0,.15);
+}
+.mspi-print-page .zzal-print-brand--header { margin-bottom:5px!important; }
+.mspi-print-page .zzal-print-brand--footer { position:static!important; margin-top:auto!important; padding-top:5px!important; }
+.mspi-print-page .mspi-title { margin:2px 0 3px; }
+.mspi-print-page .mspi-meta { margin-bottom:3px; }
+.mspi-print-page .mspi-tbl { font-size:7.25pt; }
+.mspi-print-page .mspi-tbl th { padding:4px 7px; }
+.mspi-print-page .mspi-tbl td { padding:3px 7px; }
+.mspi-print-page .mspi-sig-area { margin-top:9mm!important; }
+.mspi-print-page .mspi-sig-bottom { margin-top:0!important; }
 
 /* Header */
 .mspi-hd {
@@ -97,6 +115,9 @@ require_once __DIR__ . '/../includes/print-brand.php';
     border-top:1px dashed #333; border-bottom:1px dashed #333;
     padding:4px 0;
 }
+.mspi-terms-title { font-size:6.375pt; font-weight:700; text-decoration:underline; margin:4px 0; }
+.mspi-terms-list { margin:0; padding-left:28px; font-size:6.05625pt; line-height:1.3; }
+.mspi-terms-list li { margin-bottom:0; }
 
 /* Signatures */
 .mspi-sig-area { margin-top:36px; }
@@ -126,13 +147,24 @@ html.pi-preview .mspi-ctrl {
 @page { size:A4 portrait; margin:0; }
 @media print {
     .mspi-ctrl, nav.page-nav, .order-id-bar { display:none !important; }
-    #mspiWrap { background:none !important; padding:0 !important; }
-    .mspi-doc { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:14mm 14mm 14mm!important; overflow:hidden; display:flex!important; flex-direction:column!important; }
-    .mspi-doc .zzal-print-brand--footer { position:static!important; margin-top:auto!important; }
-    .mspi-content { min-height:0!important; flex:1 1 auto!important; display:flex!important; flex-direction:column!important; }
+    html, body { width:210mm!important; min-height:0!important; margin:0!important; padding:0!important; background:#fff!important; overflow:visible!important; }
+    .app-shell, .form-stack { display:block!important; margin:0!important; padding:0!important; background:#fff!important; }
+    .form-stack > *:not(#mspiWrap) { display:none!important; }
+    #mspiWrap { display:block!important; background:none!important; padding:0!important; margin:0!important; width:210mm!important; min-height:0!important; }
+    #mspiWrap > .mspi-doc { display:none!important; }
+    #mspiPrintPages { display:block!important; }
+    .mspi-print-page { box-sizing:border-box; width:210mm; height:297mm; padding:4mm 14mm 8mm; overflow:hidden; background:#fff; display:flex; flex-direction:column; margin:0!important; box-shadow:none!important; break-after:page; page-break-after:always; }
+    .mspi-print-page:last-child { break-after:auto; page-break-after:auto; }
+    .mspi-print-page .zzal-print-brand--header { position:static!important; margin:0 0 5px!important; }
+    .mspi-print-page .zzal-print-brand--footer { position:static!important; margin-top:auto!important; padding-top:5px!important; }
+    .mspi-print-page .mspi-title { margin:2px 0 3px; }
+    .mspi-print-page .mspi-meta { margin-bottom:3px; }
+    .mspi-print-page .mspi-tbl { font-size:7.25pt; }
+    .mspi-print-page .mspi-tbl th { padding:4px 7px; }
+    .mspi-print-page .mspi-tbl td { padding:3px 7px; }
+    .mspi-print-page .mspi-sig-area { margin-top:9mm!important; break-inside:avoid!important; }
+    .mspi-print-page .mspi-sig-bottom { margin-top:0!important; }
     .mspi-hd { display:none !important; }
-    body, html, .app-shell { width:210mm!important; min-height:297mm!important; margin:0!important; padding:0!important; background:#fff !important; overflow:visible!important; }
-    .form-stack { padding:0 !important; }
     .no-print { display:none !important; }
 }
 </style>
@@ -144,7 +176,10 @@ html.pi-preview .mspi-ctrl {
     <select id="mspiLcType"    style="display:none;"><option value="Sight">Sight</option><option value="Usance">Usance</option><option value="Deferred Payment">Deferred Payment</option><option value="Acceptance">Acceptance</option></select>
     <select id="mspiTolerance" style="display:none;"><option value="5">5</option><option value="3">3</option><option value="10">10</option></select>
     <button class="mspi-excel-btn" onclick="downloadSummaryPiExcel()">Download Excel</button>
-    <button class="mspi-print-btn" onclick="window.print()">Print / Save PDF</button>
+    <?php if (($__user['role'] ?? '') !== 'marketing'): ?>
+    <button class="mspi-excel-btn" style="background:#0f6cbd;" onclick="emailThisPi()">📧 Email PI (Outlook)</button>
+    <?php endif; ?>
+    <button class="mspi-print-btn" onclick="atsPrintPi()">Print / Save PDF</button>
 </div>
 <script>
 (function(){
@@ -229,6 +264,11 @@ html.pi-preview .mspi-ctrl {
         <!-- Total in words -->
         <div class="mspi-words">TOTAL AMOUNT : US DOLLER: <span id="mspiWords">-</span></div>
 
+        <div id="mspiTermsBlock">
+            <div class="mspi-terms-title">Terms &amp; Conditions:</div>
+            <ol class="mspi-terms-list" id="mspiTerms"></ol>
+        </div>
+
         <!-- Signature area -->
         <div class="mspi-sig-area" id="mspiSigArea" style="margin-top:80px;">
             <div class="mspi-sig-bottom">
@@ -245,6 +285,7 @@ html.pi-preview .mspi-ctrl {
 
     </div><!-- #mspiContent -->
 </div><!-- .mspi-doc -->
+<div id="mspiPrintPages" aria-hidden="true"></div>
 </div><!-- #mspiWrap -->
 
 <script>
@@ -394,7 +435,7 @@ function renderSummaryPi() {
                 totalVal += tot;
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td></td>
+                    <td class="tc" style="font-weight:700;">${shortNum}</td>
                     <td>${item.desc || item.itemName || '—'}</td>
                     <td class="tc">${item.ply || '—'}</td>
                     <td class="tc">${qty.toLocaleString()}</td>
@@ -408,7 +449,88 @@ function renderSummaryPi() {
     document.getElementById('mspiTotalQty').innerHTML = `<strong>${totalQty.toLocaleString()}</strong>`;
     document.getElementById('mspiTotalVal').innerHTML = `<strong>${mspiUSD(totalVal)}</strong>`;
     document.getElementById('mspiWords').textContent  = mspiNumWords(totalVal);
+    const banks = {
+        ncc:  {name:'National Credit & Commerce Bank Plc.', address:'Motijheel main Branch, 6 Motijheel C/A Dhaka-1000 Bangladesh.', account:'0002-0259000092', swift:'NCCLBDDHNBB', routing:'160150137'},
+        dbbl: {name:'Dutch-Bangla Bank Plc.', address:'Local Office, 1, Dilkusha C/A, Dhaka-1000, Bangladesh.', account:'ERQ-101.117.1382', swift:'DBBLBDDHCTS', routing:'090273889'}
+    };
+    const bank = banks[window._mspiBank] || banks.ncc;
+    const terms = [
+        `100% Irrevocable confirmed <strong>${daysLabel}</strong>${days !== 'At Sight' ? ' Sight' : ''} L/C to be opened in favour of <strong>Zaber &amp; Zubair ACC. Ltd.</strong>`,
+        `P.I Validity : <strong>45 Working days</strong>.`,
+        `Letter of Credit to allow acceptability of <strong>+/- ${tolerance}% tolerance</strong> in quantity and Value.`,
+        `Letter of Credit to allow for <strong>Partial Shipment</strong>.`,
+        `The Buyer should provide a copy of the master L/C and Garment Export ${docMust} before the delivery of mentioned goods.`,
+        `Where GSP certificate is required, applicant is requested to furnish full detail of the Master L/C in BBLC opened in favour of Zaber &amp; Zubair ACC. Ltd.`,
+        `Prior to delivery- we will inform you full particulars of the consignment and forward the original delivery challan for the signature of the authorised signatory of your organisation. Please make arrangements to hand over the duly signed delivery challan at the time of delivery of goods.`,
+        `Payment to be made on Maturity in US Dollar and Maturity date will be counted <strong>${daysLabel}</strong> from the date of DELIVERY Challan / Truck Receipt / <strong>This clause Will be integral Parts of L/C.</strong>`,
+        `Interest to be paid at LIBOR by the Buyer till Maturity. If payment is not made within maturity then interest <strong>@16%</strong> will be charged for overdue period and buyer's is liable to pay. <strong>This clause Must be appeared on the L/C</strong>`,
+        `Quality complaint, if any, should be notified to us prior before sewing.`,
+        `The above mention terms &amp; condition will be the integral part of the BTB L/C &amp; it must be mention in the BTB L/C.`,
+        `Beneficiary Bin No : <strong>000230256-0103</strong>`,
+        `H.S. Code : <strong>${hsCode}</strong>`,
+        `Total Gross Weight: Kgs`,
+        `Delivery Terms: <strong>CPT</strong>`,
+        `${docMust} Mustbe`,
+        `Advising Bank : <strong>${bank.name}</strong><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${bank.address}<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Account No: ${bank.account} &nbsp;|&nbsp; Swift Code: ${bank.swift} &nbsp;|&nbsp; Bank Routing No: ${bank.routing}`
+    ];
+    document.getElementById('mspiTerms').innerHTML = terms.map(term => `<li>${term}</li>`).join('');
+    mspiBuildPrintPages();
 
+}
+
+function mspiBuildPrintPages() {
+    const host = document.getElementById('mspiPrintPages');
+    const content = document.getElementById('mspiContent');
+    const body = document.getElementById('mspiBody');
+    if (!host || !content || !body) return;
+    const clean = html => String(html || '').replace(/\s+id="[^"]*"/g, '');
+    const rows = Array.from(body.children).map(row => clean(row.outerHTML));
+    // Match Single PI pagination: the first/item-only pages use nearly the full
+    // A4 body (about 29 items plus a PO reference row), while the final page
+    // keeps a small row remainder so totals, terms and signatures fit below it.
+    const chunks = [];
+    let offset = 0;
+    const fullPageRows = 30;
+    const finalPageRows = 8;
+    if (rows.length <= finalPageRows) {
+        chunks.push(rows.slice());
+    } else {
+        while (rows.length - offset > finalPageRows) {
+            const remaining = rows.length - offset;
+            const take = Math.min(fullPageRows, remaining - finalPageRows);
+            chunks.push(rows.slice(offset, offset + take));
+            offset += take;
+        }
+        chunks.push(rows.slice(offset));
+    }
+
+    const brandHeader = clean(content.querySelector('.zzal-print-brand--header')?.outerHTML);
+    const brandFooter = clean(content.querySelector('.zzal-print-brand--footer')?.outerHTML);
+    const title = clean(content.querySelector('.mspi-title')?.outerHTML);
+    const meta = clean(content.querySelector('.mspi-meta')?.outerHTML);
+    const buyer = clean(content.querySelector('.mspi-buyer')?.outerHTML);
+    const toLabel = clean(content.querySelector('.mspi-to-label')?.outerHTML);
+    const to = clean(content.querySelector('.mspi-to')?.outerHTML);
+    const confirmation = clean(content.querySelector('.mspi-conf')?.outerHTML);
+    const tableHead = clean(content.querySelector('.mspi-tbl thead')?.outerHTML);
+    const totalFoot = clean(document.getElementById('mspiFoot')?.outerHTML);
+    const words = clean(content.querySelector('.mspi-words')?.outerHTML);
+    const terms = clean(document.getElementById('mspiTermsBlock')?.outerHTML);
+    const signature = clean(document.getElementById('mspiSigArea')?.outerHTML);
+
+    const pages = chunks.map((chunk, index) => {
+        const isFirst = index === 0;
+        const isLast = index === chunks.length - 1;
+        const partyBlock = isFirst ? buyer + toLabel + to + confirmation : '';
+        const finalBlock = isLast ? words + terms + signature : '';
+        return `<section class="mspi-print-page">
+            ${brandHeader}${title}${meta}${partyBlock}
+            <table class="mspi-tbl">${tableHead}<tbody>${chunk.join('')}</tbody>${isLast ? totalFoot : ''}</table>
+            ${finalBlock}${brandFooter}
+        </section>`;
+    });
+    document.getElementById('mspiWrap')?.classList.toggle('mspi-paginated', pages.length > 1);
+    host.innerHTML = pages.join('');
 }
 
 async function downloadSummaryPiExcel() {
@@ -494,4 +616,5 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+<script src="<?= BASE_PATH ?>/assets/ats-email-pi.js"></script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

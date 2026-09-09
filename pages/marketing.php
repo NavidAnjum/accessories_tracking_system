@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 $pageTitle   = 'Marketing';
 $activePage  = 'marketing';
 $navSection  = 'order';
@@ -269,7 +269,8 @@ include __DIR__ . '/../includes/header.php';
                 <p>Review the submitted PI exactly as Commercial prints it. No Marketing input is required here.</p>
             </div>
             <div class="mkt-review-actions">
-                <a class="ghost-btn" id="mktOpenPiBtn" href="#" target="_blank" rel="noopener">Open Printable PI</a>
+                <button type="button" class="ghost-btn" id="mktPrintPiBtn" onclick="printMarketingPi()">Print PI</button>
+                <button type="button" class="primary-btn" id="mktDownloadPiBtn" onclick="downloadMarketingPi()">Download PDF</button>
             </div>
         </div>
         <div class="mkt-pi-scroll">
@@ -445,16 +446,19 @@ function marketingPiUrl(orderId, salesData, embed) {
     return APP_BASE + '/pages/' + page + '.php?' + params.toString();
 }
 
+let _marketingPiOrderId = '';
+let _marketingPiSalesData = {};
+
 function setMarketingPiPreview(orderId, salesData) {
     const frame  = document.getElementById('mktPiPreview');
-    const openBtn = document.getElementById('mktOpenPiBtn');
     if (!frame || !orderId) return;
+    _marketingPiOrderId = orderId;
+    _marketingPiSalesData = salesData || {};
     // The iframe shares sessionStorage (same origin) and auto-loads the current
     // order, so ensure the id is stored before it navigates.
     try { sessionStorage.setItem('ats_current_order_id', orderId); } catch (e) {}
     const embedUrl = marketingPiUrl(orderId, salesData, true);
     if (frame.getAttribute('src') !== embedUrl) frame.src = embedUrl;
-    if (openBtn) openBtn.href = marketingPiUrl(orderId, salesData, false);
     frame.addEventListener('load', mktScheduleFit, { once: true });
     mktScheduleFit();
 }
@@ -503,13 +507,97 @@ function mktScheduleFit() {
     }
 })();
 
-function printMarketingPi() {
+function mktPiIsRendered(piWindow) {
+    if (!piWindow || piWindow.closed) return false;
+    const content = piWindow.document.querySelector('#spiContent, #mspiContent, #mpiContent');
+    return piWindow.document.readyState === 'complete' && content
+        && piWindow.getComputedStyle(content).display !== 'none';
+}
+
+function mktWaitForPiWindow(piWindow, timeoutMs = 30000) {
+    return new Promise((resolve, reject) => {
+        const started = Date.now();
+        const timer = setInterval(() => {
+            try {
+                if (mktPiIsRendered(piWindow)) {
+                    clearInterval(timer);
+                    piWindow.requestAnimationFrame(() => piWindow.requestAnimationFrame(() => resolve(piWindow)));
+                } else if (!piWindow || piWindow.closed || Date.now() - started > timeoutMs) {
+                    clearInterval(timer);
+                    reject(new Error('The PI did not finish loading.'));
+                }
+            } catch (_) {
+                if (Date.now() - started > timeoutMs) {
+                    clearInterval(timer);
+                    reject(new Error('The PI did not finish loading.'));
+                }
+            }
+        }, 200);
+    });
+}
+
+async function printMarketingPi() {
+    if (!_marketingPiOrderId) { alert('Load an order first.'); return; }
+    const piWindow = window.open(marketingPiUrl(_marketingPiOrderId, _marketingPiSalesData, true), '_blank');
+    if (!piWindow) { alert('Please allow pop-ups to print the PI.'); return; }
+    try {
+        await mktWaitForPiWindow(piWindow);
+        piWindow.focus();
+        piWindow.print();
+    } catch (error) {
+        if (!piWindow.closed) piWindow.close();
+        alert(error.message || 'Could not print the PI.');
+    }
+}
+
+async function downloadMarketingPi() {
+    const button = document.getElementById('mktDownloadPiBtn');
     const frame = document.getElementById('mktPiPreview');
-    if (frame && frame.contentWindow) {
-        frame.contentWindow.focus();
-        frame.contentWindow.print();
-    } else {
-        window.print();
+    if (!_marketingPiOrderId || !frame?.contentWindow) { alert('Load an order first.'); return; }
+    if (button) { button.disabled = true; button.textContent = 'Creating PDF...'; }
+    try {
+        const piWindow = await mktWaitForPiWindow(frame.contentWindow);
+        const childDoc = piWindow.document;
+        const pendingImages = Array.from(childDoc.images).filter(image => !image.complete);
+        await Promise.race([
+            Promise.all(pendingImages.map(image => new Promise(resolve => {
+                image.addEventListener('load', resolve, {once:true});
+                image.addEventListener('error', resolve, {once:true});
+            }))),
+            new Promise(resolve => setTimeout(resolve, 5000))
+        ]);
+        if (childDoc.fonts?.ready) await Promise.race([childDoc.fonts.ready, new Promise(resolve => setTimeout(resolve, 3000))]);
+
+        const pageNodes = Array.from(childDoc.querySelectorAll('.spi-doc, .mspi-doc, .mpi-doc'))
+            .filter(node => piWindow.getComputedStyle(node).display !== 'none');
+        if (!pageNodes.length || typeof piWindow.atsElementToPngDataUrl !== 'function') {
+            throw new Error('Printable PI pages were not found.');
+        }
+        const pages = [];
+        for (const node of pageNodes) {
+            const image = await piWindow.atsElementToPngDataUrl(node);
+            if (!image?.src) throw new Error('A PI page could not be rendered.');
+            pages.push(image);
+        }
+
+        const response = await fetch(APP_BASE + '/api/export_pdf.php', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({filename:childDoc.title || 'PI', pages})
+        });
+        if (!response.ok) throw new Error((await response.text()) || 'PDF creation failed.');
+        const blobUrl = URL.createObjectURL(await response.blob());
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = String(childDoc.title || 'PI').replace(/[\\/:*?"<>|]+/g, '-') + '.pdf';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+    } catch (error) {
+        console.error('Marketing PI PDF download failed', error);
+        alert(error.message || 'Could not download the PI PDF.');
+    } finally {
+        if (button) { button.disabled = false; button.textContent = 'Download PDF'; }
     }
 }
 

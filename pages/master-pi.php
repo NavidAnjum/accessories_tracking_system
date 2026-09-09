@@ -64,6 +64,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .mpi-doc .zzal-print-brand--footer { position:static; margin-top:auto!important; padding-top:6px!important; }
 .mpi-content { min-height:0; flex:1 1 auto; display:flex; flex-direction:column; }
 .mpi-continuation { display:none; }
+html.ats-print-layout #mpiDocument { height:281mm!important; min-height:281mm!important; overflow:hidden!important; }
 .mpi-continuation.is-active { display:flex; }
 
 /* Header */
@@ -142,19 +143,25 @@ require_once __DIR__ . '/../includes/print-brand.php';
 /* Empty state */
 .mpi-empty { text-align:center; padding:60px 20px; color:#94a3b8; font-family:sans-serif; }
 
-@page { size:A4 portrait; margin:0; }
+@page { size:A4 portrait; margin:0 0 16mm; }
 @media print {
     .mpi-ctrl, nav.page-nav, .order-id-bar { display:none !important; }
-    #mpiWrap { background:none !important; padding:0 !important; }
-    .mpi-doc { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; min-height:297mm!important; max-width:210mm; padding:4mm 14mm 12mm!important; overflow:hidden; display:flex!important; flex-direction:column!important; break-after:page; page-break-after:always; }
+    html, body { width:210mm!important; min-height:0!important; margin:0!important; padding:0!important; background:#fff!important; overflow:visible!important; }
+    .app-shell, .form-stack { display:block!important; margin:0!important; padding:0!important; background:#fff!important; }
+    .form-stack > *:not(#mpiWrap) { display:none!important; }
+    #mpiWrap { display:block!important; background:none!important; padding:0!important; margin:0!important; width:210mm!important; min-height:0!important; }
+    .mpi-doc { box-sizing:border-box; box-shadow:none; margin:0; width:210mm!important; height:auto!important; min-height:281mm!important; max-width:210mm; padding:4mm 14mm 8mm!important; overflow:visible!important; display:flex!important; flex-direction:column!important; break-after:page; page-break-after:always; }
+    #mpiDocument { height:281mm!important; min-height:281mm!important; overflow:hidden!important; }
     .mpi-continuation.is-active { break-before:page; page-break-before:always; break-after:auto; page-break-after:auto; }
     .mpi-doc:last-child { break-after:auto; page-break-after:auto; }
-    .mpi-doc .zzal-print-brand--footer { position:static!important; margin-top:auto!important; }
+    #mpiDocument .zzal-print-brand--footer { position:fixed!important; left:14mm!important; right:14mm!important; bottom:2mm!important; width:auto!important; margin:0!important; padding:0!important; z-index:20; background:#fff; }
+    .mpi-continuation .zzal-print-brand--footer { display:none!important; }
+    .mpi-tbl thead { display:table-header-group!important; }
+    .mpi-tbl tbody { break-inside:auto!important; page-break-inside:auto!important; }
+    .mpi-tbl tr { break-inside:avoid-page!important; page-break-inside:avoid!important; }
     .mpi-content { min-height:0!important; flex:1 1 auto!important; display:flex!important; flex-direction:column!important; }
     .mpi-continuation:not(.is-active) { display:none!important; }
     .mpi-hd { display:none !important; }
-    body, html, .app-shell { width:210mm!important; min-height:297mm!important; margin:0!important; padding:0!important; background:#fff !important; overflow:visible!important; }
-    .form-stack { padding:0 !important; }
     .no-print { display:none !important; }
 }
 html.pi-preview .mpi-ctrl {
@@ -182,7 +189,10 @@ html.pi-preview .mpi-ctrl {
     </div>
 
     <button class="mpi-excel-btn" onclick="downloadMasterPiExcel()">Download Excel</button>
-    <button class="mpi-print-btn" onclick="window.print()">Print / Save PDF</button>
+    <?php if (($__user['role'] ?? '') !== 'marketing'): ?>
+    <button class="mpi-excel-btn" style="background:#0f6cbd;" onclick="emailThisPi()">📧 Email PI (Outlook)</button>
+    <?php endif; ?>
+    <button class="mpi-print-btn" onclick="atsPrintPi()">Print / Save PDF</button>
 </div>
 <script>
 (function(){
@@ -720,6 +730,7 @@ window.onOrderLoad = (function(_prev) {
             try {
                 const groups = JSON.parse(customJson);
                 sessionStorage.removeItem('mpi_custom_items');
+                window.atsRerenderPiForLayout = () => renderMasterPiFromCustom(groups, res);
                 renderMasterPiFromCustom(groups, res);
                 if (atsShouldAutoExcel() && !_mpiExcelDone) {
                     _mpiExcelDone = true;
@@ -730,6 +741,7 @@ window.onOrderLoad = (function(_prev) {
         }
 
         mpiBuildList(res);
+        window.atsRerenderPiForLayout = () => renderMasterPi();
         renderMasterPi();
         if (atsShouldAutoExcel() && !_mpiExcelDone) {
             _mpiExcelDone = true;
@@ -739,4 +751,5 @@ window.onOrderLoad = (function(_prev) {
 })(window.onOrderLoad);
 </script>
 
+<script src="<?= BASE_PATH ?>/assets/ats-email-pi.js"></script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -50,11 +50,33 @@ try {
 
     if (!empty($inbox['work_order_id'])) {
         if ($requestedWorkOrderId !== '' && $requestedWorkOrderId !== (string)$inbox['work_order_id']) {
+            // Does the owning work order actually exist? A claim can be left behind
+            // by a work order that was never finished/created → the ERP order looks
+            // "taken" even though nothing was really created for it.
+            $ownerExists = $db->prepare('SELECT COUNT(*) FROM orders WHERE order_id = ?');
+            $ownerExists->execute([(string)$inbox['work_order_id']]);
+            $orderRowExists = (int)$ownerExists->fetchColumn() > 0;
+
+            $piExists = $db->prepare('SELECT COUNT(*) FROM pis WHERE order_id = ?');
+            $piExists->execute([(string)$inbox['work_order_id']]);
+            $piCount = (int)$piExists->fetchColumn();
+
+            $msg = 'ERP sales order ' . $erpOrderNo . ' already belongs to ' . $inbox['work_order_id'] . '.';
+            if (!$orderRowExists) {
+                $msg .= ' (That work order does not exist yet — it looks like a stale claim. It can be released so this ERP order is reusable.)';
+            } elseif ($piCount === 0) {
+                $msg .= ' (That work order exists but has no PI created yet.)';
+            }
+
             $db->commit();
             http_response_code(409);
             echo json_encode([
-                'error' => 'ERP sales order ' . $erpOrderNo . ' already belongs to ' . $inbox['work_order_id'] . '.',
+                'error' => $msg,
+                'sale_order_no' => $erpOrderNo,
                 'order_id' => $inbox['work_order_id'],
+                'owner_order_exists' => $orderRowExists,
+                'owner_pi_count' => $piCount,
+                'stale_claim' => !$orderRowExists,
             ]);
             exit;
         }

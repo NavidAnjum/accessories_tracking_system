@@ -20,6 +20,16 @@ include __DIR__ . '/../includes/header.php';
                             <span>Invoice goes to packing list, then checked details continue to LC and factory release.</span>
                         </div>
                     </div>
+                    <div class="form-grid" id="packingEpzFields" style="display:none;margin-bottom:16px;">
+                        <div class="field span-6">
+                            <label for="packingListNo">Packing List No.</label>
+                            <input id="packingListNo" name="packingListNo" placeholder="Packing list number">
+                        </div>
+                        <div class="field span-6">
+                            <label for="packingTruckNo">Truck No.</label>
+                            <input id="packingTruckNo" name="packingTruckNo" placeholder="Truck number">
+                        </div>
+                    </div>
                     <div class="packing-sheet">
                         <div class="packing-sheet-header packing-sheet-header-centered">
                             <div class="packing-logo">ZZAL</div>
@@ -151,6 +161,8 @@ window.onOrderLoad = function(res) {
     const exch  = res.pages?.exchange   || {};
     const lc    = res.pages?.lc         || {};
     const sales = res.pages?.sales      || {};
+    const epzFields = document.getElementById('packingEpzFields');
+    if (epzFields) epzFields.style.display = lc.lcZoneType === 'epz' ? 'grid' : 'none';
 
     const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.textContent = val; };
     const pick = (...vals) => {
@@ -168,20 +180,21 @@ window.onOrderLoad = function(res) {
     set('packingFooterCompany',      comm.commercialBeneficiaryName    || '—');
 
     // Consignee from order
-    set('packingConsigneeName', order.customer_name || comm.commercialConsigneeName || '—');
+    set('packingConsigneeName', lc.lcApplicantName || order.customer_name || comm.commercialConsigneeName || '—');
+    set('packingConsigneeAddress', lc.lcApplicantAddress || comm.commercialConsigneeAddress || '—');
     set('packingAdvisingBank', pick(
+        lc.reimbursementBank,
         comm.commercialAdvisingBank,
         exch.payToBankAddress,
         exch.payToBankName,
-        lc.reimbursementBank,
         sales.advisingBank
     ));
     set('packingConsigneeBank', pick(
+        lc.negotiatingBeneficiaryBank,
         comm.commercialConsigneeBankAddress,
         sales.consigneeBank,
         exch.negotiatingBankAddress,
-        exch.beneficiaryBankAddress,
-        lc.negotiatingBeneficiaryBank
+        exch.beneficiaryBankAddress
     ));
 
     // Notes from exchange page data
@@ -191,8 +204,8 @@ window.onOrderLoad = function(res) {
     set('packingDetailsText',  exch.packingDetailsMaster || 'Standard Poly Packing Rolls');
     set('packingCarrierText',  exch.carrierNameMaster    || comm.commercialCarrier || '—');
 
-    const contract = exch.exportSalesContractNo   || '';
-    const contDate = exch.exportSalesContractDate || '';
+    const contract = lc.lcExportSalesContractNo || exch.exportSalesContractNo || lc.lcNumber || '';
+    const contDate = lc.lcExportSalesContractDate || exch.exportSalesContractDate || lc.lcDate || '';
     set('packingContractText', contract ? contract + (contDate ? ' Dated ' + contDate : '') : '—');
 
     const proforma     = comm.proformaNo   || '';
@@ -207,8 +220,12 @@ window.onOrderLoad = function(res) {
     const bond = exch.bondLicenseNo   || '';
     const bvat = exch.beneficiaryVatBin || '';
     const hs   = exch.hsCodeMaster    || '';
-    if (irc || tin) {
+    const applicantName = lc.lcApplicantName || '';
+    const applicantAddress = lc.lcApplicantAddress || '';
+    if (applicantName || applicantAddress || irc || tin) {
         const parts = [];
+        if (applicantName) parts.push(applicantName);
+        if (applicantAddress) parts.push(applicantAddress);
         if (irc)  parts.push('IRC No. ' + irc);
         if (tin)  parts.push('TIN No. ' + tin);
         if (vat)  parts.push('Vat/bin No. ' + vat);

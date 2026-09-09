@@ -56,6 +56,14 @@ include __DIR__ . '/../includes/header.php';
                                     <span>Dated</span>
                                     <strong><input id="commercialLcDate" name="commercialLcDate" type="date"></strong>
                                 </div>
+                                <div class="commercial-meta-row commercial-epz-meta" style="display:none;">
+                                    <span>EXP No</span>
+                                    <strong id="commercialExpNo">—</strong>
+                                </div>
+                                <div class="commercial-meta-row commercial-epz-meta" style="display:none;">
+                                    <span>EXP Date</span>
+                                    <strong id="commercialExpDate">—</strong>
+                                </div>
                                 <div class="commercial-meta-row">
                                     <span>Proforma Invoice</span>
                                     <strong><input id="proformaNo" name="proformaNo" placeholder="e.g. ZZAL/PI/26/52017"></strong>
@@ -228,11 +236,25 @@ window.onOrderLoad = function(res) {
     const exch  = res.pages?.exchange || {};
 
     const fill = (id, val) => { const el = document.getElementById(id); if (el && val && !el.value) el.value = val; };
+    const displayDate = value => {
+        const text = String(value || '');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return text || '—';
+        const [year, month, day] = text.split('-');
+        return `${day}/${month}/${year}`;
+    };
+
+    const isEpz = lc.lcZoneType === 'epz';
+    document.querySelectorAll('.commercial-epz-meta').forEach(row => row.style.display = isEpz ? '' : 'none');
+    if (isEpz) {
+        const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value || '—'; };
+        setText('commercialExpNo', lc.lcExpNo);
+        setText('commercialExpDate', displayDate(lc.lcExpDate));
+    }
 
     // ── Carry Beneficiary details from the LC page ──
-    fill('commercialBeneficiaryName',    lc.lcBeneficiaryName);
-    fill('commercialBeneficiaryAddress', lc.lcBeneficiaryAddress);
-    fill('commercialFactoryAddress',     lc.lcFactoryAddress);
+    if (lc.lcBeneficiaryName) document.getElementById('commercialBeneficiaryName').value = lc.lcBeneficiaryName;
+    if (lc.lcBeneficiaryAddress) document.getElementById('commercialBeneficiaryAddress').value = lc.lcBeneficiaryAddress;
+    if (lc.lcFactoryAddress) document.getElementById('commercialFactoryAddress').value = lc.lcFactoryAddress;
 
     // ── Populate source-glance reference fields (salesOrder, customerPo, buyer, customer) ──
     const allPis   = res.pis || [];
@@ -380,8 +402,10 @@ window.onOrderLoad = function(res) {
         const f = v => ex[v] || '';
         // Only rebuild if exchange has any data, otherwise keep manually saved value
         const hasExchangeData = Object.values(ex).some(v => v && String(v).trim());
-        if (hasExchangeData || !footerEl.value) {
-            footerEl.value = `Export Sales Contract No. ${f('exportSalesContractNo')} Dated ${f('exportSalesContractDate')}, `
+        if (hasExchangeData || lc.lcNumber || !footerEl.value) {
+            const exportScNo = lc.lcExportSalesContractNo || f('exportSalesContractNo') || lc.lcNumber || '';
+            const exportScDate = lc.lcExportSalesContractDate || f('exportSalesContractDate') || lc.lcDate || '';
+            footerEl.value = `Export Sales Contract No. ${exportScNo} Dated ${exportScDate}, `
                 + `Applicants IRC No. ${f('applicantIrc')}, `
                 + `Applicants TIN No. ${f('applicantTin')}, `
                 + `Applicants Vat/bin No. ${f('applicantVatBin')}, `

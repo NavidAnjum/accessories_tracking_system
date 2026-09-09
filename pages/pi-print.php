@@ -64,11 +64,14 @@ require_once __DIR__ . '/../includes/print-brand.php';
 
 /* Print */
 @media print {
-    @page { size:A4 portrait; margin:0; }
+@page { size:A4 portrait; margin:0 0 16mm; }
     .pi-ctrl, nav, .order-id-bar, .form-stack > *:not(#piWrap) { display:none !important; }
     body, html { width:210mm!important; min-height:297mm!important; margin:0!important; padding:0!important; background:#fff !important; overflow:visible!important; }
-    .pi-wrap { box-shadow:none; margin:0; width:210mm!important; height:297mm!important; max-width:210mm; padding:14mm 14mm 12mm!important; overflow:hidden; display:flex!important; flex-direction:column!important; }
-    .pi-wrap .zzal-print-brand--footer { position:static!important; margin-top:auto!important; }
+    .pi-wrap { box-sizing:border-box; box-shadow:none; margin:0; width:210mm!important; height:auto!important; min-height:281mm!important; max-width:210mm; padding:8mm 14mm 8mm!important; overflow:visible!important; display:flex!important; flex-direction:column!important; }
+    .pi-wrap .zzal-print-brand--footer { position:fixed!important; left:14mm!important; right:14mm!important; bottom:2mm!important; width:auto!important; margin:0!important; padding:0!important; z-index:20; background:#fff; }
+    .pi-table thead { display:table-header-group!important; }
+    .pi-table tbody { break-inside:auto!important; page-break-inside:auto!important; }
+    .pi-table tr { break-inside:avoid-page!important; page-break-inside:avoid!important; }
     .pi-header { display:none !important; }
     .app-shell { display:block !important; }
     .form-stack { padding:0 !important; }
