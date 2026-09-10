@@ -161,8 +161,18 @@ window.onOrderLoad = function(res) {
     const exch  = res.pages?.exchange   || {};
     const lc    = res.pages?.lc         || {};
     const sales = res.pages?.sales      || {};
+    const packing = res.pages?.packing  || {};
     const epzFields = document.getElementById('packingEpzFields');
     if (epzFields) epzFields.style.display = lc.lcZoneType === 'epz' ? 'grid' : 'none';
+
+    const packingListNo = document.getElementById('packingListNo');
+    if (packingListNo && !packingListNo.value) {
+        packingListNo.value = packing.packingListNo || comm.invoiceNo || comm.proformaNo || sales.piNum || '';
+    }
+    const packingTruckNo = document.getElementById('packingTruckNo');
+    if (packingTruckNo && !packingTruckNo.value && packing.packingTruckNo) {
+        packingTruckNo.value = packing.packingTruckNo;
+    }
 
     const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.textContent = val; };
     const pick = (...vals) => {

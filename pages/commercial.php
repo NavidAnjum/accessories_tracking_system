@@ -303,7 +303,7 @@ window.onOrderLoad = function(res) {
     // Issuing bank from exchange page
     const issuingBankVal = commercialNormalizeBank(exch.applicantBank || lc.lcIssuingBank || '', 'ncc');
     const issuingBankName = issuingBankVal.split('\n')[0] || '';
-    const issuingBankAddr = issuingBankVal;
+    const issuingBankAddr = issuingBankVal.split('\n').slice(1).join('\n') || issuingBankVal;
     const issuingAddrEl = document.getElementById('commercialIssuingBankAddress');
     if (issuingAddrEl && (!issuingAddrEl.value || /bank address/i.test(issuingAddrEl.value) || /issuing bank/i.test(issuingAddrEl.value))) {
         issuingAddrEl.value = issuingBankAddr;

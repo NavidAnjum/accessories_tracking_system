@@ -131,6 +131,12 @@ require_once __DIR__ . '/../includes/print-brand.php';
     margin:5px 0 2px;
     font-weight:700;
 }
+.ci-cont-meta {
+    margin:2px 0 5px;
+    grid-template-columns:1fr auto;
+    border-bottom:1px solid #333;
+    padding-bottom:3px;
+}
 .ci-items {
     width:100%;
     border-collapse:collapse;
@@ -320,6 +326,26 @@ function ciDate(val) {
     return val;
 }
 
+function ciPaginateItems(items) {
+    if (!items.length || items.length <= 22) return [items];
+    const pages = [];
+    const firstTake = items.length <= 28 ? items.length - 12 : 28;
+    pages.push(items.slice(0, firstTake));
+    let offset = firstTake;
+    const continuationRows = 38;
+    const finalPageRows = 28;
+    while (items.length - offset > finalPageRows) {
+        const remaining = items.length - offset;
+        const take = remaining <= finalPageRows * 2
+            ? Math.ceil(remaining / 2)
+            : Math.min(continuationRows, remaining - finalPageRows);
+        pages.push(items.slice(offset, offset + take));
+        offset += take;
+    }
+    pages.push(items.slice(offset));
+    return pages;
+}
+
 function ciResolveDocs(res) {
     const order = res.order || {};
     const sales = res.pages?.sales || {};
@@ -392,6 +418,12 @@ function ciBuildPages() {
     const consigneeBank = ciResolveBank(comm.commercialConsigneeBankAddress || exch.beneficiaryBankAddress || exch.negotiatingBankAddress || lc.negotiatingBeneficiaryBank || '', 'dbbl');
     const issuingBankAddress = ciResolveBank(comm.commercialIssuingBankAddress || exch.applicantBank || lc.lcIssuingBank || '', 'ncc');
     const issuingBankName = comm.commercialIssuingBankName || (issuingBankAddress.split('\n')[0] || '');
+    const issuingBankDetailLines = ciSplit(issuingBankAddress);
+    if (issuingBankDetailLines.length && issuingBankName &&
+        issuingBankDetailLines[0].trim().toLowerCase() === issuingBankName.trim().toLowerCase()) {
+        issuingBankDetailLines.shift();
+    }
+    const issuingBankDetails = issuingBankDetailLines.join('\n');
     const invoiceNo = comm.invoiceNo || sales.piNum || order.order_id || '-';
     const invoiceDate = ciDate(comm.invoiceDate || sales.piDate || order.created_at?.slice(0,10) || '');
     const lcNo = comm.commercialLcNo || exch.masterLcNo || lc.lcNumber || '-';
@@ -422,36 +454,44 @@ function ciBuildPages() {
     let html = '';
     chosen.forEach(doc => {
         const items = doc.po?.items || [];
-        let totalQty = 0;
-        let totalAmt = 0;
-        const rowsHtml = items.length
-            ? items.map((item, idx) => {
-                const desc = item.desc || item.itemName || '-';
-                const qty = parseFloat(item.qty || 0) || 0;
-                const price = parseFloat(item.price || item.unitPrc || 0) || 0;
-                const amt = parseFloat(item.total || (qty * price)) || 0;
-                totalQty += qty;
-                totalAmt += amt;
-                return `<tr>
-                    <td class="center">${idx + 1}</td>
-                    <td>${ciEsc(desc)}</td>
-                    <td class="right">${ciEsc(ciQty(qty))}</td>
-                    <td class="right">$ ${ciEsc(ciMoney(price, 4))}</td>
-                    <td class="right">$ ${ciEsc(ciMoney(amt, 2))}</td>
-                </tr>`;
-            }).join('')
-            : '<tr><td colspan="5" class="center">No items found</td></tr>';
+        let totalQty = items.reduce((sum, item) => sum + (parseFloat(item.qty || 0) || 0), 0);
+        let totalAmt = items.reduce((sum, item) => {
+            const qty = parseFloat(item.qty || 0) || 0;
+            const price = parseFloat(item.price || item.unitPrc || 0) || 0;
+            return sum + (parseFloat(item.total || (qty * price)) || 0);
+        }, 0);
 
         if (!items.length) {
             totalQty = parseFloat(doc.po?.qty || 0) || 0;
             totalAmt = parseFloat(doc.po?.val || 0) || 0;
         }
 
-        html += `
+        const itemPages = ciPaginateItems(items);
+        itemPages.forEach((pageItems, pageIndex) => {
+            const isLastPage = pageIndex === itemPages.length - 1;
+            const startIndex = itemPages.slice(0, pageIndex).reduce((sum, page) => sum + page.length, 0);
+            const rowsHtml = pageItems.length
+                ? pageItems.map((item, idx) => {
+                    const desc = item.desc || item.itemName || '-';
+                    const qty = parseFloat(item.qty || 0) || 0;
+                    const price = parseFloat(item.price || item.unitPrc || 0) || 0;
+                    const amt = parseFloat(item.total || (qty * price)) || 0;
+                    return `<tr>
+                        <td class="center">${startIndex + idx + 1}</td>
+                        <td>${ciEsc(desc)}</td>
+                        <td class="right">${ciEsc(ciQty(qty))}</td>
+                        <td class="right">$ ${ciEsc(ciMoney(price, 4))}</td>
+                        <td class="right">$ ${ciEsc(ciMoney(amt, 2))}</td>
+                    </tr>`;
+                }).join('')
+                : '<tr><td colspan="5" class="center">No items found</td></tr>';
+
+            html += `
         <div class="ci-page">
             ${CI_BRAND_HEADER}
             <div class="ci-title">Commercial Invoice</div>
 
+            ${pageIndex === 0 ? `
             <table class="ci-topbox">
                 <tr>
                     <td>
@@ -480,7 +520,7 @@ function ciBuildPages() {
                             <div class="ci-meta-row"><span class="ci-meta-label">Dated</span><span>${ciEsc(proformaDate)}</span></div>
                             <div class="ci-meta-row"><span class="ci-meta-label">Total PI Value</span><span>USD ${ciEsc(ciMoney(piSummary.total || 0, 2))}</span></div>
                             <div class="ci-meta-row"><span class="ci-meta-label">L/C Bank</span><span>${ciEsc(issuingBankName)}</span></div>
-                            <div style="margin-left:88px;">${ciLines(issuingBankAddress)}</div>
+                            <div style="margin-left:88px;">${ciLines(issuingBankDetails)}</div>
                             <div class="ci-meta-row"><span class="ci-meta-label">Place of Loading</span><span>${ciEsc(placeLoading)}</span></div>
                             <div class="ci-meta-row"><span class="ci-meta-label">Place of Delivery</span><span>${ciEsc(placeDelivery)}</span></div>
                             <div class="ci-meta-row"><span class="ci-meta-label">Delivery</span><span>${ciEsc(carrier)}</span></div>
@@ -490,6 +530,7 @@ function ciBuildPages() {
             </table>
 
             <div class="ci-buyer">BUYER: ${ciEsc(doc.po?.buyer || order.buyer_name || '')}</div>
+            ` : `<div class="ci-meta-row ci-cont-meta"><span><strong>Invoice No:</strong> ${ciEsc(invoiceNo)}</span><span><strong>Date:</strong> ${ciEsc(invoiceDate)}</span></div>`}
 
             <table class="ci-items">
                 <thead>
@@ -503,24 +544,25 @@ function ciBuildPages() {
                 </thead>
                 <tbody>
                     ${rowsHtml}
-                    <tr>
+                    ${isLastPage ? `<tr>
                         <td colspan="2" class="right"><strong>Total</strong></td>
                         <td class="right"><strong>${ciEsc(ciQty(totalQty))}</strong></td>
                         <td></td>
                         <td class="right"><strong>$ ${ciEsc(ciMoney(totalAmt, 2))}</strong></td>
-                    </tr>
+                    </tr>` : ''}
                 </tbody>
             </table>
 
-            <div class="ci-footnote">Freight prepaid</div>
+            ${isLastPage ? `<div class="ci-footnote">Freight prepaid</div>
             <div class="ci-footnote">${ciEsc(applicantsText)}</div>
 
             <div class="ci-sign-block">
                 <img src="<?= BASE_PATH ?>/AKM.png" alt="For Zaber & Zubair Accessories Ltd. — Authorised Signature" style="height:100px;max-width:300px;object-fit:contain;display:block;">
-            </div>
+            </div>` : ''}
 
             ${CI_BRAND_FOOTER}
         </div>`;
+        });
     });
 
     holder.innerHTML = html;
