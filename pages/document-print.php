@@ -1,9 +1,10 @@
 <?php
 $doc = preg_replace('/[^a-z\-]/', '', $_GET['doc'] ?? 'packing');
-$validDocs = ['sales-contract','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding'];
+$validDocs = ['sales-contract','bill','packing','delivery','truck','origin','beneficiary','forwarding','bank-forwarding'];
 if (!in_array($doc, $validDocs, true)) $doc = 'packing';
 $titles = [
     'sales-contract' => 'Sales Contract Print',
+    'bill' => 'Bill / Sales Contract Print',
     'packing' => 'Packing List Print',
     'delivery' => 'Delivery Challan Print',
     'truck' => 'Truck Challan Print',
@@ -65,6 +66,27 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .sc-contract-signatures{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:70px;text-align:center;font:700 12px Arial,Helvetica,sans-serif}
 .sc-contract-signbox{min-height:105px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
 .sc-contract-signbox img{height:72px;max-width:230px;object-fit:contain;margin-bottom:3px}
+/* Bill / Sales Contract (BILL NO ...) */
+.bill-title{text-align:center;font-weight:800;font-size:13px;margin:2px 0 8px}
+.bill-head-row{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:4px}
+.bill-buyer{font-weight:700}
+.bill-datebox{border:1px solid #333;border-collapse:collapse}
+.bill-datebox td{border:1px solid #333;padding:3px 10px;font-weight:700}
+.bill-confirm{margin:6px 0 8px;font-weight:700;text-transform:uppercase}
+.bill-table{width:100%;border-collapse:collapse;margin-top:2px}
+.bill-table th,.bill-table td{border:1px solid #333;padding:3px 5px;vertical-align:top}
+.bill-table th{text-align:center;font-weight:700}
+.bill-perpi{background:#ffff00;font-weight:700}
+.bill-body{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}
+.bill-table thead{display:table-header-group}
+.bill-table tr{break-inside:avoid;page-break-inside:avoid}
+.bill-terms{margin-top:6px}
+.bill-total-words{margin:6px 0 2px;font-weight:700}
+.bill-terms{margin-top:4px}
+.bill-terms-title{font-weight:800;font-style:italic;text-decoration:underline;margin-bottom:3px}
+.bill-term{display:grid;grid-template-columns:34px 1fr;gap:4px;margin-bottom:1px}
+.bill-term-sub{padding-left:34px}
+.bill-sign-row{margin-top:auto;padding-top:40px;display:flex;justify-content:space-between;font-weight:700}
 /* §7 — anchor signature + footer to the bottom of the page (COO / Beneficiary) */
 .doc-page.doc-letter-page{display:flex;flex-direction:column}
 .doc-letter-page .doc-letter-body{flex:1;display:flex;flex-direction:column;min-height:0}
@@ -134,7 +156,7 @@ function renderPackingStylePaged(titleText,res){
         const itemRows=pageRows.map((row,idx)=>`<tr><td class="center">${startIndex+idx+1}</td><td>${esc(row.desc)}</td><td class="right">${esc(qtyFmt(row.qty))}</td></tr>`).join('')||'<tr><td colspan="3" class="center">No items found</td></tr>';
         startIndex+=pageRows.length;
         const firstDetails=pageIndex===0?`${DOC_TYPE==='delivery'?`<div class="doc-meta-line"><div>Ref No: ${esc(refText)}</div><div>Date: ${esc(dateText)}</div></div>`:''}<table class="doc-topbox"><tr><td><div class="doc-grid-block"><div><strong>Beneficiary:</strong></div><div>${lines(c.beneficiaryAddress)}</div><div>${lines(c.factoryAddress)}</div><div style="margin-top:4px;"><strong>Advising Bank:</strong></div><div>${lines(c.advisingBank)}</div></div></td><td><div class="doc-grid-block"><div><strong>Consignee:</strong></div><div>${esc(c.customer)}</div><div>${lines(c.comm.commercialConsigneeAddress||c.sales.buyerAddress||'')}</div><div style="margin-top:4px;"><strong>Consignee's Bank:</strong></div><div>${lines(c.consigneeBank)}</div></div></td></tr></table><div class="doc-buyer">BUYER: ${esc(c.buyer||'-')}</div>`:`<div class="doc-cont-meta"><span><strong>${DOC_TYPE==='delivery'?'Ref No':'PI No'}:</strong> ${esc(refText)}</span><span><strong>Date:</strong> ${esc(dateText||fmtDate(c.proformaDate,'.'))}</span></div>`;
-        const finalBlocks=isLastPage?`${DOC_TYPE==='delivery'?'<div style="margin-top:4px;">Freight prepaid</div>':''}<div class="doc-note-list">${noteRows.map(([label,val])=>`<div class="doc-note-row"><div>${esc(label)}</div><div>${esc(val||'-')}</div></div>`).join('')}</div><div class="doc-sign-row"><div><img src="<?= BASE_PATH ?>/AKM.png" alt="Authorised Signature" style="height:100px;max-width:300px;object-fit:contain;display:block;"></div><div class="doc-sign-right" style="display:flex;flex-direction:column;justify-content:space-between;"><div>Goods received in good condition</div><div><div class="doc-sign-line"></div><div>Signature of Consignee with Seal</div></div></div></div>`:'';
+        const finalBlocks=isLastPage?`${DOC_TYPE==='delivery'?'<div style="margin-top:4px;">Freight prepaid</div>':''}<div class="doc-note-list">${noteRows.map(([label,val])=>`<div class="doc-note-row"><div>${esc(label)}</div><div>${esc(val||'-')}</div></div>`).join('')}</div>${epzWeightBlock(res,totalQty)}<div class="doc-sign-row"><div><img src="<?= BASE_PATH ?>/AKM.png" alt="Authorised Signature" style="height:100px;max-width:300px;object-fit:contain;display:block;"></div><div class="doc-sign-right" style="display:flex;flex-direction:column;justify-content:space-between;"><div>Goods received in good condition</div><div><div class="doc-sign-line"></div><div>Signature of Consignee with Seal</div></div></div></div>`:'';
         return `<div class="doc-page doc-item-page"><div class="doc-brand-header">${DOC_BRAND_HEADER}</div><div class="doc-head"><div class="doc-logo">ZZAL</div><div class="doc-title-wrap"><div class="doc-company">${esc(DOC_COMPANY_NAME)}</div><div class="doc-title">${esc(titleText)}</div></div></div>${firstDetails}<table class="doc-table"><thead><tr><th style="width:42px;">SL NO.</th><th>Description of Goods</th><th style="width:86px;">Quantity${DOC_TYPE==='truck'?'/Cone':''}</th></tr></thead><tbody>${itemRows}${isLastPage?`<tr><td colspan="2" class="right"><strong>Total</strong></td><td class="right"><strong>${esc(qtyFmt(totalQty))}</strong></td></tr>`:''}</tbody></table>${finalBlocks}${DOC_BRAND_FOOTER}</div>`;
     }).join('');
 }
@@ -143,6 +165,10 @@ function renderOrigin(res){const c=getCommon(res);const statement='This is to ce
 function renderBeneficiary(res){const c=getCommon(res);const qty=c.comm.commercialTotalQty||qtyFmt(buildItemRows(c.pos).totalQty);const amt=c.amount?money(c.amount,2):'0.00';const bank=plain(c.consigneeBank||'');const statement1='We hereby confirm that we have supplied Accessories for 100% export oriented garments industry '+qty+' cones / pcs total amount of US $ '+amt+' all other details as per pro-forma invoice No. '+(c.proforma||'-')+(c.proformaDate?' Dated '+fmtDate(c.proformaDate,'.'):'')+'. To The '+(c.customer||'-')+(bank?' against their '+bank:'')+(c.lcNo?' L/C No. '+c.lcNo+(c.lcDate?' Dated '+fmtDate(c.lcDate,'.'):''):'')+'.';const statement2="We do hereby undertake that the said accessories shipment from : Beneficiary's factory to applicant factory warehouse. We also certified that quantity, quality, rate specification & all other terms & conditions are as per suppliers pro-forma invoice No. "+(c.proforma||'-')+(c.proformaDate?' Dated '+fmtDate(c.proformaDate,'.'):'')+' any short and defective goods to be replaced by us on free of cost.';return `<div class="doc-page doc-letter-page"><div class="doc-brand-header">${DOC_BRAND_HEADER}</div><div class="doc-head"><div class="doc-logo">ZZAL</div><div class="doc-title-wrap"><div class="doc-company">${esc(DOC_COMPANY_NAME)}</div><div class="doc-title">Beneficiary's Certificate</div></div></div><div class="doc-letter-body"><p class="doc-letter-p">${esc(statement1)}</p><p class="doc-letter-p">${esc(statement2)}</p><div class="doc-letter-sign"><div>For &amp; on behalf of</div><img src="<?= BASE_PATH ?>/AKM.png" alt="For Zaber & Zubair Accessories Ltd. — Authorised Signature" style="height:100px;max-width:300px;object-fit:contain;display:block;"></div></div>${DOC_BRAND_FOOTER}</div>`}
 function renderForwarding(res){const c=getCommon(res);const f=c.doc||{};const rows=[['1','Bill of Exchange',f.forwardingQty1||'2 Copies'],['2','Commercial Invoice',f.forwardingQty2||'1 Copy'],['3','Packing List',f.forwardingQty3||'1 Copy'],['4','Delivery Challan',f.forwardingQty4||'1 Copy'],['5','Certificate of Origin',f.forwardingQty5||'1 Copy'],['6','Beneficiary Certificate',f.forwardingQty6||'1 Copy'],['7','Truck Challan',f.forwardingQty7||'1 Copy'],['8','Delivery Challan Original Copy',f.forwardingQty8||'1 Copy'],['9','L/C Copy & PI',f.forwardingQty9||'1 Copy'],['10',f.forwardingExtraDesc1||'',f.forwardingExtraQty1||''],['11',f.forwardingExtraDesc2||'',f.forwardingExtraQty2||''],['12',f.forwardingExtraDesc3||'',f.forwardingExtraQty3||''],['13',f.forwardingExtraDesc4||'',f.forwardingExtraQty4||'']].filter(r=>r[1]||r[2]);return `<div class="doc-page"><div class="doc-brand-header">${DOC_BRAND_HEADER}</div><div class="doc-head"><div class="doc-logo">ZZAL</div><div class="doc-title-wrap"><div class="doc-company">${esc(DOC_COMPANY_NAME)}</div><div class="doc-title">Document Check List</div></div></div><div class="doc-meta-line"><div>Document Submit Date: ${esc(fmtDate(f.forwardingSubmitDate||'', '.'))}</div></div><div class="doc-note-list" style="margin-bottom:16px;"><div class="doc-note-row"><div>Customer Name</div><div>${esc(c.customer||'-')}</div></div><div class="doc-note-row"><div>LC No.</div><div>${esc(c.lcNo||'-')}</div></div><div class="doc-note-row"><div>LC Date</div><div>${esc(fmtDate(c.lcDate||'', '.'))}</div></div><div class="doc-note-row"><div>Value</div><div>US $ ${esc(money(c.amount,2))}</div></div><div class="doc-note-row"><div>Document Value</div><div>US $ ${esc(money(c.amount,2))}</div></div></div><table class="doc-table"><thead><tr><th style="width:42px;">SL</th><th>Description</th><th style="width:160px;">Requirement Qty</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="center">${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td></tr>`).join('')}</tbody></table><div class="doc-sign-solo" style="margin-top:90px;"><img src="<?= BASE_PATH ?>/AKM.png" alt="For Zaber & Zubair Accessories Ltd. — Authorised Signature" style="height:100px;max-width:300px;object-fit:contain;display:block;"></div>${DOC_BRAND_FOOTER}</div>`}
 function renderBankForwarding(res){const c=getCommon(res);const amount=parseFloat(c.amount||0)||0;const fwd=res.pages?.['bank-forwarding']||{};const rows=[['1','Bill of Exchange'],['2','Commercial Invoice'],['3','Packing List'],['4','Delivery Challan'],['5','Certificate of Origin'],['6','Beneficiary Certificate'],['7','Truck Challan'],['8','Mushok Challan 6.3'],['9','Others']];const defaults=[['2 Copies','2 Copies'],['1 Copy','6 Copies'],['1 Copy','3 Copies'],['1 Copy','4 Copies'],['1 Copy','2 Copies'],['1 Copy','2 Copies'],['1 Copy','0 Copy'],['1 Copy','0 Copy'],['1 Copy','0 Copy']];return `<div class="doc-page"><div class="doc-brand-header">${DOC_BRAND_HEADER}</div><div class="doc-head"><div class="doc-logo">ZZAL</div><div class="doc-title-wrap"><div class="doc-company">${esc(DOC_COMPANY_NAME)}</div><div class="doc-title">Bank Forwarding</div></div></div><div class="doc-meta-line"><div>Date: ${esc(fmtDate(fwd.forwardingDate||c.comm.invoiceDate||c.proformaDate||'', '.'))}</div><div>Reference No.: ${esc(c.comm.invoiceNo||c.proforma||'-')}</div></div><div style="margin:14px 0 18px;"><div>To</div><div><strong>The Manager,</strong></div><div><strong>${esc(c.exch.payToBankName||'-')}</strong></div><div>${lines(c.exch.payToBankAddress||'')}</div></div><div style="margin-bottom:14px;font-weight:700;">Subject: Application for the following negotiation documents for US $ ${esc(money(amount,2))} Against Letter of Credit No. ${esc(c.lcNo||'-')} dated ${esc(fmtDate(c.lcDate||'', '.'))} of ${esc(c.customer||'-')}.</div><div style="margin-bottom:12px;">Dear Sir,<br>We hereby submit the following documents for negotiation of US $ ${esc(money(amount,2))} (${esc(c.exch.tenorWordsMaster||amountWords(amount))}) delivery of Garments accessories as per proforma Invoice No. ${esc(c.proforma||'-')} Dated ${esc(fmtDate(c.proformaDate||'', '.'))}.</div><table class="doc-table"><thead><tr><th style="width:42px;">SL</th><th>Description</th><th style="width:140px;">Advising Bank</th><th style="width:140px;">Consignee's Bank</th></tr></thead><tbody>${rows.map((row,idx)=>`<tr><td class="center">${row[0]}</td><td>${esc(row[1])}</td><td class="center">${esc(defaults[idx][0])}</td><td class="center">${esc(defaults[idx][1])}</td></tr>`).join('')}</tbody></table><div style="margin-top:16px;">So we request you to negotiate the above stated matter as early as possible.<br>Thanking you,<br>Sincerely yours.<br></div><div class="doc-sign-solo" style="margin-top:8px;"><img src="<?= BASE_PATH ?>/AKM.png" alt="For Zaber & Zubair Accessories Ltd. — Authorised Signature" style="height:100px;max-width:300px;object-fit:contain;display:block;"></div>${DOC_BRAND_FOOTER}</div>`}
+// EPZ weight/bundle summary for Packing List / Delivery Challan / Truck Challan.
+// Net Weight, Gross Weight, Total Bundle come from LC (EPZ only); Total Qty is
+// the sum of item quantities. Shown only when EPZ zone is selected.
+function epzWeightBlock(res,totalQty){const lc=res.pages?.lc||{};if(lc.lcZoneType!=='epz')return'';const fmt=(v,u)=>`${(v!==''&&v!=null&&v!==undefined)?esc(v):'-'} ${u}`;return `<div class="doc-note-list" style="margin-top:10px;padding:7px 9px;border:1px solid #cbd5e1;"><div class="doc-note-row"><div>Net Weight</div><div>${fmt(lc.lcNetWeight,'Kgs')}</div></div><div class="doc-note-row"><div>Gross Weight</div><div>${fmt(lc.lcGrossWeight,'Kgs')}</div></div><div class="doc-note-row"><div>Total Bundle</div><div>${fmt(lc.lcTotalBundle,'Pcs')}</div></div><div class="doc-note-row"><div>Total Qty</div><div>${esc(qtyFmt(totalQty||0))} Pcs</div></div></div>`}
 function epzReferenceBlock(res){const lc=res.pages?.lc||{};if(lc.lcZoneType!=='epz')return'';return `<div class="doc-note-list" style="margin-top:10px;padding:7px 9px;border:1px solid #cbd5e1;"><div class="doc-note-row"><div>EXP No.</div><div>${esc(lc.lcExpNo||'-')}</div></div><div class="doc-note-row"><div>EXP Date</div><div>${esc(fmtDate(lc.lcExpDate||'', '.'))}</div></div><div class="doc-note-row"><div>IP No.</div><div>${esc(lc.lcIpNo||'-')}</div></div><div class="doc-note-row"><div>IP Date</div><div>${esc(fmtDate(lc.lcIpDate||'', '.'))}</div></div></div>`}
 function addLcApplicantInformation(html,res){if(!['packing','delivery','truck','origin'].includes(DOC_TYPE))return html;const c=getCommon(res);const applicant=`<div class="doc-note-row"><div>Applicant Information</div><div>${esc(c.applicantInfo||'-')}</div></div>`;if(DOC_TYPE==='origin'){return html.replace('<p class="doc-letter-p">Export Sales Contract No.',`<p class="doc-letter-p"><strong>Applicant Information:</strong> ${esc(c.applicantInfo||'-')}</p><p class="doc-letter-p">Export Sales Contract No.`)}return html.replace('<div class="doc-note-list">','<div class="doc-note-list">'+applicant)}
 function insertBeforeLast(html,needle,addition){const index=html.lastIndexOf(needle);return index<0?html:html.slice(0,index)+addition+html.slice(index)}
@@ -180,7 +206,66 @@ function renderPackingList(res){
     const meta=`<div class="doc-meta-line"><div>Packing List No: ${esc(packingListNo)}</div><div>Truck No: ${esc(packing.packingTruckNo||'-')}</div></div>`;
     return html.replace('<table class="doc-topbox">',meta+'<table class="doc-topbox">');
 }
-function renderDoc(res){if(DOC_TYPE==='sales-contract')return addPiReferencesSalesContract(renderSalesContract(res),res);let html;if(DOC_TYPE==='packing')html=renderPackingList(res);else if(DOC_TYPE==='delivery')html=renderPackingStylePaged('Delivery Challan',res);else if(DOC_TYPE==='truck')html=renderPackingStylePaged('Truck Challan',res);else if(DOC_TYPE==='origin')html=renderOrigin(res);else if(DOC_TYPE==='beneficiary')html=renderBeneficiary(res);else if(DOC_TYPE==='forwarding')html=renderForwarding(res);else if(DOC_TYPE==='bank-forwarding')html=renderBankForwarding(res);else return '<div class="doc-empty">Unsupported document.</div>';return addPiReferences(addEpzReferences(html,res),res)}
+// Bill / Sales Contract — the "BILL NO: ../.." merchandise sold-to form.
+// Optional, print-only step after the PI. Bill No. comes from the URL (defaults
+// to the PI number). Terms differ slightly from the formal Sales Contract.
+const BILL_NO_PARAM=(new URLSearchParams(location.search)).get('bill_no')||'';
+function renderBill(res){
+    const c=getCommon(res);const exch=c.exch;
+    const billNo=BILL_NO_PARAM||c.proforma||'-';
+    const dateVal=c.comm.invoiceDate||c.proformaDate||c.order.created_at?.slice(0,10)||'';
+    let total=0;const rows=[];
+    c.pos.forEach(po=>(po.items||[]).forEach(item=>{
+        const qty=parseFloat(item.qty||0)||0;
+        const price=parseFloat(item.price||item.unitPrice||0)||0;
+        const amt=parseFloat(item.total||0)||qty*price;
+        total+=amt;
+        rows.push({desc:item.desc||item.itemName||'-',ply:item.ply||'',qty,price,amt});
+    }));
+    const totalQty=rows.reduce((s,r)=>s+r.qty,0);
+    const buyerLine=c.buyer||'-';
+    const buyerBlock=[c.customer,c.applicantAddress].filter(Boolean).map(esc).join('<br>');
+    const hs=exch.hsCodeMaster||c.doc?.scHsCode||'4819.10.00';
+    const vatBin=exch.beneficiaryVatBin||'';
+    const bank=plain(c.advisingBank||c.consigneeBank||'')||'National Credit & Commerce Bank LTD Motijheel Main Branch, 6 Motijheel C/A Dhaka-1000 Bangladesh.';
+    const term=(no,text,sub)=>`<div class="bill-term"><div>${no}</div><div>${esc(text)}</div></div>${sub?`<div class="bill-term-sub">${esc(sub)}</div>`:''}`;
+    const colgroup='<colgroup><col style="width:42px;"><col><col style="width:70px;"><col style="width:90px;"><col style="width:90px;"><col style="width:110px;"></colgroup>';
+    const thead='<thead><tr><th>SL NO</th><th>Description of goods</th><th>Ply/MM</th><th>CONE/PCS/YDS</th><th>USD Unit Price</th><th>Total Amount(USD)</th></tr></thead>';
+    const headBlock=
+        `<div class="bill-title">BILL NO: ${esc(billNo)}</div>`+
+        `<div class="bill-head-row"><div><div class="bill-buyer">BUYER # ${esc(buyerLine)}</div><div>NAME &amp; ADDRESS OF BUYER:</div><div>TO</div><div>${buyerBlock||'-'}</div></div>`+
+        `<table class="bill-datebox"><tr><td>Date :</td><td>${esc(fmtDate(dateVal,'/'))}</td></tr></table></div>`+
+        `<div class="bill-confirm">We confirm having sold to you the following merchandise as per terms and condition stated below.</div>`;
+    const finalBlock=
+        `<div class="bill-total-words">TOTAL AMOUNT : ${esc(amountWords(total).toUpperCase())}</div>`+
+        `<div class="bill-terms"><div class="bill-terms-title">Terms &amp; Conditions:</div>`+
+        term('1)','Packing :  Standard Export Packing.')+
+        term('2)','Validity : 07 days From Sales Contract/Bill issue date.')+
+        term('3)','Payment :  USD')+
+        term("4)",'Inspection :  Inspection should be carried out by the buyer at seller’s factory site before delivery.','After inspection of goods in our factory premises buyer will provide us documents acceptance on the spot before the goods delivery.')+
+        term('5)','Country of Origin : Bangladesh.')+
+        term('6)','HS Code No. '+hs)+
+        term('7)','Beneficiary Bin No :'+(vatBin||'-'))+
+        term('8)','Payment Through   : '+bank)+
+        term('9)','Goods will be delivered after receiving clearance “ No Objection” from buyer at our factory premises.')+
+        `<div style="font-weight:700;margin-top:2px;">Zaber &amp; Zubair Accessories LTD. A/C NO.:  -0002-0251008278</div>`+
+        `</div>`+
+        `<div class="bill-sign-row"><div>SIGNATURE OF BUYER</div><div>SIGNATURE OF SELLER</div></div>`;
+    const pages=paginateDocumentItems(rows);
+    let sl=0;
+    return pages.map((pageRows,pageIndex)=>{
+        const isLast=pageIndex===pages.length-1;
+        const itemRows=pageRows.map(r=>{sl++;return `<tr><td class="center">${sl}</td><td>${esc(r.desc)}</td><td class="center">${esc(r.ply||'')}</td><td class="right">${esc(qtyFmt(r.qty))}</td><td class="right">${r.price?esc(money(r.price,4)):''}</td><td class="right">${r.amt?esc(money(r.amt,2)):''}</td></tr>`;}).join('');
+        const totalRow=isLast?`<tr><td colspan="3" class="right"><strong>Total</strong></td><td class="right"><strong>${esc(qtyFmt(totalQty))}</strong></td><td></td><td class="right"><strong>$ ${esc(money(total,2))}</strong></td></tr>`:'';
+        const contMeta=pageIndex>0?`<div class="doc-cont-meta"><span><strong>BILL NO:</strong> ${esc(billNo)}</span><span><strong>Date:</strong> ${esc(fmtDate(dateVal,'/'))}</span></div>`:'';
+        return `<div class="doc-page doc-item-page"><div class="doc-brand-header">${DOC_BRAND_HEADER}</div>`+
+            (pageIndex===0?headBlock:contMeta)+
+            `<div class="bill-body"><table class="bill-table">${colgroup}${thead}<tbody>${itemRows}${totalRow}</tbody></table>`+
+            (isLast?finalBlock:'')+
+            `</div>${DOC_BRAND_FOOTER}</div>`;
+    }).join('');
+}
+function renderDoc(res){if(DOC_TYPE==='bill')return renderBill(res);if(DOC_TYPE==='sales-contract')return addPiReferencesSalesContract(renderSalesContract(res),res);let html;if(DOC_TYPE==='packing')html=renderPackingList(res);else if(DOC_TYPE==='delivery')html=renderPackingStylePaged('Delivery Challan',res);else if(DOC_TYPE==='truck')html=renderPackingStylePaged('Truck Challan',res);else if(DOC_TYPE==='origin')html=renderOrigin(res);else if(DOC_TYPE==='beneficiary')html=renderBeneficiary(res);else if(DOC_TYPE==='forwarding')html=renderForwarding(res);else if(DOC_TYPE==='bank-forwarding')html=renderBankForwarding(res);else return '<div class="doc-empty">Unsupported document.</div>';return addPiReferences(addEpzReferences(html,res),res)}
 let _docExcelDone = false;
 function downloadDocExcel(){atsDownloadExcelFromElement({elementId:'docPages',filename:DOC_TYPE+'-'+((window.getCurrentOrderId&&window.getCurrentOrderId())||'document'),title:document.title})}
 window.onOrderLoad=function(res){const holder=document.getElementById('docPages');if(!holder)return;holder.innerHTML=renderDoc(res);if(atsShouldAutoExcel()&&!_docExcelDone){_docExcelDone=true;setTimeout(downloadDocExcel,250)}}
