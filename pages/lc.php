@@ -139,6 +139,20 @@ include __DIR__ . '/../includes/header.php';
                             <label for="lcIpDate">IP Date</label>
                             <input id="lcIpDate" name="lcIpDate" type="date">
                         </div>
+                        <!-- EPZ weight / bundle inputs — feed Packing List, Delivery Challan, Truck Challan.
+                             Total Qty is not entered here; it comes from the order's item total. -->
+                        <div class="field span-4 lc-epz-field" style="display:none;">
+                            <label for="lcNetWeight">Net Weight (Kgs)</label>
+                            <input id="lcNetWeight" name="lcNetWeight" type="number" min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="field span-4 lc-epz-field" style="display:none;">
+                            <label for="lcGrossWeight">Gross Weight (Kgs)</label>
+                            <input id="lcGrossWeight" name="lcGrossWeight" type="number" min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="field span-4 lc-epz-field" style="display:none;">
+                            <label for="lcTotalBundle">Total Bundle (Pcs)</label>
+                            <input id="lcTotalBundle" name="lcTotalBundle" type="number" min="0" step="1" placeholder="0">
+                        </div>
                         <div class="field span-6">
                             <label for="lcCheckStatus">LC Check Status</label>
                             <select id="lcCheckStatus" name="lcCheckStatus">
@@ -629,6 +643,9 @@ function lcBuildPreview() {
                 ['EXP Date',    lcFieldVal('lcExpDate')],
                 ['IP No.',      lcFieldVal('lcIpNo')],
                 ['IP Date',     lcFieldVal('lcIpDate')],
+                ['Net Weight (Kgs)',   lcFieldVal('lcNetWeight')],
+                ['Gross Weight (Kgs)', lcFieldVal('lcGrossWeight')],
+                ['Total Bundle (Pcs)', lcFieldVal('lcTotalBundle')],
             ] : []),
             ['LC Buyer',        lcFieldVal('lcBuyer')],
             ['Applicant Name',  lcFieldVal('lcApplicantName')],

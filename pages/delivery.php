@@ -80,6 +80,24 @@ include __DIR__ . '/../includes/header.php';
                             </table>
                         </div>
 
+                        <!-- EPZ weight/bundle summary (from LC page, EPZ zone only) -->
+                        <div id="epzWeightBlock" style="display:none;margin-top:10px;border:1px solid #000;">
+                            <table style="width:100%;border-collapse:collapse;font-size:9pt;">
+                                <tr>
+                                    <td style="border:1px solid #000;padding:5px 10px;font-weight:700;">Net Weight</td>
+                                    <td style="border:1px solid #000;padding:5px 10px;text-align:right;" id="epzNetWeight">— Kgs</td>
+                                    <td style="border:1px solid #000;padding:5px 10px;font-weight:700;">Gross Weight</td>
+                                    <td style="border:1px solid #000;padding:5px 10px;text-align:right;" id="epzGrossWeight">— Kgs</td>
+                                </tr>
+                                <tr>
+                                    <td style="border:1px solid #000;padding:5px 10px;font-weight:700;">Total Bundle</td>
+                                    <td style="border:1px solid #000;padding:5px 10px;text-align:right;" id="epzTotalBundle">— Pcs</td>
+                                    <td style="border:1px solid #000;padding:5px 10px;font-weight:700;">Total Qty</td>
+                                    <td style="border:1px solid #000;padding:5px 10px;text-align:right;" id="epzTotalQty">— Pcs</td>
+                                </tr>
+                            </table>
+                        </div>
+
                         <div class="delivery-freight">Freight prepaid</div>
 
                         <div class="packing-notes">
@@ -256,8 +274,22 @@ window.onOrderLoad = function(res) {
             });
         });
         if (totalEl) totalEl.textContent = totalQty.toLocaleString();
+        atsFillEpzWeightBlock(lc, totalQty);
     }
 };
+
+// Populate the EPZ Net/Gross/Bundle/Qty block (only when the LC zone is EPZ).
+function atsFillEpzWeightBlock(lc, totalQty) {
+    const block = document.getElementById('epzWeightBlock');
+    if (!block) return;
+    if (!(lc && lc.lcZoneType === 'epz')) { block.style.display = 'none'; return; }
+    block.style.display = 'block';
+    const set = (id, val, unit) => { const el = document.getElementById(id); if (el) el.textContent = (val !== '' && val != null ? val : '—') + ' ' + unit; };
+    set('epzNetWeight',   lc.lcNetWeight,   'Kgs');
+    set('epzGrossWeight', lc.lcGrossWeight, 'Kgs');
+    set('epzTotalBundle', lc.lcTotalBundle, 'Pcs');
+    set('epzTotalQty',    (totalQty != null ? Number(totalQty).toLocaleString() : ''), 'Pcs');
+}
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
