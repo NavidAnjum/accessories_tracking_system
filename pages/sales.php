@@ -687,6 +687,40 @@ function onPiTypeChange() {
     if (val === 'summary' && typeof enterSummaryMode === 'function') enterSummaryMode();
     // Leaving Summary → restore the top bar to the PO-block (Single PI) totals.
     if (val === 'single' && typeof updateSummary === 'function') updateSummary();
+    // Update top-bar PI number badge for Summary / Master tabs
+    const numDisp = document.getElementById('piNumDisplay');
+    if (numDisp) {
+        const ordId = sessionStorage.getItem('ats_current_order_id') || '';
+        if (val === 'summary') {
+            numDisp.textContent = ordId ? ordId + '-SUMM' : 'SUMMARY';
+        } else if (val === 'master') {
+            // Show saved master PI number if available, else placeholder
+            const mPi = (window._salesSnapshot && (window._salesSnapshot.masterPiNum || window._salesSnapshot.piNum)) || (ordId ? ordId + '-MASTER' : 'MASTER');
+            numDisp.textContent = mPi;
+        }
+        // Single: left to the existing PI number field logic
+    }
+    // Clear override fields when switching tabs so they don't bleed across PI types
+    const _ovName = document.getElementById('piCustOverrideName');
+    const _ovAddr = document.getElementById('piCustOverrideAddr');
+    if (_ovName) _ovName.value = '';
+    if (_ovAddr) _ovAddr.value = '';
+    // Show/hide and re-label the customer override block
+    const overrideBlock = document.getElementById('piCustOverrideBlock');
+    const overrideLabel = document.getElementById('piCustOverrideLabel');
+    const overrideNameLbl = document.getElementById('piCustOverrideNameLabel');
+    const overrideAddrLbl = document.getElementById('piCustOverrideAddrLabel');
+    if (overrideBlock) {
+        if (val === 'single') {
+            overrideBlock.style.display = 'none';
+        } else {
+            overrideBlock.style.display = '';
+            const typeName = val === 'summary' ? 'Summary PI' : 'Master PI';
+            if (overrideLabel) overrideLabel.firstChild.textContent = typeName + ' — Customer Override';
+            if (overrideNameLbl) overrideNameLbl.textContent = 'Customer Name (TO) — ' + typeName + ' only';
+            if (overrideAddrLbl) overrideAddrLbl.textContent = 'Customer Address — ' + typeName + ' only';
+        }
+    }
 }
 document.addEventListener('DOMContentLoaded', onPiTypeChange);
 function goToPiPrint(excelMode = false) {
@@ -707,7 +741,7 @@ function goToPiPrint(excelMode = false) {
     const pages = { single:'single-pi.php', summary:'summary-pi.php', master:'master-pi.php' };
     let url = APP_BASE + '/pages/' + (pages[val] || 'single-pi.php');
     if (val === 'master') {
-        const selection = getSelectedMasterGroups();
+        const selection = (_masterEditGroups.length && !getSelectedMasterGroups().length) ? _masterEditGroups : getSelectedMasterGroups();
         if (selection.length) {
             sessionStorage.setItem('mpi_custom_items', JSON.stringify(selection));
         }
@@ -720,7 +754,17 @@ function goToPiPrint(excelMode = false) {
         }
         // Hand the chosen (already-created) PIs to summary-pi.php — preview/print only.
         sessionStorage.setItem('summary_selected_pis', JSON.stringify(_summarySelectedPis));
+        // Pass Summary-PI-only customer overrides (blank = use shared PI Header values)
+        const sName = (document.getElementById('piCustOverrideName')?.value || '').trim();
+        const sAddr = (document.getElementById('piCustOverrideAddr')?.value || '').trim();
+        sessionStorage.setItem('summary_pi_cust_override', JSON.stringify({ name: sName, addr: sAddr }));
         url += '?summary=1';
+    }
+    if (val === 'master') {
+        // Pass Master-PI-only customer overrides
+        const mName = (document.getElementById('piCustOverrideName')?.value || '').trim();
+        const mAddr = (document.getElementById('piCustOverrideAddr')?.value || '').trim();
+        sessionStorage.setItem('master_pi_cust_override', JSON.stringify({ name: mName, addr: mAddr }));
     }
     if (val === 'single' || val === 'master' || val === 'summary') {
         const days = document.getElementById('termLcDays')?.value || '90';
@@ -757,13 +801,21 @@ async function emailPiFromSales() {
     let url = APP_BASE + '/pages/' + (pages[val] || 'single-pi.php');
 
     if (val === 'master') {
-        const selection = getSelectedMasterGroups();
+        const selection = (_masterEditGroups.length && !getSelectedMasterGroups().length) ? _masterEditGroups : getSelectedMasterGroups();
         if (selection.length) sessionStorage.setItem('mpi_custom_items', JSON.stringify(selection));
     }
     if (val === 'summary') {
         if (!_summarySelectedPis.length) { alert('Add at least one PI to the Summary before emailing.'); return; }
         sessionStorage.setItem('summary_selected_pis', JSON.stringify(_summarySelectedPis));
+        const sName2 = (document.getElementById('piCustOverrideName')?.value || '').trim();
+        const sAddr2 = (document.getElementById('piCustOverrideAddr')?.value || '').trim();
+        sessionStorage.setItem('summary_pi_cust_override', JSON.stringify({ name: sName2, addr: sAddr2 }));
         url += '?summary=1';
+    }
+    if (val === 'master') {
+        const mName2 = (document.getElementById('piCustOverrideName')?.value || '').trim();
+        const mAddr2 = (document.getElementById('piCustOverrideAddr')?.value || '').trim();
+        sessionStorage.setItem('master_pi_cust_override', JSON.stringify({ name: mName2, addr: mAddr2 }));
     }
     const days = document.getElementById('termLcDays')?.value || '90';
     const tol  = document.getElementById('termTolerance')?.value || '5';
@@ -869,6 +921,23 @@ async function emailPiFromSales() {
         <div class="field span-6">
             <label for="piBuyerAddress">Customer Address</label>
             <textarea id="piBuyerAddress" rows="2" placeholder="Auto-filled from customer profile..."></textarea>
+        </div>
+        <!-- Override fields — shown only for Summary PI / Master PI tabs -->
+        <div id="piCustOverrideBlock" style="display:none;grid-column:1/-1;margin-top:4px;padding-top:12px;border-top:1.5px dashed #c7d2fe;">
+            <div style="font-size:11px;font-weight:700;color:#4f46e5;margin-bottom:10px;" id="piCustOverrideLabel">
+                Summary PI — Customer Override
+                <span style="font-weight:400;color:#94a3b8;"> · only applies to this PI type's print. Leave blank to use the fields above.</span>
+            </div>
+            <div class="form-grid">
+                <div class="field span-6">
+                    <label id="piCustOverrideNameLabel" for="piCustOverrideName">Customer Name (TO) — Summary PI only</label>
+                    <input id="piCustOverrideName" placeholder="Leave blank to use shared name above…">
+                </div>
+                <div class="field span-6">
+                    <label id="piCustOverrideAddrLabel" for="piCustOverrideAddr">Customer Address — Summary PI only</label>
+                    <textarea id="piCustOverrideAddr" rows="2" placeholder="Leave blank to use shared address above…"></textarea>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -2132,61 +2201,158 @@ function getSelectedMasterGroups() {
     return Object.values(groups);
 }
 
+// In-memory editable copy of Master PI groups (authoritative source for the panel).
+let _masterEditGroups = [];
+
+function _masterGroupKey(group) {
+    return (group.piNumber || '') + '|' + (group.poNum || '') + '|' + (group.orderRef || '');
+}
+
+// Merge freshly-selected groups from checkboxes into _masterEditGroups, preserving
+// any edits the user already made to existing groups/items.
+function _masterMergeGroups(freshGroups) {
+    const existing = {};
+    _masterEditGroups.forEach(g => { existing[_masterGroupKey(g)] = g; });
+    const freshKeys = new Set(freshGroups.map(_masterGroupKey));
+    // Remove groups that were unchecked
+    _masterEditGroups = _masterEditGroups.filter(g => freshKeys.has(_masterGroupKey(g)));
+    // Add new groups (preserve existing edited ones)
+    freshGroups.forEach(g => {
+        if (!existing[_masterGroupKey(g)]) _masterEditGroups.push(g);
+    });
+}
+
 function renderMasterSelectedItems() {
     const panel = document.getElementById('masterPiSelectedList');
     if (!panel) return;
-    const groups = getSelectedMasterGroups();
-    renderMasterSelectedItemsFromGroups(groups);
+    const fresh = getSelectedMasterGroups();
+    _masterMergeGroups(fresh);
+    _renderMasterEditPanel();
 }
 
 function renderMasterSelectedItemsFromGroups(groups) {
+    _masterEditGroups = groups.map(g => ({
+        ...g,
+        items: (g.items || []).map(it => ({ ...it }))
+    }));
+    _renderMasterEditPanel();
+}
+
+// Mutate an item field in _masterEditGroups and refresh totals.
+function _masterItemChanged(groupIdx, itemIdx, field, value) {
+    const group = _masterEditGroups[groupIdx];
+    if (!group) return;
+    const item = group.items[itemIdx];
+    if (!item) return;
+    item[field] = value;
+    const qty = parseFloat(item.qty   || 0) || 0;
+    const prc = parseFloat(item.price || item.unitPrice || 0) || 0;
+    item.total = qty * prc;
+    const amtEl = document.getElementById('mbi_amt_' + groupIdx + '_' + itemIdx);
+    if (amtEl) amtEl.value = item.total ? item.total.toFixed(2) : '';
+    _masterRefreshTotals();
+}
+
+function _masterAddItemRow(groupIdx) {
+    const group = _masterEditGroups[groupIdx];
+    if (!group) return;
+    group.items.push({ desc: '', ply: '', qty: 0, price: 0, total: 0 });
+    _renderMasterEditPanel();
+}
+
+function _masterDelItemRow(groupIdx, itemIdx) {
+    const group = _masterEditGroups[groupIdx];
+    if (!group) return;
+    group.items.splice(itemIdx, 1);
+    _renderMasterEditPanel();
+}
+
+function _masterRefreshTotals() {
+    let tq = 0, tv = 0;
+    _masterEditGroups.forEach(g => g.items.forEach(it => {
+        tq += parseFloat(it.qty || 0) || 0;
+        tv += parseFloat(it.total || 0) || 0;
+    }));
+    const el = document.getElementById('mbiTotals');
+    if (el) el.innerHTML = `<span>Qty: ${tq.toLocaleString()}</span><span>Total: $${tv.toFixed(2)}</span>`;
+}
+
+function _renderMasterEditPanel() {
     const panel = document.getElementById('masterPiSelectedList');
     if (!panel) return;
-    if (!groups.length) {
+    if (!_masterEditGroups.length) {
         panel.innerHTML = '<div style="padding:18px;border:1px dashed #cbd5e1;border-radius:10px;color:#64748b;background:#f8fafc;">Select one or more items from the order PI list above to build the Master PI.</div>';
         return;
     }
 
-    let totalQty = 0;
-    let totalVal = 0;
-    let html = '<div class="opo-item-hdr"><span></span><span>Description of Goods</span><span>Ply</span><span>Qty</span><span>Unit Price</span><span>Amount</span></div>';
-    groups.forEach(group => {
+    let html = '';
+    _masterEditGroups.forEach((group, groupIdx) => {
         const refParts = [
-            group.poNum ? 'PO # ' + group.poNum : '',
+            group.poNum    ? 'PO # ' + group.poNum    : '',
             group.orderRef ? 'ORDER REF: ' + group.orderRef : '',
-            group.style ? 'Style# ' + group.style : ''
+            group.style    ? 'Style# ' + group.style   : ''
         ].filter(Boolean);
-        if (refParts.length) {
-            html += `<div class="opo-ref-line">${refParts.join(' | ')}</div>`;
-        }
-        group.items.forEach(item => {
-            const qty = parseFloat(item.qty || 0);
-            const prc = parseFloat(item.price || item.unitPrice || 0);
+        const refLabel = refParts.join(' · ');
+
+        let itemRows = '';
+        group.items.forEach((item, itemIdx) => {
+            const qty = parseFloat(item.qty || 0) || 0;
+            const prc = parseFloat(item.price || item.unitPrice || 0) || 0;
             const tot = parseFloat(item.total || (qty * prc)) || 0;
-            totalQty += qty;
-            totalVal += tot;
-            html += `<div class="opo-item-row">
-                <span></span>
-                <span>${item.desc || '-'}</span>
-                <span>${item.ply || ''}</span>
-                <span>${qty.toLocaleString()}</span>
-                <span>${prc ? '$' + prc.toFixed(2) : '-'}</span>
-                <span style="font-weight:700;">${tot ? '$' + tot.toFixed(2) : '-'}</span>
-            </div>`;
+            itemRows += `<tr>
+                <td style="text-align:center;font-size:11px;color:#94a3b8;">${itemIdx + 1}</td>
+                <td><input value="${escHtml(item.desc || item.itemName || '')}"
+                    style="width:100%;padding:4px 6px;border:1.5px solid #e2e8f0;border-radius:5px;font-size:12px;"
+                    oninput="_masterItemChanged(${groupIdx},${itemIdx},'desc',this.value)"></td>
+                <td><input value="${escHtml(item.ply || '')}"
+                    style="width:60px;padding:4px 6px;border:1.5px solid #e2e8f0;border-radius:5px;font-size:12px;"
+                    oninput="_masterItemChanged(${groupIdx},${itemIdx},'ply',this.value)"></td>
+                <td><input type="number" min="0" value="${qty || ''}"
+                    style="width:80px;padding:4px 6px;border:1.5px solid #e2e8f0;border-radius:5px;font-size:12px;"
+                    oninput="_masterItemChanged(${groupIdx},${itemIdx},'qty',this.value)"></td>
+                <td><input type="number" min="0" step="0.0001" value="${prc || ''}"
+                    style="width:80px;padding:4px 6px;border:1.5px solid #e2e8f0;border-radius:5px;font-size:12px;"
+                    oninput="_masterItemChanged(${groupIdx},${itemIdx},'price',this.value)"></td>
+                <td><input id="mbi_amt_${groupIdx}_${itemIdx}" readonly value="${tot ? tot.toFixed(2) : ''}"
+                    style="width:80px;padding:4px 6px;border:1.5px solid #e2e8f0;border-radius:5px;font-size:12px;background:#f8fafc;font-weight:700;color:#4f46e5;"></td>
+                <td><button type="button" class="si-del-btn" title="Remove row"
+                    onclick="_masterDelItemRow(${groupIdx},${itemIdx})">X</button></td>
+            </tr>`;
         });
+
+        html += `<div style="border:1.5px solid #e0e3ff;border-radius:10px;margin-bottom:10px;overflow:hidden;">
+            ${refLabel ? `<div style="padding:4px 12px;font-size:11px;color:#64748b;background:#f8fafc;border-bottom:1px solid #e2e8f0;">${escHtml(refLabel)}</div>` : ''}
+            <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead><tr style="background:#f1f5f9;">
+                    <th style="padding:4px 6px;font-weight:700;color:#64748b;font-size:11px;border-bottom:1px solid #e2e8f0;">SL</th>
+                    <th style="padding:4px 6px;font-weight:700;color:#64748b;font-size:11px;text-align:left;border-bottom:1px solid #e2e8f0;">Description</th>
+                    <th style="padding:4px 6px;font-weight:700;color:#64748b;font-size:11px;border-bottom:1px solid #e2e8f0;">Ply</th>
+                    <th style="padding:4px 6px;font-weight:700;color:#64748b;font-size:11px;border-bottom:1px solid #e2e8f0;">Qty</th>
+                    <th style="padding:4px 6px;font-weight:700;color:#64748b;font-size:11px;border-bottom:1px solid #e2e8f0;">Price $</th>
+                    <th style="padding:4px 6px;font-weight:700;color:#64748b;font-size:11px;border-bottom:1px solid #e2e8f0;">Amount $</th>
+                    <th style="border-bottom:1px solid #e2e8f0;"></th>
+                </tr></thead>
+                <tbody>${itemRows}</tbody>
+            </table>
+            </div>
+            <div style="padding:4px 8px;">
+                <button type="button" class="ghost-btn" style="font-size:11px;padding:2px 10px;"
+                    onclick="_masterAddItemRow(${groupIdx})">+ Add Row</button>
+            </div>
+        </div>`;
     });
-    html += `<div style="display:flex;justify-content:flex-end;gap:18px;padding:14px 6px 0;font-size:13px;font-weight:700;color:#312e81;">
-        <span>Qty: ${totalQty.toLocaleString()}</span>
-        <span>Total: $${totalVal.toFixed(2)}</span>
-    </div>`;
+
+    html += `<div id="mbiTotals" style="display:flex;justify-content:flex-end;gap:18px;padding:14px 6px 0;font-size:13px;font-weight:700;color:#312e81;"></div>`;
     panel.innerHTML = html;
+    _masterRefreshTotals();
 }
 
 // â”€â”€ Collect current PI data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function collectSalesPageData() {
     const piType = document.querySelector('input[name="piTypeChoice"]:checked')?.value || 'single';
     if (piType === 'master') {
-        const masterGroups = getSelectedMasterGroups();
+        const masterGroups = (_masterEditGroups.length && !getSelectedMasterGroups().length) ? _masterEditGroups : getSelectedMasterGroups();
         const selectedPiNumbers = [...new Set(masterGroups.map(group => group.piNumber).filter(Boolean))];
         let grandQty = 0;
         let grandVal = 0;
@@ -2819,6 +2985,7 @@ function resetPiFormFields() {
     window._salesSnapshot = null;
     window._pendingPiCustomer = '';
     _summarySelectedPis = [];
+    _masterEditGroups = [];
     _savedPisCache = [];
     _savedPisOverviewCache = [];
     _savedPisModalCache = [];
@@ -3065,6 +3232,34 @@ async function createMasterFromSelection() {
 }
 
 // Open the printable Master PI (loads the saved Master for the current order).
+// Delete the saved Summary PI (clears piType/summarySelectedPis from the sales snapshot).
+async function deleteSummaryPi(orderId) {
+    if (!confirm('Delete the saved Summary PI for this order?\nThis removes the summary — the individual PIs are kept.')) return;
+    try {
+        const data = { ...(window._salesSnapshot || {}), piType: null, summarySelectedPis: [], selectedPiNumbers: [] };
+        await fetch(APP_BASE + '/api/save_page.php', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_id: orderId, page_name: 'sales', ...data })
+        });
+        window._salesSnapshot = data;
+        _summarySelectedPis = [];
+        renderOrderPiOverview(orderId);
+        document.getElementById('piStatus').textContent = 'Summary deleted';
+    } catch (e) { alert('Delete failed: ' + (e.message || 'server error')); }
+}
+
+// Delete a Master PI record from the DB.
+async function deleteMasterPi(piId, orderId) {
+    if (!confirm('Delete this Master PI? This cannot be undone.')) return;
+    try {
+        const r = await fetch(APP_BASE + '/api/pis.php?id=' + encodeURIComponent(piId), { method: 'DELETE' });
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || 'Delete failed');
+        renderOrderPiOverview(orderId);
+        document.getElementById('piStatus').textContent = 'Master PI deleted';
+    } catch (e) { alert('Delete failed: ' + (e.message || 'server error')); }
+}
+
 function printMasterPi() {
     const days = document.getElementById('termLcDays')?.value || '90';
     const tol  = document.getElementById('termTolerance')?.value || '5';
@@ -3085,6 +3280,62 @@ function _summaryUpdateTopBar(count, qty, val) {
     const sv = document.getElementById('sumTotalVal'); if (sv) sv.textContent = '$' + (val || 0).toFixed(2);
 }
 
+// Called from inline item inputs to propagate edits back into _summarySelectedPis
+// and refresh grand totals.
+function _summaryItemChanged(piKey, poIdx, itemIdx, field, value) {
+    const pi = _summarySelectedPis.find(p => _summaryPiKey(p) === piKey);
+    if (!pi) return;
+    const item = (pi.pos?.[poIdx]?.items || [])[itemIdx];
+    if (!item) return;
+    item[field] = value;
+    // Recompute item total
+    const qty = parseFloat(item.qty   || 0) || 0;
+    const prc = parseFloat(item.price || item.unitPrice || 0) || 0;
+    item.total = qty * prc;
+    // Recompute PI grand totals
+    let gq = 0, gv = 0;
+    (pi.pos || []).forEach(po => (po.items || []).forEach(it => {
+        gq += parseFloat(it.qty || 0) || 0;
+        gv += parseFloat(it.total || 0) || 0;
+    }));
+    pi.grand_qty = gq;
+    pi.grand_val = gv;
+    // Update the amount cell for this row
+    const amtEl = document.getElementById('sbi_' + piKey.replace(/\W/g,'_') + '_' + poIdx + '_' + itemIdx + '_amt');
+    if (amtEl) amtEl.value = item.total ? item.total.toFixed(2) : '';
+    // Update header badge
+    const hdrEl = document.getElementById('sbi_hdr_' + piKey.replace(/\W/g,'_'));
+    if (hdrEl) hdrEl.textContent = gq.toLocaleString() + ' pcs · $' + gv.toFixed(2);
+    // Refresh global totals bar
+    let totalQty = 0, totalVal = 0;
+    _summarySelectedPis.forEach(p => { totalQty += parseFloat(p.grand_qty||0)||0; totalVal += parseFloat(p.grand_val||0)||0; });
+    _summaryUpdateTopBar(_summarySelectedPis.length, totalQty, totalVal);
+}
+
+function _summaryAddItemRow(piKey, poIdx) {
+    const pi = _summarySelectedPis.find(p => _summaryPiKey(p) === piKey);
+    if (!pi) return;
+    if (!pi.pos[poIdx]) return;
+    pi.pos[poIdx].items = pi.pos[poIdx].items || [];
+    pi.pos[poIdx].items.push({ desc: '', ply: '', qty: 0, price: 0, total: 0 });
+    renderSummaryBasket();
+}
+
+function _summaryDelItemRow(piKey, poIdx, itemIdx) {
+    const pi = _summarySelectedPis.find(p => _summaryPiKey(p) === piKey);
+    if (!pi) return;
+    (pi.pos[poIdx]?.items || []).splice(itemIdx, 1);
+    // Recompute PI grand totals
+    let gq = 0, gv = 0;
+    (pi.pos || []).forEach(po => (po.items || []).forEach(it => {
+        gq += parseFloat(it.qty || 0) || 0;
+        gv += parseFloat(it.total || 0) || 0;
+    }));
+    pi.grand_qty = gq;
+    pi.grand_val = gv;
+    renderSummaryBasket();
+}
+
 function renderSummaryBasket() {
     const box = document.getElementById('summaryBasket');
     if (!box) return;
@@ -3098,19 +3349,78 @@ function renderSummaryBasket() {
         const qty = parseFloat(pi.grand_qty || 0) || 0;
         const val = parseFloat(pi.grand_val || 0) || 0;
         totalQty += qty; totalVal += val;
-        const po = (pi.pos || [])[0] || {};
-        const ref = po.poNum || po.customerPo || po.salesOrder || '';
-        return `<div class="opo-row opo-standalone" style="cursor:default;">
-            <span class="opo-badge b-standalone">PI</span>
-            <div class="opo-num">${escHtml(pi.pi_number || '-')}</div>
-            <div class="opo-meta">${escHtml(pi.customer || '-')}${ref ? ' · ' + escHtml(ref) : ''} · ${qty.toLocaleString()} pcs</div>
-            <div class="opo-val">$${val.toFixed(2)}</div>
-            <button class="ghost-btn" style="font-size:11px;padding:2px 10px;color:#f87171;border-color:#fca5a5;"
-                    onclick="removeSummaryPi('${escHtml(_summaryPiKey(pi))}')">Remove</button>
+        const piKey = _summaryPiKey(pi);
+        const piKeyId = piKey.replace(/\W/g,'_');
+        const po0 = (pi.pos || [])[0] || {};
+        const ref = po0.poNum || po0.customerPo || po0.salesOrder || '';
+
+        // Build editable item tables for each PO group
+        let itemTablesHtml = '';
+        (pi.pos || []).forEach((po, poIdx) => {
+            const poRef = [po.poNum || po.customerPo || '', po.salesOrder || po.orderRef || '', po.style || ''].filter(Boolean).join(' · ');
+            let itemRows = '';
+            (po.items || []).forEach((item, itemIdx) => {
+                const idPfx = `sbi_${piKeyId}_${poIdx}_${itemIdx}`;
+                const escKey = piKey.replace(/'/g,"\\'");
+                const tot = parseFloat(item.total || 0) || 0;
+                itemRows += `<tr>
+                    <td style="text-align:center;font-size:11px;color:#94a3b8;">${itemIdx+1}</td>
+                    <td><input value="${escHtml(item.desc || item.itemName || '')}"
+                        style="width:100%;padding:4px 6px;border:1.5px solid #e2e8f0;border-radius:5px;font-size:12px;"
+                        oninput="_summaryItemChanged('${escKey}',${poIdx},${itemIdx},'desc',this.value)"></td>
+                    <td><input value="${escHtml(item.ply || '')}"
+                        style="width:60px;padding:4px 6px;border:1.5px solid #e2e8f0;border-radius:5px;font-size:12px;"
+                        oninput="_summaryItemChanged('${escKey}',${poIdx},${itemIdx},'ply',this.value)"></td>
+                    <td><input type="number" min="0" value="${parseFloat(item.qty||0)||''}"
+                        style="width:80px;padding:4px 6px;border:1.5px solid #e2e8f0;border-radius:5px;font-size:12px;"
+                        oninput="_summaryItemChanged('${escKey}',${poIdx},${itemIdx},'qty',this.value)"></td>
+                    <td><input type="number" min="0" step="0.0001" value="${parseFloat(item.price||item.unitPrice||0)||''}"
+                        style="width:80px;padding:4px 6px;border:1.5px solid #e2e8f0;border-radius:5px;font-size:12px;"
+                        oninput="_summaryItemChanged('${escKey}',${poIdx},${itemIdx},'price',this.value)"></td>
+                    <td><input id="${idPfx}_amt" readonly value="${tot ? tot.toFixed(2) : ''}"
+                        style="width:80px;padding:4px 6px;border:1.5px solid #e2e8f0;border-radius:5px;font-size:12px;background:#f8fafc;font-weight:700;color:#4f46e5;"></td>
+                    <td><button type="button" class="si-del-btn" title="Remove row"
+                        onclick="_summaryDelItemRow('${escKey}',${poIdx},${itemIdx})">X</button></td>
+                </tr>`;
+            });
+            itemTablesHtml += `<div style="margin:6px 0 10px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+                ${poRef ? `<div style="padding:3px 10px;font-size:10.5px;color:#64748b;background:#f8fafc;border-bottom:1px solid #e2e8f0;">${escHtml(poRef)}</div>` : ''}
+                <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                    <thead><tr style="background:#f1f5f9;">
+                        <th style="padding:4px 6px;font-weight:700;color:#64748b;font-size:11px;white-space:nowrap;border-bottom:1px solid #e2e8f0;">SL</th>
+                        <th style="padding:4px 6px;font-weight:700;color:#64748b;font-size:11px;text-align:left;border-bottom:1px solid #e2e8f0;">Description</th>
+                        <th style="padding:4px 6px;font-weight:700;color:#64748b;font-size:11px;border-bottom:1px solid #e2e8f0;">Ply</th>
+                        <th style="padding:4px 6px;font-weight:700;color:#64748b;font-size:11px;border-bottom:1px solid #e2e8f0;">Qty</th>
+                        <th style="padding:4px 6px;font-weight:700;color:#64748b;font-size:11px;border-bottom:1px solid #e2e8f0;">Price $</th>
+                        <th style="padding:4px 6px;font-weight:700;color:#64748b;font-size:11px;border-bottom:1px solid #e2e8f0;">Amount $</th>
+                        <th style="border-bottom:1px solid #e2e8f0;"></th>
+                    </tr></thead>
+                    <tbody>${itemRows}</tbody>
+                </table>
+                </div>
+                <div style="padding:4px 8px;">
+                    <button type="button" class="ghost-btn" style="font-size:11px;padding:2px 10px;"
+                        onclick="_summaryAddItemRow('${piKey.replace(/'/g,"\\'")}',${poIdx})">+ Add Row</button>
+                </div>
+            </div>`;
+        });
+
+        return `<div style="border:1.5px solid #e0e3ff;border-radius:10px;margin-bottom:10px;overflow:hidden;">
+            <div class="opo-row opo-standalone" style="cursor:default;border-radius:0;">
+                <span class="opo-badge b-standalone">PI</span>
+                <div class="opo-num">${escHtml(pi.pi_number || '-')}</div>
+                <div class="opo-meta">${escHtml(pi.customer || '-')}${ref ? ' · ' + escHtml(ref) : ''}
+                    <span id="sbi_hdr_${piKeyId}" style="margin-left:6px;color:#4f46e5;font-weight:600;">${qty.toLocaleString()} pcs · $${val.toFixed(2)}</span>
+                </div>
+                <button class="ghost-btn" style="font-size:11px;padding:2px 10px;color:#f87171;border-color:#fca5a5;margin-left:auto;"
+                        onclick="removeSummaryPi('${escHtml(piKey)}')">Remove</button>
+            </div>
+            <div style="padding:8px 12px 4px;">${itemTablesHtml}</div>
         </div>`;
     }).join('');
     box.innerHTML =
-        '<div class="opo-list">' + rows + '</div>' +
+        rows +
         `<div style="display:flex;justify-content:flex-end;gap:18px;padding:12px 6px 0;font-size:13px;font-weight:700;color:#312e81;">
             <span>${_summarySelectedPis.length} PI(s)</span>
             <span>Qty: ${totalQty.toLocaleString()}</span>
@@ -3127,7 +3437,13 @@ function renderOrderPiOverview(orderId) {
     fetch(APP_BASE + '/api/pis.php?order_id=' + encodeURIComponent(orderId))
         .then(r => r.json())
         .then(pis => {
-            if (!pis || !pis.length) { overview.style.display = 'none'; return; }
+            pis = pis || [];
+            // For a cross-order Summary PI, this order has no pis rows of its own.
+            // Still show the overview if the snapshot has summarySelectedPis.
+            const snapshotSummary = (window._salesSnapshot && window._salesSnapshot.piType === 'summary'
+                && Array.isArray(window._salesSnapshot.summarySelectedPis) && window._salesSnapshot.summarySelectedPis.length)
+                ? window._salesSnapshot.summarySelectedPis : null;
+            if (!pis.length && !snapshotSummary) { overview.style.display = 'none'; return; }
             updatePrintLock(_currentPiStep, true);
 
             const masters     = pis.filter(p => p.is_master);
@@ -3136,9 +3452,7 @@ function renderOrderPiOverview(orderId) {
 
             // When a Summary is saved, its (cross-order) PIs become the selectable
             // set for building a Master PI; otherwise use this order's own PIs.
-            const savedSummary = (window._salesSnapshot && window._salesSnapshot.piType === 'summary'
-                && Array.isArray(window._salesSnapshot.summarySelectedPis) && window._salesSnapshot.summarySelectedPis.length)
-                ? window._salesSnapshot.summarySelectedPis : null;
+            const savedSummary = snapshotSummary;
             const selectablePis = (savedSummary && savedSummary.length) ? savedSummary : individuals;
 
             // Store the selectable PIs for item-level Master PI selection
@@ -3157,11 +3471,15 @@ function renderOrderPiOverview(orderId) {
                 const nums = savedSummary.map(p => escHtml(p.pi_number || '')).filter(Boolean).join(', ') || '-';
                 html += `<div class="opo-row opo-master" style="background:#eef2ff;border:1.5px solid #c7d2fe;">
                     <span class="opo-badge b-master" style="background:#4f46e5;">SUMMARY</span>
-                    <div class="opo-num">Summary PI</div>
+                    <div class="opo-num">${escHtml(orderId)}-SUMM</div>
                     <div class="opo-meta">${savedSummary.length} PI(s) · Qty ${sQty.toLocaleString()} · expand the PIs below to pick items for a Master PI
                         <div class="opo-includes">Combines: ${nums}</div>
                     </div>
                     <div class="opo-val">$${sVal.toFixed(2)}</div>
+                    <?php if (in_array($__user['role'] ?? '', ['commercial','commercial_dept','admin'])): ?>
+                    <button class="ghost-btn" style="font-size:11px;padding:2px 10px;color:#f87171;border-color:#fca5a5;"
+                            onclick="deleteSummaryPi('${escHtml(orderId)}')">Delete</button>
+                    <?php endif; ?>
                 </div>`;
             }
 
@@ -3176,6 +3494,10 @@ function renderOrderPiOverview(orderId) {
                     </div>
                     <div class="opo-val">$${parseFloat(pi.grand_val||0).toFixed(2)}</div>
                     <button class="ghost-btn" style="font-size:11px;padding:2px 10px;" onclick="printMasterPi()">Print</button>
+                    <?php if (in_array($__user['role'] ?? '', ['commercial','commercial_dept','admin'])): ?>
+                    <button class="ghost-btn" style="font-size:11px;padding:2px 10px;color:#f87171;border-color:#fca5a5;"
+                            onclick="deleteMasterPi(${pi.id},'${escHtml(orderId)}')">Delete</button>
+                    <?php endif; ?>
                 </div>`;
             });
 
@@ -3699,7 +4021,7 @@ function updatePrintLock(step, forceUnlock = false) {
 window.onOrderLoad = async function(res) {
     setPiContentVisible(true);
     resetSubmitBtn();
-    _summarySelectedPis = []; // re-seeded from this order's PIs when Summary mode opens
+    _summarySelectedPis = []; _masterEditGroups = []; // re-seeded from this order's PIs when Summary/Master mode opens
     const orderId = res.order?.order_id;
     const salesSnapshot = res.pages?.sales || null;
     window._salesSnapshot = salesSnapshot; // used by Save Summary to merge without clobbering
@@ -3824,6 +4146,7 @@ window.onNewOrder = function(orderId) {
     _currentPiStep = 'sales';
     _marketingApproved = false;
     _summarySelectedPis = [];
+    _masterEditGroups = [];
     resetPiFormFields();
     updatePrintLock('sales', false);
     if (orderId) {

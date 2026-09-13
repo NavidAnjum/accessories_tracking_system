@@ -188,6 +188,24 @@ html.pi-preview .mpi-ctrl {
         </div>
     </div>
 
+    <div>
+        <div class="mpi-ctrl-label">PI Date</div>
+        <input type="date" id="mpiDateInput"
+               style="background:#2d2d50;color:#fff;border:1.5px solid #4f46e5;border-radius:6px;padding:6px 10px;font-size:9px;outline:none;color-scheme:dark;"
+               onchange="mpiUpdateDate(this.value)">
+    </div>
+    <div>
+        <div class="mpi-ctrl-label">Customer Name (TO)</div>
+        <input type="text" id="mpiCustNameInput" placeholder="Override customer name…"
+               style="background:#2d2d50;color:#fff;border:1.5px solid #4f46e5;border-radius:6px;padding:6px 10px;font-size:9px;outline:none;min-width:200px;"
+               oninput="mpiUpdateCustomer()">
+    </div>
+    <div>
+        <div class="mpi-ctrl-label">Customer Address</div>
+        <textarea id="mpiCustAddrInput" rows="2" placeholder="Override address…"
+               style="background:#2d2d50;color:#fff;border:1.5px solid #4f46e5;border-radius:6px;padding:6px 10px;font-size:9px;outline:none;min-width:220px;resize:vertical;"
+               oninput="mpiUpdateCustomer()"></textarea>
+    </div>
     <button class="mpi-excel-btn" onclick="downloadMasterPiExcel()">Download Excel</button>
     <?php if (($__user['role'] ?? '') !== 'marketing'): ?>
     <button class="mpi-excel-btn" style="background:#0f6cbd;" onclick="emailThisPi()">📧 Email PI (Outlook)</button>
@@ -205,7 +223,29 @@ html.pi-preview .mpi-ctrl {
     window._mpiHsCode = p.get('hs') || '4819.10.00';
     window._mpiDocMust = p.get('doc') || 'UD';
     window._mpiBank = p.get('bank') || 'ncc';
+    try {
+        const ov = JSON.parse(sessionStorage.getItem('master_pi_cust_override') || 'null');
+        if (ov) window._mpiCustOverride = ov; // { name, addr }
+    } catch (e) {}
+    // Default date input to today
+    const dateInput = document.getElementById('mpiDateInput');
+    if (dateInput) dateInput.value = new Date().toISOString().slice(0,10);
 })();
+
+function mpiUpdateDate(val) {
+    const formatted = mpiFormatDate(val);
+    const d1 = document.getElementById('mpiDate');
+    const d2 = document.getElementById('mpiContDate');
+    if (d1) d1.textContent = formatted;
+    if (d2) d2.textContent = formatted;
+}
+
+function mpiUpdateCustomer() {
+    const name = document.getElementById('mpiCustNameInput')?.value.trim() || window._mpiRenderedCustName || '';
+    const addr = document.getElementById('mpiCustAddrInput')?.value.trim() || window._mpiRenderedCustAddr || '';
+    const el = document.getElementById('mpiTo');
+    if (el) el.innerHTML = `<strong>${name || '—'}</strong>` + (addr ? '<br>' + addr.replace(/\n/g,'<br>') : '');
+}
 </script>
 
 <!-- ── Document ── -->
@@ -320,11 +360,7 @@ html.pi-preview .mpi-ctrl {
         </tbody>
     </table>
     <div class="mpi-words" id="mpiContWordsWrap" style="display:none;">TOTAL AMOUNT : US DOLLER: <span id="mpiContWords">-</span></div>
-    <div>
-        <div class="mpi-terms-title">Terms &amp; Conditions:</div>
-        <ol class="mpi-terms-list" id="mpiTermsCont" start="12"></ol>
-    </div>
-    <div class="mpi-sig-area" style="margin-top:28mm;">
+
         <div class="mpi-sig-bottom">
             <div class="mpi-sig-bottom-label">SIGNATURE OF BUYER</div>
             <div class="mpi-sig-bottom-label" style="display:flex;flex-direction:column;align-items:center;gap:1px;">
@@ -536,7 +572,11 @@ function renderMasterPi() {
     // PI number = first selected PI
     const firstPi = selectedPis[0];
     const masterPiNum = firstPi.pi_number || order.order_id + '-MPI';
-    const masterPiDate = mpiFormatDate(firstPi.pi_date || salesPg.piDate || order.created_at?.slice(0,10) || '');
+    const dateInputEl = document.getElementById('mpiDateInput');
+    const rawDate = firstPi.pi_date || salesPg.piDate || order.created_at?.slice(0,10) || '';
+    const effectiveDate = (dateInputEl && dateInputEl.value) ? dateInputEl.value : (rawDate || new Date().toISOString().slice(0,10));
+    if (dateInputEl && !dateInputEl.value) dateInputEl.value = effectiveDate;
+    const masterPiDate = mpiFormatDate(effectiveDate);
     document.getElementById('mpiNum').textContent  = masterPiNum;
     document.title = mpiFileName(masterPiNum, salesPg.customer || intake.customer || order.customer_name || ''); // Save-as-PDF / print default file name = Customer-PINumber
     document.getElementById('mpiDate').textContent = masterPiDate;
@@ -548,9 +588,20 @@ function renderMasterPi() {
     const buyer    = salesPg.buyer || firstPo0.sharedBuyer || firstPo0.endBuyer || intake.pos?.[0]?.endBuyer || '—';
     const custName = salesPg.customer || intake.customer || order.customer_name || '—';
     const custAddr = salesPg.buyerAddress || firstPo0.sharedBuyerAddress || '';
+    const mpiOv = window._mpiCustOverride || {};
+    const mpiDisplayName = (mpiOv.name || custName) || '—';
+    const mpiDisplayAddr = (mpiOv.addr !== undefined ? mpiOv.addr : custAddr) || '';
+    const mpiNameInp = document.getElementById('mpiCustNameInput');
+    const mpiAddrInp = document.getElementById('mpiCustAddrInput');
+    if (mpiNameInp && !mpiNameInp.dataset.userEdited) { mpiNameInp.value = mpiDisplayName; }
+    if (mpiAddrInp && !mpiAddrInp.dataset.userEdited) { mpiAddrInp.value = mpiDisplayAddr; }
+    if (mpiNameInp && !mpiNameInp._watchSet) { mpiNameInp._watchSet = true; mpiNameInp.addEventListener('input', () => { mpiNameInp.dataset.userEdited = '1'; }); }
+    if (mpiAddrInp && !mpiAddrInp._watchSet) { mpiAddrInp._watchSet = true; mpiAddrInp.addEventListener('input', () => { mpiAddrInp.dataset.userEdited = '1'; }); }
+    const mpiFinalName = mpiNameInp?.dataset.userEdited ? (mpiNameInp.value.trim() || mpiDisplayName) : mpiDisplayName;
+    const mpiFinalAddr = mpiAddrInp?.dataset.userEdited ? mpiAddrInp.value.trim() : mpiDisplayAddr;
     document.getElementById('mpiBuyer').textContent = buyer;
     document.getElementById('mpiTo').innerHTML =
-        `<strong>${custName}</strong>` + (custAddr ? '<br>' + custAddr.replace(/\n/g,'<br>') : '');
+        `<strong>${mpiFinalName}</strong>` + (mpiFinalAddr ? '<br>' + mpiFinalAddr.replace(/\n/g,'<br>') : '');
 
     // Build items
     const tbody = document.getElementById('mpiBody');
@@ -639,7 +690,11 @@ function renderMasterPiFromCustom(groups, res) {
     document.getElementById('mpiContent').style.display = 'flex';
 
     const customPiNum = firstGrp.piNumber || firstPi.pi_number || order.order_id + '-MPI';
-    const customPiDate = mpiFormatDate(firstPi.pi_date || salesPg.piDate || '');
+    const dateInputEl2 = document.getElementById('mpiDateInput');
+    const rawDate2 = firstPi.pi_date || salesPg.piDate || '';
+    const effectiveDate2 = (dateInputEl2 && dateInputEl2.value) ? dateInputEl2.value : (rawDate2 || new Date().toISOString().slice(0,10));
+    if (dateInputEl2 && !dateInputEl2.value) dateInputEl2.value = effectiveDate2;
+    const customPiDate = mpiFormatDate(effectiveDate2);
     document.getElementById('mpiNum').textContent  = customPiNum;
     document.title = mpiFileName(customPiNum, salesPg.customer || intake.customer || order.customer_name || ''); // Save-as-PDF / print default file name = Customer-PINumber
     document.getElementById('mpiDate').textContent = customPiDate;
@@ -649,8 +704,19 @@ function renderMasterPiFromCustom(groups, res) {
     const buyer    = salesPg.buyer || firstGrp.sharedBuyer || firstPo.sharedBuyer || '—';
     const custName = salesPg.customer || intake.customer || order.customer_name || '—';
     const custAddr = salesPg.buyerAddress || firstGrp.sharedBuyerAddress || firstPo.sharedBuyerAddress || '';
+    const mpiOv2 = window._mpiCustOverride || {};
+    const mpiDisplayName2 = (mpiOv2.name || custName) || '—';
+    const mpiDisplayAddr2 = (mpiOv2.addr !== undefined ? mpiOv2.addr : custAddr) || '';
+    const mpiNameInp2 = document.getElementById('mpiCustNameInput');
+    const mpiAddrInp2 = document.getElementById('mpiCustAddrInput');
+    if (mpiNameInp2 && !mpiNameInp2.dataset.userEdited) { mpiNameInp2.value = mpiDisplayName2; }
+    if (mpiAddrInp2 && !mpiAddrInp2.dataset.userEdited) { mpiAddrInp2.value = mpiDisplayAddr2; }
+    if (mpiNameInp2 && !mpiNameInp2._watchSet) { mpiNameInp2._watchSet = true; mpiNameInp2.addEventListener('input', () => { mpiNameInp2.dataset.userEdited = '1'; }); }
+    if (mpiAddrInp2 && !mpiAddrInp2._watchSet) { mpiAddrInp2._watchSet = true; mpiAddrInp2.addEventListener('input', () => { mpiAddrInp2.dataset.userEdited = '1'; }); }
+    const mpiFinalName2 = mpiNameInp2?.dataset.userEdited ? (mpiNameInp2.value.trim() || mpiDisplayName2) : mpiDisplayName2;
+    const mpiFinalAddr2 = mpiAddrInp2?.dataset.userEdited ? mpiAddrInp2.value.trim() : mpiDisplayAddr2;
     document.getElementById('mpiBuyer').textContent = buyer;
-    document.getElementById('mpiTo').innerHTML = `<strong>${custName}</strong>` + (custAddr ? '<br>' + custAddr.replace(/\n/g,'<br>') : '');
+    document.getElementById('mpiTo').innerHTML = `<strong>${mpiFinalName2}</strong>` + (mpiFinalAddr2 ? '<br>' + mpiFinalAddr2.replace(/\n/g,'<br>') : '');
 
     const tbody = document.getElementById('mpiBody');
     tbody.innerHTML = '';

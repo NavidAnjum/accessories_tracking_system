@@ -166,6 +166,24 @@ html.pi-preview .mspi-ctrl {
     <select id="mspiDays"      style="display:none;"><option value="At Sight">At Sight</option><option value="30">30</option><option value="60">60</option><option value="90">90</option><option value="120">120</option></select>
     <select id="mspiLcType"    style="display:none;"><option value="Sight">Sight</option><option value="Usance">Usance</option><option value="Deferred Payment">Deferred Payment</option><option value="Acceptance">Acceptance</option></select>
     <select id="mspiTolerance" style="display:none;"><option value="5">5</option><option value="3">3</option><option value="10">10</option></select>
+    <div class="mspi-ctrl-group">
+        <span class="mspi-ctrl-label">PI Date</span>
+        <input type="date" id="mspiDateInput"
+               style="background:#2d2d50;color:#fff;border:1.5px solid #4f46e5;border-radius:6px;padding:6px 10px;font-size:12px;outline:none;color-scheme:dark;"
+               onchange="mspiUpdateDate(this.value)">
+    </div>
+    <div class="mspi-ctrl-group">
+        <span class="mspi-ctrl-label">Customer Name (TO)</span>
+        <input type="text" id="mspiCustNameInput" placeholder="Override customer name…"
+               style="background:#2d2d50;color:#fff;border:1.5px solid #4f46e5;border-radius:6px;padding:6px 10px;font-size:12px;outline:none;min-width:200px;"
+               oninput="mspiUpdateCustomer()">
+    </div>
+    <div class="mspi-ctrl-group">
+        <span class="mspi-ctrl-label">Customer Address</span>
+        <textarea id="mspiCustAddrInput" rows="2" placeholder="Override address…"
+               style="background:#2d2d50;color:#fff;border:1.5px solid #4f46e5;border-radius:6px;padding:6px 10px;font-size:12px;outline:none;min-width:220px;resize:vertical;"
+               oninput="mspiUpdateCustomer()"></textarea>
+    </div>
     <button class="mspi-excel-btn" onclick="downloadSummaryPiExcel()">Download Excel</button>
     <?php if (($__user['role'] ?? '') !== 'marketing'): ?>
     <button class="mspi-excel-btn" style="background:#0f6cbd;" onclick="emailThisPi()">📧 Email PI (Outlook)</button>
@@ -188,12 +206,34 @@ html.pi-preview .mspi-ctrl {
             const sel = JSON.parse(sessionStorage.getItem('summary_selected_pis') || 'null');
             if (Array.isArray(sel) && sel.length) window._mspiSelectionPis = sel;
         } catch (e) {}
+        try {
+            const ov = JSON.parse(sessionStorage.getItem('summary_pi_cust_override') || 'null');
+            if (ov) window._mspiCustOverride = ov; // { name, addr }
+        } catch (e) {}
     }
     window._mspiBank = p.get('bank') || 'ncc';
     window._mspiBin  = p.get('bin')  || '';
     window._mspiHsCode = p.get('hs') || '4819.10.00';
     window._mspiDocMust = p.get('doc') || 'UD';
+    // Default date input to today
+    const dateInput = document.getElementById('mspiDateInput');
+    if (dateInput) dateInput.value = new Date().toISOString().slice(0,10);
 })();
+
+function mspiUpdateDate(val) {
+    const formatted = mspiFormatDate(val);
+    const d1 = document.getElementById('mspiDate');
+    const d2 = document.getElementById('mspiContDate');
+    if (d1) d1.textContent = formatted;
+    if (d2) d2.textContent = formatted;
+}
+
+function mspiUpdateCustomer() {
+    const name = document.getElementById('mspiCustNameInput')?.value.trim() || window._mspiRenderedCustName || '';
+    const addr = document.getElementById('mspiCustAddrInput')?.value.trim() || window._mspiRenderedCustAddr || '';
+    const el = document.getElementById('mspiTo');
+    if (el) el.innerHTML = `<strong>${name || '—'}</strong>` + (addr ? '<br>' + addr.replace(/\n/g,'<br>') : '');
+}
 </script>
 
 <!-- ── Document ── -->
@@ -227,13 +267,13 @@ html.pi-preview .mspi-ctrl {
         <div class="mspi-to-label">TO</div>
         <div class="mspi-to" id="mspiTo">-</div>
         <div class="mspi-orderref" id="mspiOrderRef" style="display:none;"></div>
-        <div class="mspi-conf">WE CONFIRM HAVING SOLD TO YOU THE FOLLOWING MERCHANDISE AS PER TERMS AND CONDITION STATED BELOW.</div>
+        <div class="mspi-conf">WE CONFIRM HAVING SOLD TO YOU THE FOLLOWING MERCHANDISE.</div>
 
         <!-- Item Table -->
         <table class="mspi-tbl">
             <thead>
                 <tr>
-                    <th style="width:40px;">SL NO</th>
+                    <th style="width:62px;">PI NO</th>
                     <th>Description of goods</th>
                     <th style="width:50px;">PLY</th>
                     <th style="width:100px;">Quantity/<br>Pcs/con</th>
@@ -256,7 +296,7 @@ html.pi-preview .mspi-ctrl {
         <!-- Total in words -->
         <div class="mspi-words">TOTAL AMOUNT : US DOLLER: <span id="mspiWords">-</span></div>
 
-        <div id="mspiTermsBlock">
+        <div id="mspiTermsBlock" style="display:none;">
             <div class="mspi-terms-title">Terms &amp; Conditions:</div>
             <ol class="mspi-terms-list" id="mspiTerms"></ol>
         </div>
@@ -307,7 +347,7 @@ html.pi-preview .mspi-ctrl {
         </tbody>
     </table>
     <div class="mspi-words" id="mspiContWordsWrap" style="display:none;">TOTAL AMOUNT : US DOLLER: <span id="mspiContWords">-</span></div>
-    <div id="mspiTermsContBlock">
+    <div id="mspiTermsContBlock" style="display:none;">
         <div class="mspi-terms-title">Terms &amp; Conditions:</div>
         <ol class="mspi-terms-list" id="mspiTermsCont"></ol>
     </div>
@@ -418,21 +458,38 @@ function renderSummaryPi() {
     const firstPo0 = firstPi.pos?.[0] || {};
     const piNum   = firstPi.pi_number || salesPg.piNum || (order.order_id || '') + '-SPI';
     const piDate  = firstPi.pi_date   || salesPg.piDate || order.created_at?.slice(0,10) || '';
+    // Use the date input value if set, otherwise fall back to PI data date; default to today
+    const dateInputEl = document.getElementById('mspiDateInput');
+    const effectiveDate = (dateInputEl && dateInputEl.value) ? dateInputEl.value : (piDate || new Date().toISOString().slice(0,10));
+    if (dateInputEl && !dateInputEl.value) dateInputEl.value = effectiveDate;
     document.getElementById('mspiNum').textContent  = piNum;
     document.title = mspiFileName(piNum, (usingSelection ? firstPi.customer : (salesPg.customer || intake.customer || order.customer_name)) || ''); // Save-as-PDF / print default file name = Customer-PINumber
-    document.getElementById('mspiDate').textContent = mspiFormatDate(piDate);
+    document.getElementById('mspiDate').textContent = mspiFormatDate(effectiveDate);
     const contNumEl = document.getElementById('mspiContNum');
     const contDateEl = document.getElementById('mspiContDate');
     if (contNumEl) contNumEl.textContent = piNum;
-    if (contDateEl) contDateEl.textContent = mspiFormatDate(piDate);
+    if (contDateEl) contDateEl.textContent = mspiFormatDate(effectiveDate);
 
     // Buyer / TO — when using a selection, take them from the first picked PI.
     const buyer    = (usingSelection ? (firstPo0.sharedBuyer || firstPo0.buyer || firstPo0.endBuyer) : (salesPg.buyer || firstPo0.sharedBuyer || firstPo0.endBuyer || intake.pos?.[0]?.endBuyer)) || '—';
     const custName = (usingSelection ? firstPi.customer : (salesPg.customer || intake.customer || order.customer_name)) || '—';
     const custAddr = (usingSelection ? firstPo0.sharedBuyerAddress : (salesPg.buyerAddress || firstPo0.sharedBuyerAddress)) || '';
+    // Apply customer override from sales.php if provided (Summary-PI-only, doesn't affect Single/Master)
+    const ov = window._mspiCustOverride || {};
+    const displayName = (ov.name || custName) || '—';
+    const displayAddr = (ov.addr !== undefined ? ov.addr : custAddr) || '';
+    // Seed the controls-bar inputs so user can further tweak on this page
+    const nameInp = document.getElementById('mspiCustNameInput');
+    const addrInp = document.getElementById('mspiCustAddrInput');
+    if (nameInp && !nameInp.dataset.userEdited) { nameInp.value = displayName; }
+    if (addrInp && !addrInp.dataset.userEdited) { addrInp.value = displayAddr; }
+    if (nameInp && !nameInp._watchSet) { nameInp._watchSet = true; nameInp.addEventListener('input', () => { nameInp.dataset.userEdited = '1'; }); }
+    if (addrInp && !addrInp._watchSet) { addrInp._watchSet = true; addrInp.addEventListener('input', () => { addrInp.dataset.userEdited = '1'; }); }
+    const finalName = nameInp?.dataset.userEdited ? (nameInp.value.trim() || displayName) : displayName;
+    const finalAddr = addrInp?.dataset.userEdited ? (addrInp.value.trim()) : displayAddr;
     document.getElementById('mspiBuyer').textContent = buyer;
     document.getElementById('mspiTo').innerHTML =
-        `<strong>${custName}</strong>` + (custAddr ? '<br>' + custAddr.replace(/\n/g,'<br>') : '');
+        `<strong>${finalName}</strong>` + (finalAddr ? '<br>' + finalAddr.replace(/\n/g,'<br>') : '');
 
     const allSummaryPos = pis.flatMap(pi => pi.pos || []);
     const orderRefs = [...new Set(allSummaryPos.map(po => po.orderRef || po.salesOrder || po.salesOrderNo || '').filter(Boolean))];
@@ -455,23 +512,35 @@ function renderSummaryPi() {
     // Build rows — all PIs
     const tbody = document.getElementById('mspiBody');
     tbody.innerHTML = '';
-    let totalQty = 0, totalVal = 0, sl = 0;
+    let totalQty = 0, totalVal = 0;
 
     pis.forEach(pi => {
-        const pos       = pi.pos || [];
+        const pos = pi.pos || [];
+        const piLabel = (pi.pi_number || '—').split('/').slice(-2).join('/');
 
+        // Count total items across all POs for this PI (for rowspan)
+        let piItemCount = 0;
+        pos.forEach(po => { piItemCount += (po.items || []).length; });
+
+        let piFirstRow = true;
         pos.forEach(po => {
-            // Item rows
             (po.items || []).forEach(item => {
-                sl++;
                 const qty = parseFloat(item.qty   || 0);
                 const prc = parseFloat(item.price || item.unitPrice || 0);
                 const tot = parseFloat(item.total || (qty * prc)) || 0;
                 totalQty += qty;
                 totalVal += tot;
                 const tr = document.createElement('tr');
+                // Show PI number only on first row of each PI; blank on subsequent rows
+                const piCell = piFirstRow
+                    ? `<td class="tc" style="font-size:9px;font-weight:700;word-break:break-all;border-bottom:none;">${piLabel}</td>`
+                    : `<td style="border-top:none;border-bottom:none;"></td>`;
+                if (piFirstRow) {
+                    tr.style.borderTop = '1.5px solid #555';
+                    piFirstRow = false;
+                }
                 tr.innerHTML = `
-                    <td class="tc">${sl}</td>
+                    ${piCell}
                     <td>${item.desc || item.itemName || '—'}</td>
                     <td class="tc">${item.ply || '—'}</td>
                     <td class="tc">${qty.toLocaleString()}</td>
@@ -551,8 +620,8 @@ function mspiPaginateLikeSingle(terms) {
     contWordsWrap.style.display = 'none';
     totalFoot.style.display = '';
     if (wordsWrap) wordsWrap.style.display = '';
-    if (termsBlock) termsBlock.style.display = '';
-    firstTerms.innerHTML = terms.map(term => `<li>${term}</li>`).join('');
+    if (termsBlock) termsBlock.style.display = 'none';
+    firstTerms.innerHTML = '';
     contTerms.innerHTML = '';
     continuationEl.classList.remove('is-active');
     signature.style.display = 'block';
@@ -570,7 +639,7 @@ function mspiPaginateLikeSingle(terms) {
     document.getElementById('mspiContWords').textContent = document.getElementById('mspiWords').textContent;
     firstTerms.innerHTML = '';
     if (termsBlock) termsBlock.style.display = 'none';
-    contTerms.innerHTML = terms.map(term => `<li>${term}</li>`).join('');
+    contTerms.innerHTML = '';
     contTerms.start = 1;
     signature.style.display = 'none';
 
