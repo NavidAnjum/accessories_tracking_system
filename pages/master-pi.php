@@ -65,7 +65,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .mpi-content { min-height:0; flex:1 1 auto; display:flex; flex-direction:column; }
 .mpi-continuation { display:none; }
 html.ats-print-layout #mpiDocument { height:281mm!important; min-height:281mm!important; overflow:hidden!important; }
-.mpi-continuation.is-active { display:flex; }
+.mpi-continuation.is-active { display:flex; flex-direction:column; }
 
 /* Header */
 .mpi-hd {
@@ -360,7 +360,11 @@ function mpiUpdateCustomer() {
         </tbody>
     </table>
     <div class="mpi-words" id="mpiContWordsWrap" style="display:none;">TOTAL AMOUNT : US DOLLER: <span id="mpiContWords">-</span></div>
-
+    <div style="flex:1 1 auto;">
+        <div class="mpi-terms-title">Terms &amp; Conditions:</div>
+        <ol class="mpi-terms-list" id="mpiTermsCont" start="12"></ol>
+    </div>
+    <div class="mpi-sig-area" style="margin-top:8px;">
         <div class="mpi-sig-bottom">
             <div class="mpi-sig-bottom-label">SIGNATURE OF BUYER</div>
             <div class="mpi-sig-bottom-label" style="display:flex;flex-direction:column;align-items:center;gap:1px;">
