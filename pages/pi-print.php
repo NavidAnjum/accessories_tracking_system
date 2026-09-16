@@ -40,7 +40,7 @@ require_once __DIR__ . '/../includes/print-brand.php';
 /* Table */
 .pi-table { width:100%; border-collapse:collapse; margin-bottom:8px; font-size:7.5pt; }
 .pi-table th { background:#fff; color:#111; padding:6px 8px; text-align:center; border:1px solid #1a3a6e; font-size:7.125pt; }
-.pi-table td { border:1px solid #888; padding:5px 8px; vertical-align:top; }
+.pi-table td { border:1px solid #888; padding:1.5px 8px; vertical-align:top; line-height:1.2; }
 .pi-table td.center { text-align:center; }
 .pi-table td.right  { text-align:right; }
 .pi-table tr.total-row td { font-weight:700; background:#f0f4ff; border-top:2.5px solid #1a3a6e; }
@@ -269,6 +269,7 @@ function numToWords(n) {
 }
 
 function formatUSD(v) { return '$ ' + parseFloat(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function formatUnitUSD(v) { return '$ ' + parseFloat(v||0).toLocaleString('en-US',{minimumFractionDigits:4,maximumFractionDigits:4}); }
 
 // ── Render PI document ────────────────────────────────────────────
 function renderPi() {
@@ -350,7 +351,7 @@ function renderPi() {
                 tr.innerHTML = `<td class="center">${sl}</td>
                     <td>${item.desc || item.itemName || '—'}</td>
                     <td class="center">${qty.toLocaleString()}</td>
-                    <td class="right">${prc ? formatUSD(prc) : '—'}</td>
+                    <td class="right">${prc ? formatUnitUSD(prc) : '—'}</td>
                     <td class="right">${tot ? formatUSD(tot) : '—'}</td>`;
                 tbody.appendChild(tr);
             });
@@ -382,7 +383,7 @@ function renderPi() {
                         tr.innerHTML = `<td class="center">${sl}</td>
                             <td>${item.desc || item.itemName || '—'}</td>
                             <td class="center">${qty.toLocaleString()}</td>
-                            <td class="right">${prc ? formatUSD(prc) : '—'}</td>
+                            <td class="right">${prc ? formatUnitUSD(prc) : '—'}</td>
                             <td class="right">${tot ? formatUSD(tot) : '—'}</td>`;
                         tbody.appendChild(tr);
                     });

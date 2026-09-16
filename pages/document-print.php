@@ -44,13 +44,14 @@ require_once __DIR__ . '/../includes/print-brand.php';
 .doc-topbox td{border:1px solid #333;vertical-align:top;width:50%;padding:4px 6px}
 .doc-grid-block div{margin-bottom:1px}
 .doc-buyer{margin:4px 0 3px;font-weight:700}
-.doc-table{width:100%;border-collapse:collapse;margin-top:4px}
-.doc-table th,.doc-table td{border:1px solid #333;padding:3px 5px;vertical-align:top}
+.doc-table{width:100%;border-collapse:collapse;margin-top:4px;font-size:9px;line-height:1.15}
+.doc-table th,.doc-table td{border:1px solid #333;padding:1.5px 5px;vertical-align:top}
 .doc-table th{text-align:center;font-weight:700}
 .center{text-align:center}.right{text-align:right}
-.doc-note-list{margin-top:8px}
-.doc-note-row{display:grid;grid-template-columns:140px 1fr;gap:8px;margin-bottom:2px}
-.doc-sign-row{margin-top:90px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
+.doc-note-list{margin-top:5px;font-size:8.5px;line-height:1.15}
+.doc-note-row{display:grid;grid-template-columns:135px 1fr;gap:8px;margin-bottom:0}
+.doc-sign-row{margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
+.doc-sign-row img{height:64px!important}
 .doc-sign-line{width:120px;border-top:1px solid #000;margin-top:28px;margin-bottom:4px}
 .doc-sign-right{text-align:right}.doc-sign-right .doc-sign-line{margin-left:auto}
 .doc-bottom-bar{margin-top:56px;padding-top:4px;border-top:1px solid #000;font-size:9px;text-align:center}
@@ -124,16 +125,22 @@ function amountWords(n){const parsed=parseFloat(n||0)||0;const ones=['Zero','One
 function resolvePos(res){const lc=res.pages?.lc||{};const exch=res.pages?.exchange||(res.pages.exchange={});if(lc.lcExportSalesContractNo)exch.exportSalesContractNo=lc.lcExportSalesContractNo;if(lc.lcExportSalesContractDate)exch.exportSalesContractDate=lc.lcExportSalesContractDate;const resolved=window.atsResolveDisplayPos?window.atsResolveDisplayPos(res):{pos:res.pages?.sales?.pos||[]};return resolved.pos||[]}
 function getCommon(res){const order=res.order||{};const sales=res.pages?.sales||{};const comm=res.pages?.commercial||{};const exch=res.pages?.exchange||{};const lc=res.pages?.lc||{};const doc=res.pages?.[DOC_TYPE]||{};const pos=resolvePos(res);const buyer=[...new Set(pos.map(p=>p.buyer).filter(Boolean))].join(', ')||order.buyer_name||'';const customer=order.customer_name||comm.commercialConsigneeName||sales.customer||'';const applicantName=lc.lcApplicantName||customer;const applicantAddress=lc.lcApplicantAddress||comm.commercialConsigneeAddress||sales.buyerAddress||'';const applicantInfo=[applicantName,applicantAddress].filter(Boolean).join(', ');const beneficiary=lc.lcBeneficiaryName||comm.commercialBeneficiaryName||DOC_COMPANY_NAME;const beneficiaryAddress=lc.lcBeneficiaryAddress||comm.commercialBeneficiaryAddress||'';const factoryAddress=lc.lcFactoryAddress||comm.commercialFactoryAddress||'';const advisingBank=lc.reimbursementBank||comm.commercialAdvisingBank||exch.payToBankAddress||exch.payToBankName||'';const consigneeBank=lc.negotiatingBeneficiaryBank||comm.commercialConsigneeBankAddress||exch.beneficiaryBankAddress||'';const lcNo=exch.masterLcNo||lc.lcNumber||'';const lcDate=exch.masterLcDate||lc.lcDate||'';const contract=exch.exportSalesContractNo||lc.lcNumber||'';const contractDate=exch.exportSalesContractDate||lc.lcDate||'';const proforma=comm.proformaNo||sales.piNum||'';const proformaDate=comm.proformaDate||sales.piDate||'';const carrier=exch.carrierNameMaster||comm.commercialCarrier||'By Truck';const packing=exch.packingDetailsMaster||'Standard Poly Packing Rolls';const amount=exch.exchangeAmount||String(comm.commercialTotalAmount||'').replace(/[^\d.]/g,'')||0;const applicantsParts=[];if(exch.beneficiaryVatBin)applicantsParts.push("Beneficiary's Vat/Bin: "+exch.beneficiaryVatBin);if(exch.hsCodeMaster)applicantsParts.push('H.S Code No: '+exch.hsCodeMaster);const applicantLine=applicantsParts.join(' and ');return{order,sales,comm,exch,lc,doc,pos,buyer,customer,applicantName,applicantAddress,applicantInfo,beneficiary,beneficiaryAddress,factoryAddress,advisingBank,consigneeBank,lcNo,lcDate,contract,contractDate,proforma,proformaDate,carrier,packing,amount,applicantLine}}
 function buildItemRows(pos){let totalQty=0;const rows=[];pos.forEach(po=>{(po.items||[]).forEach(item=>{const qty=parseFloat(item.qty||0)||0;totalQty+=qty;rows.push({desc:item.desc||item.itemName||'-',ply:item.ply||'-',qty})})});return{rows,totalQty}}
-function paginateDocumentItems(rows){
-    if(!rows.length||rows.length<=18)return[rows];
+function paginateDocumentItems(rows,reserve){
+    // `reserve` = rows worth of vertical space the LAST sheet must keep free for
+    // totals + notes + EPZ/PI reference blocks + signature + footer. Bigger reserve
+    // (EPZ docs carry extra blocks) => split sooner so the signature always fits.
+    reserve=reserve||0;
+    // With the compact 9px item table, keep up to ~34 rows on a single page.
+    const singleMax=Math.max(12,34-reserve);
+    if(!rows.length||rows.length<=singleMax)return[rows];
     const pages=[];
-    const firstTake=rows.length<=28?rows.length-10:28;
+    const firstTake=rows.length<=44?rows.length-12:44;
     pages.push(rows.slice(0,firstTake));
     let offset=firstTake;
-    const continuationRows=38;
+    const continuationRows=52;
     // Keep room on the last sheet for totals, document notes, EPZ/PI references,
     // signatures and the fixed footer, like the Single PI continuation page.
-    const finalPageRows=12;
+    const finalPageRows=Math.max(10,14-reserve);
     while(rows.length-offset>finalPageRows){
         const remaining=rows.length-offset;
         const take=remaining<=finalPageRows*2?Math.ceil(remaining/2):Math.min(continuationRows,remaining-finalPageRows);
@@ -168,8 +175,8 @@ function renderBankForwarding(res){const c=getCommon(res);const amount=parseFloa
 // EPZ weight/bundle summary for Packing List / Delivery Challan / Truck Challan.
 // Net Weight, Gross Weight, Total Bundle come from LC (EPZ only); Total Qty is
 // the sum of item quantities. Shown only when EPZ zone is selected.
-function epzWeightBlock(res,totalQty){const lc=res.pages?.lc||{};if(lc.lcZoneType!=='epz')return'';const fmt=(v,u)=>`${(v!==''&&v!=null&&v!==undefined)?esc(v):'-'} ${u}`;return `<div class="doc-note-list" style="margin-top:10px;padding:7px 9px;border:1px solid #cbd5e1;"><div class="doc-note-row"><div>Net Weight</div><div>${fmt(lc.lcNetWeight,'Kgs')}</div></div><div class="doc-note-row"><div>Gross Weight</div><div>${fmt(lc.lcGrossWeight,'Kgs')}</div></div><div class="doc-note-row"><div>Total Bundle</div><div>${fmt(lc.lcTotalBundle,'Pcs')}</div></div><div class="doc-note-row"><div>Total Qty</div><div>${esc(qtyFmt(totalQty||0))} Pcs</div></div></div>`}
-function epzReferenceBlock(res){const lc=res.pages?.lc||{};if(lc.lcZoneType!=='epz')return'';return `<div class="doc-note-list" style="margin-top:10px;padding:7px 9px;border:1px solid #cbd5e1;"><div class="doc-note-row"><div>EXP No.</div><div>${esc(lc.lcExpNo||'-')}</div></div><div class="doc-note-row"><div>EXP Date</div><div>${esc(fmtDate(lc.lcExpDate||'', '.'))}</div></div><div class="doc-note-row"><div>IP No.</div><div>${esc(lc.lcIpNo||'-')}</div></div><div class="doc-note-row"><div>IP Date</div><div>${esc(fmtDate(lc.lcIpDate||'', '.'))}</div></div></div>`}
+function epzWeightBlock(res,totalQty){const lc=res.pages?.lc||{};if(lc.lcZoneType!=='epz')return'';const fmt=(v,u)=>`${(v!==''&&v!=null&&v!==undefined)?esc(v):'-'} ${u}`;return `<div class="doc-note-list" style="margin-top:5px;padding:3px 8px;border:1px solid #cbd5e1;"><div class="doc-note-row"><div>Net Weight</div><div>${fmt(lc.lcNetWeight,'Kgs')}</div></div><div class="doc-note-row"><div>Gross Weight</div><div>${fmt(lc.lcGrossWeight,'Kgs')}</div></div><div class="doc-note-row"><div>Total Bundle</div><div>${fmt(lc.lcTotalBundle,'Pcs')}</div></div><div class="doc-note-row"><div>Total Qty</div><div>${esc(qtyFmt(totalQty||0))} Pcs</div></div></div>`}
+function epzReferenceBlock(res){const lc=res.pages?.lc||{};if(lc.lcZoneType!=='epz')return'';return `<div class="doc-note-list" style="margin-top:5px;padding:3px 8px;border:1px solid #cbd5e1;"><div class="doc-note-row"><div>EXP No.</div><div>${esc(lc.lcExpNo||'-')}</div></div><div class="doc-note-row"><div>EXP Date</div><div>${esc(fmtDate(lc.lcExpDate||'', '.'))}</div></div><div class="doc-note-row"><div>IP No.</div><div>${esc(lc.lcIpNo||'-')}</div></div><div class="doc-note-row"><div>IP Date</div><div>${esc(fmtDate(lc.lcIpDate||'', '.'))}</div></div></div>`}
 function addLcApplicantInformation(html,res){if(!['packing','delivery','truck','origin'].includes(DOC_TYPE))return html;const c=getCommon(res);const applicant=`<div class="doc-note-row"><div>Applicant Information</div><div>${esc(c.applicantInfo||'-')}</div></div>`;if(DOC_TYPE==='origin'){return html.replace('<p class="doc-letter-p">Export Sales Contract No.',`<p class="doc-letter-p"><strong>Applicant Information:</strong> ${esc(c.applicantInfo||'-')}</p><p class="doc-letter-p">Export Sales Contract No.`)}return html.replace('<div class="doc-note-list">','<div class="doc-note-list">'+applicant)}
 function insertBeforeLast(html,needle,addition){const index=html.lastIndexOf(needle);return index<0?html:html.slice(0,index)+addition+html.slice(index)}
 // Insert ABOVE the signature block (doc-sign-row) when the doc has one, so extra
@@ -177,7 +184,7 @@ function insertBeforeLast(html,needle,addition){const index=html.lastIndexOf(nee
 // to before the footer for docs without a sign-row.
 function insertBeforeSignOrFooter(html,addition){for(const m of ['<div class="doc-sign-row">','<div class="doc-sign-solo"']){const i=html.lastIndexOf(m);if(i>=0)return html.slice(0,i)+addition+html.slice(i)}return insertBeforeLast(html,DOC_BRAND_FOOTER,addition)}
 function addEpzReferences(html,res){const block=epzReferenceBlock(res);const withEpz=block?insertBeforeSignOrFooter(html,block):html;return addLcApplicantInformation(withEpz,res)}
-function piReferenceBlock(res){const s=window.atsResolveOrderPiSummary?window.atsResolveOrderPiSummary(res):{numbers:[],total:0,count:0};if(!s.count&&!s.total)return'';return `<div class="doc-note-list" style="margin-top:10px;padding:7px 9px;border:1px solid #a5b4fc;"><div class="doc-note-row"><div>PI Numbers Included</div><div>${esc((s.numbers||[]).join(' / ')||'-')}</div></div><div class="doc-note-row"><div>Total PI Value (USD)</div><div>$ ${esc(money(s.total,2))}</div></div></div>`}
+function piReferenceBlock(res){const s=window.atsResolveOrderPiSummary?window.atsResolveOrderPiSummary(res):{numbers:[],total:0,count:0};if(!s.count&&!s.total)return'';return `<div class="doc-note-list" style="margin-top:5px;padding:3px 8px;border:1px solid #a5b4fc;"><div class="doc-note-row"><div>PI Numbers Included</div><div>${esc((s.numbers||[]).join(' / ')||'-')}</div></div><div class="doc-note-row"><div>Total PI Value (USD)</div><div>$ ${esc(money(s.total,2))}</div></div></div>`}
 function addPiReferences(html,res){const block=piReferenceBlock(res);return block?insertBeforeSignOrFooter(html,block):html}
 // Sales Contract: the PI reference box must sit ABOVE the acceptance/signatures,
 // not below them. Insert it just before the "Configuration for Acceptance" line.
@@ -251,11 +258,13 @@ function renderBill(res){
         `<div style="font-weight:700;margin-top:2px;">Zaber &amp; Zubair Accessories LTD. A/C NO.:  -0002-0251008278</div>`+
         `</div>`+
         `<div class="bill-sign-row"><div>SIGNATURE OF BUYER</div><div>SIGNATURE OF SELLER</div></div>`;
-    const pages=paginateDocumentItems(rows);
+    // The bill's last page carries total-in-words + the 9-point terms + signature,
+    // which is tall — reserve generous room so items split before crowding it.
+    const pages=paginateDocumentItems(rows,16);
     let sl=0;
     return pages.map((pageRows,pageIndex)=>{
         const isLast=pageIndex===pages.length-1;
-        const itemRows=pageRows.map(r=>{sl++;return `<tr><td class="center">${sl}</td><td>${esc(r.desc)}</td><td class="center">${esc(r.ply||'')}</td><td class="right">${esc(qtyFmt(r.qty))}</td><td class="right">${r.price?esc(money(r.price,4)):''}</td><td class="right">${r.amt?esc(money(r.amt,2)):''}</td></tr>`;}).join('');
+        const itemRows=pageRows.map(r=>{sl++;return `<tr><td class="center">${sl}</td><td>${esc(r.desc)}</td><td class="center">${esc(r.ply||'')}</td><td class="right">${esc(qtyFmt(r.qty))}</td><td class="right">${r.price?'$ '+esc(money(r.price,4)):''}</td><td class="right">${r.amt?'$ '+esc(money(r.amt,2)):''}</td></tr>`;}).join('');
         const totalRow=isLast?`<tr><td colspan="3" class="right"><strong>Total</strong></td><td class="right"><strong>${esc(qtyFmt(totalQty))}</strong></td><td></td><td class="right"><strong>$ ${esc(money(total,2))}</strong></td></tr>`:'';
         const contMeta=pageIndex>0?`<div class="doc-cont-meta"><span><strong>BILL NO:</strong> ${esc(billNo)}</span><span><strong>Date:</strong> ${esc(fmtDate(dateVal,'/'))}</span></div>`:'';
         return `<div class="doc-page doc-item-page"><div class="doc-brand-header">${DOC_BRAND_HEADER}</div>`+

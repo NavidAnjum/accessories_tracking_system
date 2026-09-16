@@ -93,7 +93,7 @@ html.ats-print-layout #mspiDocument { height:281mm!important; min-height:281mm!i
     background:#fff; color:#111; padding:5px 8px;
     border:1px solid #1a3a6e; text-align:center; font-size:7.125pt; line-height:1.3;
 }
-.mspi-tbl td { border:1px solid #7a7a7a; padding:4px 8px; vertical-align:top; }
+.mspi-tbl td { border:1px solid #7a7a7a; padding:1.5px 8px; vertical-align:top; line-height:1.2; }
 .mspi-tbl td.tc { text-align:center; }
 .mspi-tbl td.tr { text-align:right; }
 .mspi-tbl tr.ref-row td { border:1px solid #7a7a7a; padding:2px 8px; }
@@ -413,6 +413,9 @@ function mspiNumWords(n) {
     return result + ' ONLY.';
 }
 
+function mspiUnitUSD(v) {
+    return '$ ' + parseFloat(v || 0).toLocaleString('en-US', {minimumFractionDigits:4, maximumFractionDigits:4});
+}
 function mspiUSD(v) {
     return '$ ' + parseFloat(v || 0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
@@ -544,7 +547,7 @@ function renderSummaryPi() {
                     <td>${item.desc || item.itemName || '—'}</td>
                     <td class="tc">${item.ply || '—'}</td>
                     <td class="tc">${qty.toLocaleString()}</td>
-                    <td class="tr">${prc ? mspiUSD(prc) : '—'}</td>
+                    <td class="tr">${prc ? mspiUnitUSD(prc) : '—'}</td>
                     <td class="tr">${tot ? mspiUSD(tot) : '—'}</td>`;
                 tbody.appendChild(tr);
             });

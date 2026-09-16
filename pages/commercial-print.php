@@ -141,11 +141,13 @@ require_once __DIR__ . '/../includes/print-brand.php';
     width:100%;
     border-collapse:collapse;
     margin-top:4px;
+    font-size:9px;
+    line-height:1.15;
 }
 .ci-items th,
 .ci-items td {
     border:1px solid #333;
-    padding:3px 5px;
+    padding:1.5px 5px;
     vertical-align:top;
 }
 .ci-items th {
@@ -154,8 +156,8 @@ require_once __DIR__ . '/../includes/print-brand.php';
 }
 .ci-items td.center { text-align:center; }
 .ci-items td.right { text-align:right; }
-.ci-footnote { margin-top:6px; }
-.ci-sign-block { margin-top:48px; }
+.ci-footnote { margin-top:4px; font-size:9px; }
+.ci-sign-block { margin-top:20px; }
 .ci-sign-line {
     width:120px;
     border-top:1px solid #000;
@@ -327,12 +329,14 @@ function ciDate(val) {
 }
 
 function ciPaginateItems(items) {
-    if (!items.length || items.length <= 22) return [items];
+    // Keep up to ~28 items on a single page (matching the PI density) before
+    // splitting. Only spill to more pages on real overflow.
+    if (!items.length || items.length <= 28) return [items];
     const pages = [];
-    const firstTake = items.length <= 28 ? items.length - 12 : 28;
+    const firstTake = items.length <= 40 ? items.length - 12 : 38;
     pages.push(items.slice(0, firstTake));
     let offset = firstTake;
-    const continuationRows = 38;
+    const continuationRows = 44;
     const finalPageRows = 28;
     while (items.length - offset > finalPageRows) {
         const remaining = items.length - offset;

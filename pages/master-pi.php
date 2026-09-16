@@ -104,7 +104,7 @@ html.ats-print-layout #mpiDocument { height:281mm!important; min-height:281mm!im
     background:#fff; color:#111; padding:5px 8px;
     border:1px solid #1a3a6e; text-align:center; font-size:7.125pt; line-height:1.3;
 }
-.mpi-tbl td { border:1px solid #7a7a7a; padding:4px 8px; vertical-align:top; }
+.mpi-tbl td { border:1px solid #7a7a7a; padding:1.5px 8px; vertical-align:top; line-height:1.2; }
 .mpi-tbl tr { page-break-inside:avoid; }
 .mpi-tbl td.tc { text-align:center; }
 .mpi-tbl td.tr { text-align:right; }
@@ -115,27 +115,27 @@ html.ats-print-layout #mpiDocument { height:281mm!important; min-height:281mm!im
 /* Total words */
 .mpi-words {
     font-size:7.5pt; font-weight:700; text-transform:uppercase;
-    margin:8px 0 12px; color:#000;
+    margin:5px 0 6px; color:#000;
     border-top:1px dashed #333; border-bottom:1px dashed #333;
-    padding:4px 0;
+    padding:3px 0;
 }
 
 /* Terms */
 .mpi-terms-title { font-size:6.375pt; font-weight:700; text-decoration:underline; margin:0 0 4px; }
-.mpi-terms-list  { margin:0; padding-left:32px; font-size:6.05625pt; line-height:1.3; }
+.mpi-terms-list  { margin:0; padding-left:28px; font-size:5.7pt; line-height:1.15; }
 .mpi-terms-list li { margin-bottom:0; }
 
 /* Signatures */
-.mpi-sig-area { margin-top:36px; }
+.mpi-sig-area { margin-top:14px; }
 .mpi-sig-bottom {
     display:flex; justify-content:space-between; align-items:flex-end;
-    padding-top:6px; margin-top:160px;
+    padding-top:6px; margin-top:40px;
 }
 .mpi-sig-bottom-label { font-size:7.5pt; font-weight:700; }
 
 /* Footer bar */
 .mpi-footer-bar {
-    margin-top:24px; border:1.5px solid #000;
+    margin-top:12px; border:1.5px solid #000;
     padding:6px 12px; font-size:6.375pt; line-height:1.7;
     text-align:center;
 }
@@ -422,6 +422,9 @@ function mpiNumWords(n) {
     if (cents > 0) result += ' & CENTS ' + fullWords(cents);
     return result + ' ONLY.';
 }
+function mpiUnitUSD(v) {
+    return '$ ' + parseFloat(v||0).toLocaleString('en-US',{minimumFractionDigits:4,maximumFractionDigits:4});
+}
 function mpiUSD(v) {
     return '$ ' + parseFloat(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
@@ -450,7 +453,8 @@ function mpiRenderTerms(terms) {
     const contTotalVal   = document.getElementById('mpiContTotalVal');
     const contWords      = document.getElementById('mpiContWords');
 
-    const overflows = () => docEl.scrollHeight > docEl.clientHeight + 2;
+    // Tolerance so a few px of rounding overshoot doesn't force a needless split.
+    const overflows = () => docEl.scrollHeight > docEl.clientHeight + 8;
 
     // Reset continuation item area
     contBody.innerHTML = '';
@@ -479,9 +483,20 @@ function mpiRenderTerms(terms) {
 
     if (!overflows()) return; // fits on one page
 
-    // Page 1 overflows. Activate continuation and move overflow item rows there,
-    // carrying the totals + words + terms + signature onto the continuation page.
+    // STAGE 1 — the long Terms block is usually what overflows, not the items. Move
+    // only the terms + signature to page 2 and keep the items, totals and words on
+    // page 1. For a typical order this alone fixes it (no big gap on page 1).
     continuationEl.classList.add('is-active');
+    firstTermsEl.innerHTML = '';
+    if (termsBlock) termsBlock.style.display = 'none';
+    contTermsEl.innerHTML  = terms.map(t => `<li>${t}</li>`).join('');
+    contTermsEl.start = 1;
+    sigAreaEl.style.display = 'none';
+
+    if (!overflows()) return; // items + totals fit on page 1; only terms moved to page 2
+
+    // STAGE 2 — still overflowing (genuinely too many items). Move overflow item rows
+    // to the continuation page, carrying the totals + words there too.
     contTblWrap.style.display = '';
     // Move totals/words off page 1 onto the continuation page.
     totFoot.style.display = 'none';
@@ -628,7 +643,7 @@ function renderMasterPi() {
                     <td>${item.desc || item.itemName || '—'}</td>
                     <td class="tc">${item.ply || '—'}</td>
                     <td class="tc">${qty.toLocaleString()}</td>
-                    <td class="tr">${prc ? mpiUSD(prc) : '—'}</td>
+                    <td class="tr">${prc ? mpiUnitUSD(prc) : '—'}</td>
                     <td class="tr">${tot ? mpiUSD(tot) : '—'}</td>`;
                 tbody.appendChild(tr);
             });
@@ -739,7 +754,7 @@ function renderMasterPiFromCustom(groups, res) {
                 <td>${item.desc || item.itemName || '—'}</td>
                 <td class="tc">${item.ply || '—'}</td>
                 <td class="tc">${qty.toLocaleString()}</td>
-                <td class="tr">${prc ? mpiUSD(prc) : '—'}</td>
+                <td class="tr">${prc ? mpiUnitUSD(prc) : '—'}</td>
                 <td class="tr">${tot ? mpiUSD(tot) : '—'}</td>`;
             tbody.appendChild(tr);
         });

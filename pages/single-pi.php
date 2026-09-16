@@ -104,10 +104,10 @@ html.ats-print-layout #spiDocument { height:281mm!important; min-height:281mm!im
 /* Table */
 .spi-tbl { width:100%; border-collapse:collapse; font-size:7.5pt; }
 .spi-tbl th {
-    background:#fff; color:#111; padding:5px 8px;
+    background:#fff; color:#111; padding:3px 8px;
     border:1px solid #1a3a6e; text-align:center; font-size:7.125pt; line-height:1.3;
 }
-.spi-tbl td { border:1px solid #7a7a7a; padding:4px 8px; vertical-align:top; }
+.spi-tbl td { border:1px solid #7a7a7a; padding:1.5px 8px; vertical-align:top; line-height:1.2; }
 .spi-tbl tr { page-break-inside: avoid; }
 .spi-tbl td.tc { text-align:center; }
 .spi-tbl td.tr { text-align:right; }
@@ -140,33 +140,33 @@ html.ats-print-layout #spiDocument { height:281mm!important; min-height:281mm!im
 /* Total words */
 .spi-words {
     font-size:7.5pt; font-weight:700; text-transform:uppercase;
-    margin:8px 0 12px; color:#000;
+    margin:5px 0 6px; color:#000;
     border-top:1px dashed #333; border-bottom:1px dashed #333;
-    padding:4px 0;
+    padding:3px 0;
 }
 
 /* Terms */
 .spi-terms-title { font-size:6.375pt; font-weight:700; text-decoration:underline; margin:0 0 4px; }
-.spi-terms-list  { margin:0; padding-left:32px; font-size:6.05625pt; line-height:1.3; }
+.spi-terms-list  { margin:0; padding-left:28px; font-size:5.7pt; line-height:1.15; }
 .spi-terms-list li { margin-bottom:0; }
 
 /* Signatures */
-.spi-sig-area { margin-top:36px; }
+.spi-sig-area { margin-top:14px; }
 .spi-sig-right-block {
-    text-align:right; margin-bottom:8px;
+    text-align:right; margin-bottom:6px;
 }
-.spi-sig-co   { font-size:7.5pt; font-weight:700; margin-bottom:36px; }
+.spi-sig-co   { font-size:7.5pt; font-weight:700; margin-bottom:20px; }
 .spi-sig-line { border-top:1.5px solid #000; width:220px; margin:0 0 3px auto; }
 .spi-sig-auth { font-size:7.125pt; }
 
 .spi-sig-bottom {
     display:flex; justify-content:space-between; align-items:flex-end;
-    padding-top:6px; margin-top:40px;
+    padding-top:6px; margin-top:18px;
 }
 .spi-sig-bottom-label { font-size:7.5pt; font-weight:700; }
 /* Footer bar */
 .spi-footer-bar {
-    margin-top:24px; border:1.5px solid #000;
+    margin-top:12px; border:1.5px solid #000;
     padding:6px 12px; font-size:6.375pt; line-height:1.7;
     text-align:center;
 }
@@ -451,6 +451,10 @@ function spiNumWords(n) {
 function spiUSD(v) {
     return '$ ' + parseFloat(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
+// Unit price is shown at 4 decimals (amounts/totals stay at 2).
+function spiUnitUSD(v) {
+    return '$ ' + parseFloat(v||0).toLocaleString('en-US',{minimumFractionDigits:4,maximumFractionDigits:4});
+}
 
 function spiFormatDate(d) {
     if (!d) return '—';
@@ -563,7 +567,7 @@ function renderSinglePi() {
                 <td>${item.desc || item.itemName || '—'}</td>
                 <td class="tc">${item.ply || '—'}</td>
                 <td class="tc">${qty.toLocaleString()}</td>
-                <td class="tr">${prc ? spiUSD(prc) : '—'}</td>
+                <td class="tr">${prc ? spiUnitUSD(prc) : '—'}</td>
                 <td class="tr">${tot ? spiUSD(tot) : '—'}</td>`;
             tbody.appendChild(tr);
         });
@@ -624,7 +628,9 @@ function renderSinglePi() {
     const contTotalVal  = document.getElementById('spiContTotalVal');
     const contWords     = document.getElementById('spiContWords');
 
-    const overflows = () => docEl.scrollHeight > docEl.clientHeight + 2;
+    // Small tolerance so a few px of sub-pixel/rounding overshoot doesn't force an
+    // unnecessary split (which left page 1 with a big gap). Real overflow is many px.
+    const overflows = () => docEl.scrollHeight > docEl.clientHeight + 8;
 
     // Reset continuation item area + put totals/words/terms on page 1.
     contBody.innerHTML = '';
@@ -643,23 +649,30 @@ function renderSinglePi() {
 
     if (!overflows()) return; // fits on one page
 
-    // Page 1 overflows → activate continuation and move the totals, amount-in-words,
-    // ALL terms and the signature onto page 2 (nothing lost), then spill overflow
-    // item rows there until page 1 fits.
+    // STAGE 1 — the long Terms block (17 lines) is usually what overflows, not the
+    // items. Move ONLY the terms + signature to page 2 first and keep the items,
+    // totals and amount-in-words on page 1. For a typical order this alone fixes it,
+    // so page 1 keeps all its items with no big gap.
     continuationEl.classList.add('is-active');
-    contTblWrap.style.display = '';
+    firstTermsEl.innerHTML = '';
+    if (termsBlockEl) termsBlockEl.style.display = 'none';
+    contTermsEl.innerHTML = terms.map(t => `<li>${t}</li>`).join('');
+    contTermsEl.start = 1;
+    sigAreaEl.style.display = 'none';
+
+    if (!overflows()) return; // items + totals fit on page 1; only terms moved to page 2
+
+    // STAGE 2 — still overflowing (genuinely too many items). Move the totals and
+    // amount-in-words to page 2 as well, then spill overflow item rows there until
+    // page 1 fits.
     totFoot.style.display = 'none';
     if (wordsWrap) wordsWrap.style.display = 'none';
+    contTblWrap.style.display = '';
     contTotFoot.style.display = '';
     contWordsWrap.style.display = '';
     if (contTotalQty) contTotalQty.innerHTML = document.getElementById('spiTotalQty').innerHTML;
     if (contTotalVal) contTotalVal.innerHTML = document.getElementById('spiTotalVal').innerHTML;
     if (contWords)    contWords.textContent  = document.getElementById('spiWords').textContent;
-    firstTermsEl.innerHTML = '';
-    if (termsBlockEl) termsBlockEl.style.display = 'none';   // no "Terms:" heading between items on page 1
-    contTermsEl.innerHTML = terms.map(t => `<li>${t}</li>`).join('');
-    contTermsEl.start = 1;
-    sigAreaEl.style.display = 'none';
 
     let guard = 0;
     while (overflows() && body.rows.length > 1 && guard++ < 1000) {

@@ -430,6 +430,11 @@ function boeAmountWords(amount) {
 }
 
 function boeDocAmount(doc, exch, lc) {
+    // The "Exchange for USD" value the user typed on the Bill of Exchange page is
+    // authoritative — it must win over any PO-derived total. Fall back to the PO
+    // total / line items only when that field is empty.
+    const entered = parseFloat(exch.exchangeAmount || exch.receivedAmount || 0) || 0;
+    if (entered > 0) return entered;
     const poTotal = parseFloat(doc.po?.val || 0) || 0;
     if (poTotal > 0) return poTotal;
     const fromItems = (doc.po?.items || []).reduce((sum, item) => {
@@ -437,7 +442,7 @@ function boeDocAmount(doc, exch, lc) {
         return sum + total;
     }, 0);
     if (fromItems > 0) return fromItems;
-    return parseFloat(exch.receivedAmount || exch.exchangeAmount || lc.lcAmount || 0) || 0;
+    return parseFloat(lc.lcAmount || 0) || 0;
 }
 
 function buildExchangeDocs(res) {
@@ -512,7 +517,10 @@ function renderBoePages() {
     let html = '';
     chosenDocs.forEach(doc => {
         const amount = boeDocAmount(doc, exch, lc);
-        const words = exch.tenorWordsMaster || boeAmountWords(amount);
+        // Always derive the in-words text from the resolved amount so the figure and
+        // the words can never disagree. (A stale saved tenorWordsMaster previously
+        // desynced from the entered "Exchange for USD" value.)
+        const words = boeAmountWords(amount);
         const issuingBank = boeResolveBank(exch.applicantBank || lc.lcIssuingBank || '');
         const payToBank = boeResolveBank(exch.payToBankName || lc.reimbursementBank || exch.beneficiaryBankAddress || '');
         const toBankText = boeMultiline(exch.payToBankAddress || payToBank.display || exch.beneficiaryBankAddress || lc.negotiatingBeneficiaryBank || '');
